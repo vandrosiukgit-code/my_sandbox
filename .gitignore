@@ -9,6 +9,7 @@ venv/
 .env/
 .venv/
 
+
 # Pygame/IDE
 .DS_Store
 Thumbs.db
