@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env/
+.venv/
+
+# Pygame/IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Твои личные настройки
+*.log
+*.tmp
