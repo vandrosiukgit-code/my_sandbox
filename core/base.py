@@ -1,9 +1,13 @@
-import pygame
+from abc import ABC, abstractmethod
 
-class BaseAsset:
-    def __init__(self, asset_path):
-        self.asset_path = asset_path
+
+class BaseAsset(ABC):
+    """Базовый контракт для всех игровых объектов."""
+
+    @abstractmethod
     def update(self, dt):
-        raise NotImplementedError()
+        pass
+
+    @abstractmethod
     def draw(self, screen):
-        raise NotImplementedError()
+        pass

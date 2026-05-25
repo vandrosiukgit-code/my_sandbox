@@ -1,0 +1,2 @@
+("p1_portrait_frame.png", 800)
+("p1_portrait_sheet.png", 400)
