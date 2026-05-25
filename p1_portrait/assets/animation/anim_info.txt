@@ -1,1 +1,1 @@
-(3, 2)
+("shield_crush_anim_6f.png", 3, 2, 200)

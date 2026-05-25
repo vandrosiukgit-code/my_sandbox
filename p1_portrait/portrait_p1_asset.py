@@ -8,14 +8,22 @@ from core.resource import ResourceManager
 
 
 class PortraitP1(BaseAsset):
-    def __init__(self, rect, static_assets_dir, anim_assets_dir, anim_speed=0.12):
+    ANIMATION_COMMANDS = {
+        "play",
+        "pause",
+        "stop",
+        "reset",
+        "show",
+        "hide",
+        "set_speed",
+        "set_loop",
+    }
+
+    def __init__(self, rect, static_assets_dir, anim_assets_dir, anim_speed=3):
         super().__init__()
         self.rect = rect
         self.static_assets_dir = static_assets_dir
         self.anim_assets_dir = anim_assets_dir
-        self.anim_speed = anim_speed
-        self.anim_timer = 0.0
-        self.anim_frame_index = 0
 
         self.portrait_path = os.path.join(static_assets_dir, "p1_portrait_sheet.png")
         self.frame_path = os.path.join(static_assets_dir, "p1_portrait_frame.png")
@@ -26,26 +34,113 @@ class PortraitP1(BaseAsset):
 
         self.portrait_img = ResourceManager.get_static(self.portrait_path)
         self.frame_img = ResourceManager.get_static(self.frame_path)
-        self.shield_crush_frames = ResourceManager.get_animation(self.shield_crush_path)
+        self.frame_position = self.frame_img.get_rect(center=self.rect.center).topleft
+        self._portrait_offset = (50, 200)
+        self.animation_layers = {
+            "shield_crush": self.create_animation_layer(
+                path=self.shield_crush_path,
+                offset=(450, 150),
+                speed=anim_speed,
+            )
+        }
 
     def update(self, dt):
-        if not self.shield_crush_frames:
-            return
+        for layer in self.animation_layers.values():
+            if not layer["frames"] or not layer["playing"]:
+                continue
 
-        self.anim_timer += dt
-        if self.anim_timer >= self.anim_speed:
-            self.anim_timer -= self.anim_speed
-            self.anim_frame_index = (self.anim_frame_index + 1) % len(self.shield_crush_frames)
+            layer["timer"] += dt
+            while layer["timer"] >= layer["speed"]:
+                layer["timer"] -= layer["speed"]
+                next_frame_index = layer["frame_index"] + 1
+
+                if next_frame_index < len(layer["frames"]):
+                    layer["frame_index"] = next_frame_index
+                elif layer["loop"]:
+                    layer["frame_index"] = 0
+                else:
+                    layer["frame_index"] = len(layer["frames"]) - 1
+                    layer["playing"] = False
+                    break
 
     def draw(self, screen):
-        # Отрисовка слоями: портрет, анимация, рамка.
-        self.draw_centered(screen, self.portrait_img)
-        self.draw_centered(screen, self.shield_crush_frames[self.anim_frame_index])
-        self.draw_centered(screen, self.frame_img)
+        # 1. Рамка задает локальную систему координат для внутренних слоев.
+        frame_x, frame_y = self.frame_position
 
-    def draw_centered(self, screen, surface):
-        target = surface.get_rect(center=self.rect.center)
-        screen.blit(surface, target)
+        # Рисуем снизу вверх, потому что последний blit оказывается сверху.
+        # 3. Статический портрет: screen -> frame -> portrait.
+        portrait_x = frame_x + self._portrait_offset[0]
+        portrait_y = frame_y + self._portrait_offset[1]
+        screen.blit(self.portrait_img, (portrait_x, portrait_y))
+
+        # 2. Рамка.
+        screen.blit(self.frame_img, (frame_x, frame_y))
+
+        # 1. Анимационный слой: screen -> frame -> animation.
+        for layer in self.animation_layers.values():
+            if not layer["visible"]:
+                continue
+
+            frame = layer["frames"][layer["frame_index"]]
+            animation_x = frame_x + layer["offset"][0]
+            animation_y = frame_y + layer["offset"][1]
+            screen.blit(frame, (animation_x, animation_y))
+
+    def set_frame_position(self, x, y):
+        self.frame_position = (x, y)
+
+    def get_animation_commands(self, animation_name):
+        layer = self.animation_layers.get(animation_name)
+        if layer is None:
+            raise ValueError(f"Неизвестная анимация: {animation_name}")
+
+        return tuple(sorted(layer["commands"]))
+
+    def send_animation_command(self, animation_name, command, **params):
+        layer = self.animation_layers.get(animation_name)
+        if layer is None:
+            raise ValueError(f"Неизвестная анимация: {animation_name}")
+
+        if command not in layer["commands"]:
+            raise ValueError(f"Анимация {animation_name} не поддерживает команду: {command}")
+
+        if command == "play":
+            layer["visible"] = True
+            layer["playing"] = True
+        elif command == "pause":
+            layer["playing"] = False
+        elif command == "stop":
+            layer["playing"] = False
+            layer["frame_index"] = 0
+            layer["timer"] = 0.0
+        elif command == "reset":
+            layer["frame_index"] = 0
+            layer["timer"] = 0.0
+        elif command == "show":
+            layer["visible"] = True
+        elif command == "hide":
+            layer["visible"] = False
+        elif command == "set_speed":
+            if "speed" not in params:
+                raise ValueError("Команда set_speed требует параметр speed")
+            layer["speed"] = params["speed"]
+        elif command == "set_loop":
+            if "loop" not in params:
+                raise ValueError("Команда set_loop требует параметр loop")
+            layer["loop"] = params["loop"]
+
+    def create_animation_layer(self, path, offset, speed, visible=True, playing=True, loop=True):
+        return {
+            "frames": ResourceManager.get_animation(path),
+            "offset": offset,
+            "speed": speed,
+            "timer": 0.0,
+            "frame_index": 0,
+            "visible": visible,
+            "playing": playing,
+            "loop": loop,
+            "commands": set(self.ANIMATION_COMMANDS),
+        }
 
 
 # --- Логика запуска (бывший main.py) ---

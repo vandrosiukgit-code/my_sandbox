@@ -55,7 +55,7 @@ class ResourceManager:
             if key in cls._cache_anim:
                 continue
 
-            scale_factor = cls.get_scale_factor(file_path)
+            scale_factor = cls.get_animation_scale_factor(file_path)
             surface = pygame.image.load(file_path).convert_alpha()
             scaled_size = cls.get_scaled_size(surface.get_size(), scale_factor)
             surface = pygame.transform.smoothscale(surface, scaled_size)
@@ -89,6 +89,16 @@ class ResourceManager:
 
         with Image.open(path) as image:
             return target_height / image.height
+
+    @staticmethod
+    def get_animation_scale_factor(path):
+        # 1. Берет высоту PNG и количество рядов кадров.
+        # 2. Берет из anim_info.txt целевую высоту одного кадра.
+        # 3. Вычисляет фактор масштаба: целевая высота кадра / реальная высота кадра.
+        rows, _columns, target_frame_height = ResourceManager.get_animation_info(path)
+        with Image.open(path) as image:
+            source_frame_height = image.height / rows
+        return target_frame_height / source_frame_height
 
     @staticmethod
     def get_frame_grid(path, image_size=None):
@@ -129,16 +139,22 @@ class ResourceManager:
 
     @staticmethod
     def get_animation_grid_size(path):
+        rows, columns, _target_frame_height = ResourceManager.get_animation_info(path)
+        return int(rows), int(columns)
+
+    @staticmethod
+    def get_animation_info(path):
         info_path = os.path.join(os.path.dirname(path), "anim_info.txt")
         if not os.path.exists(info_path):
-            raise FileNotFoundError(f"Не найден файл с сеткой анимации: {info_path}")
+            raise FileNotFoundError(f"Не найден файл с данными анимации: {info_path}")
 
-        items = ResourceManager.read_info_file(info_path)
-        if not items:
-            raise ValueError(f"Пустой файл с сеткой анимации: {info_path}")
+        filename = os.path.basename(path)
+        for item in ResourceManager.read_info_file(info_path):
+            if len(item) == 4 and item[0] == filename:
+                _filename, rows, columns, target_frame_height = item
+                return int(rows), int(columns), int(target_frame_height)
 
-        rows, columns = items[0]
-        return int(rows), int(columns)
+        raise ValueError(f"В anim_info.txt нет данных для файла: {filename}")
 
     @staticmethod
     def read_info_file(path):
