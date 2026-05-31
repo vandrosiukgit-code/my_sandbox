@@ -1,7 +1,7 @@
 """Dev-утилита просмотра runtime-кэша ResourceManager."""
 
-import json
 import os
+import re
 import sys
 import tkinter as tk
 from tkinter import ttk
@@ -126,19 +126,23 @@ class ResourcePickerApp:
         )
         self.preview_label.grid(row=0, column=0, sticky="nsew")
 
-        self.apply_button = ttk.Button(right_frame, text="Apply", command=self.apply_selection)
+        self.apply_button = ttk.Button(right_frame, text="Copy snippet", command=self.apply_selection)
         self.apply_button.grid(row=1, column=0, sticky="ew", pady=(8, 0))
+
+        self.copy_status_var = tk.StringVar()
+        self.copy_status_label = ttk.Label(right_frame, textvariable=self.copy_status_var)
+        self.copy_status_label.grid(row=2, column=0, sticky="w", pady=(6, 0))
 
         self.payload_text = tk.Text(
             right_frame,
-            height=7,
+            height=10,
             bg="#1b1c20",
             fg="#e6e6e6",
             insertbackground="#e6e6e6",
             relief="flat",
             wrap="none",
         )
-        self.payload_text.grid(row=2, column=0, sticky="ew", pady=(8, 0))
+        self.payload_text.grid(row=3, column=0, sticky="ew", pady=(8, 0))
         self.payload_text.configure(state="disabled")
 
     def populate_tree(self, records):
@@ -260,6 +264,7 @@ class ResourcePickerApp:
         self.payload_text.configure(state="normal")
         self.payload_text.delete("1.0", tk.END)
         self.payload_text.configure(state="disabled")
+        self.copy_status_var.set("")
 
     def show_details(self, record):
         """Показать параметры ресурса из runtime-кэша."""
@@ -296,56 +301,40 @@ class ResourcePickerApp:
         self.preview_label.configure(image=self.preview_image, text="")
 
     def apply_selection(self):
-        """Сформировать payload выбранного ресурса для GuiActorFactory."""
+        """Сформировать tuple-описание выбранного ресурса для GuiActor."""
         if self.selected_record is None:
             return
 
-        payload = self.create_factory_payload(self.selected_record)
-        text = json.dumps(payload, ensure_ascii=False, indent=2)
+        text = self.create_graphic_snippet(self.selected_record)
         print(text)
 
         self.payload_text.configure(state="normal")
         self.payload_text.delete("1.0", tk.END)
         self.payload_text.insert("1.0", text)
         self.payload_text.configure(state="disabled")
+        self.copy_to_clipboard(text)
+        self.copy_status_var.set("Snippet copied to clipboard")
 
     @staticmethod
-    def create_factory_payload(record):
-        """Создать payload, пригодный для GuiActorFactory.
-
-        Payload не создает actor сам. Он подсказывает, какие поля можно
-        вставить в будущую конфигурацию: local resource name, resource key и
-        слой, который ссылается на этот local name.
-        """
+    def create_graphic_snippet(record):
+        """Создать Python-snippet слоя для GuiActor.create_actor()."""
         local_name = ResourcePickerApp.create_local_resource_name(record)
-        payload = record.to_payload()
-        payload["factory"] = {
-            "local_resource_name": local_name,
-            "resource_key": record.key,
-            "resource_kind": record.resource_type,
-            "layer": {
-                "name": local_name,
-                "type": "animation" if record.resource_type == "animation" else "static",
-                "resource": local_name,
-                "offset": [0, 0],
-                "visible": True,
-                "alpha": 255,
-            },
-        }
-
         if record.resource_type == "animation":
-            payload["factory"]["animation_resources"] = {local_name: record.key}
-            payload["factory"]["static_resources"] = {}
-        else:
-            payload["factory"]["static_resources"] = {local_name: record.key}
-            payload["factory"]["animation_resources"] = {}
-        return payload
+            return f"({local_name!r}, {record.key!r}, \"animation\", (0, 0)),"
+
+        return f"({local_name!r}, {record.key!r}, (0, 0)),"
+
+    def copy_to_clipboard(self, text):
+        """Скопировать сгенерированный snippet в системный буфер обмена."""
+        self.root.clipboard_clear()
+        self.root.clipboard_append(text)
+        self.root.update()
 
     @staticmethod
     def create_local_resource_name(record):
         """Создать короткое local name для ресурса внутри GuiActor."""
         name, _ext = os.path.splitext(record.file_name)
-        return name.strip().replace(" ", "_")
+        return re.sub(r"\W+", "_", name.strip()).strip("_") or "resource"
 
 
 def find_project_assets_dir():

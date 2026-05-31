@@ -29,7 +29,6 @@ game_screen/
 
 gui_actor/
     gui_actor.py
-    gui_actor_factory.py
     gui_actor_store.py
 
 activities/
@@ -119,7 +118,8 @@ Pygame runtime:
   index.
 
 `ResourceManager` не знает про `GuiActor`, `GameScreen`, `Activity` и правила
-игры. Фабрика actor-ов берет из него готовые `Surface/frames`.
+игры. Для actor-ов основной метод получения графики - `get_frames(key)`: статичный
+PNG возвращается как список из одного `Surface`, spritesheet - как список кадров.
 
 ## gui_actor/gui_actor.py
 
@@ -130,14 +130,18 @@ Pygame runtime:
 - имеет `id`;
 - имеет `rect`;
 - имеет `hit_rect`;
-- хранит готовые `static_surfaces`;
-- хранит готовые `animation_frames`;
-- хранит список слоев;
-- рисует текущее состояние слоев;
-- не загружает ресурсы;
+- имеет `scale_factor`;
+- хранит список слоев в порядке отрисовки;
+- каждый слой хранит только `name`, `frames`, `current_frame_index`;
+- рисует текущий кадр каждого слоя из точки `actor.rect.topleft`;
+- умеет собрать actor через `create_actor()` из описаний слоев;
+- получает готовые кадры только через `ResourceManager.get_frames()`;
+- не читает PNG напрямую и не хранит собственный кэш ресурсов;
 - не проигрывает анимацию сам.
 
-Смена позиции, прозрачности, видимости и кадров идет через явный слойный API.
+У слоя сознательно нет `offset`, `visible` и `alpha`. Смена позиции и масштаба
+идет на уровне всего actor-а. Смена анимационного состояния идет через
+`set_layer_frame(layer_name, frame_index)`.
 
 ## gui_actor/gui_actor_store.py
 
@@ -152,18 +156,6 @@ Pygame runtime:
 - `all_ids()`.
 
 Store не знает правил игры, экранных зон и активностей.
-
-## gui_actor/gui_actor_factory.py
-
-Фабрика визуальных объектов.
-
-Это мост между `ResourceManager` и пассивным `GuiActor`:
-
-- берет `Surface/frames` из `ResourceManager`;
-- создает `GuiActor`;
-- может создать одиночный static actor;
-- может создать базовый actor карты;
-- может наполнить `GuiActorStore` из конфигураций.
 
 ## game_screen/game_screen.py
 
@@ -190,7 +182,8 @@ Store не знает правил игры, экранных зон и акти
 - хранит `rect`;
 - хранит `hit_rect`;
 - хранит `actor_ids`;
-- умеет применить простой layout к actor-ам через `GuiActorStore`.
+- умеет применить простой layout к actor-ам через `GuiActorStore` и
+  `actor.set_position(...)`.
 
 Это не логическая зона правил игры. Это экранная зона размещения.
 
@@ -224,7 +217,7 @@ Dev tool для просмотра ресурсов.
 - показать дерево `assets/`;
 - искать ресурсы по key, имени файла, пути и типу;
 - показывать preview;
-- формировать payload для будущей настройки `GuiActorFactory`.
+- формировать tuple-слой для настройки `GuiActor.create_actor()`.
 
 ## Ownership
 

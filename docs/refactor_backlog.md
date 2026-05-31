@@ -64,7 +64,8 @@ main.py
   - обязательный `id`;
   - обязательный `rect`;
   - обязательный `hit_rect`;
-  - методы слоя: `set_layer_offset`, `set_layer_alpha`, `set_layer_visible`, `set_layer_frame`;
+  - `scale_factor`;
+  - минимальные методы слоя: `set_layer_frame`, `set_layer_frames`;
 - убрать из базового контракта акцент на `send_animation_command`, потому что анимационная логика уходит в `Activity`.
 
 Критерий готовности:
@@ -118,22 +119,21 @@ main.py
 - добавить слойный API:
   - `set_position(x, y)`;
   - `set_hit_rect(rect)`;
-  - `set_layer_offset(layer_name, offset)`;
-  - `set_layer_alpha(layer_name, alpha)`;
-  - `set_layer_visible(layer_name, visible)`;
+  - `set_scale_factor(scale_factor)`;
   - `set_layer_frame(layer_name, frame_index)`;
+  - `set_layer_frames(layer_name, frames)`;
 
 Критерий готовности:
 
-- `GuiActor` ничего не знает о `ResourceManager`;
+- `GuiActor` не читает файлы напрямую и получает Surface/frames только через `ResourceManager`;
 - `GuiActor` ничего не решает про анимацию;
 - `draw(screen)` только рисует текущие состояния слоев.
 
-### 5. Создать фабрику графических объектов [done]
+### 5. Перенести сборку графических объектов в `GuiActor` [done]
 
 Возможные файлы:
 
-- `gui_actor/gui_actor_factory.py`
+- `gui_actor/gui_actor.py`
 - или `gui_actor/builders.py`
 
 Задачи:
@@ -290,8 +290,9 @@ main.py
 Задачи:
 
 - `MoveActorActivity`: плавно перемещает actor между позициями;
-- `ShowActorActivity`: включает видимость/alpha;
-- `HideActorActivity`: скрывает actor и сообщает о завершении;
+- `ScaleActorActivity`: меняет масштаб actor-а во времени;
+- `ActivateActorActivity`: добавляет actor ID в активный набор экрана;
+- `DeactivateActorActivity`: убирает actor ID из активного набора экрана;
 - `FrameAnimationActivity`: меняет текущий кадр слоя по времени.
 
 Критерий готовности:
@@ -316,8 +317,8 @@ main.py
 
 Критерий готовности:
 
-- `ResourceManager` не используется внутри `GuiActor`;
-- фабрика акторов получает ресурсы и передает их в `GuiActor`.
+- `ResourceManager` остается единственным источником Surface/frames;
+- `GuiActor.create_actor()` собирает слои из resource keys.
 
 ### 13. Обновить `resource_picker` [done]
 
@@ -329,7 +330,7 @@ main.py
 
 - убедиться, что дерево папок `assets/` работает;
 - довести поиск до стабильного состояния;
-- сделать payload, пригодный для фабрики акторов;
+- сделать tuple-слой, пригодный для `GuiActor.create_actor()`;
 - не завязывать dev tool на `pygame.display`.
 
 Критерий готовности:

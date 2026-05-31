@@ -31,6 +31,7 @@ class ActiveZone(BaseActiveZone):
         self.actor_ids = list(actor_ids or [])
         self.padding = padding
         self.spacing = spacing
+        self.actor_origins = {}
 
     @property
     def id(self):
@@ -85,7 +86,13 @@ class ActiveZone(BaseActiveZone):
         actor_count = len(self.actor_ids)
         for index, actor_id in enumerate(self.actor_ids):
             actor = actor_store.get(actor_id)
-            actor.set_position(*self.calculate_actor_position(index, actor_count, actor))
+            position = self.calculate_actor_position(index, actor_count, actor)
+            actor.set_position(*position)
+            self.actor_origins[actor_id] = position
+
+    def get_actor_origin(self, actor_id):
+        """Вернуть последнюю рассчитанную экранную точку actor-а."""
+        return self.actor_origins.get(actor_id, self.rect.topleft)
 
     def contains_point(self, point):
         """Проверить попадание точки в hit_rect зоны."""
@@ -109,6 +116,7 @@ class ActiveZone(BaseActiveZone):
             "rect": tuple(self.rect),
             "hit_rect": tuple(self.hit_rect),
             "actor_ids": tuple(self.actor_ids),
+            "actor_origins": dict(self.actor_origins),
             "padding": self.padding,
             "spacing": self.spacing,
         }

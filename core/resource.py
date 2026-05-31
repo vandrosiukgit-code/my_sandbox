@@ -51,7 +51,7 @@ class ResourceManager:
     - строит runtime-index: `resource_key -> ResourceRecord`;
     - отдельно загружает pygame.Surface и кадры spritesheet;
     - не знает о GuiActor, GameScreen, Activity и правилах игры;
-    - отдает готовые Surface/frames фабрике actor-ов.
+    - отдает готовые Surface/frames по resource_key.
 
     Важно: методы, которые вызывают `convert_alpha()`, требуют уже созданный
     pygame display. Для dev tools нужно использовать metadata-only режим.
@@ -246,7 +246,7 @@ class ResourceManager:
     def get_static(cls, key_or_path):
         """Получить статическую поверхность по resource key или пути.
 
-        Этот метод вызывается фабрикой actor-ов. Если ресурс не загружен,
+        Этот метод вызывается кодом сборки GuiActor. Если ресурс не загружен,
         ошибка явно говорит, что нужно сначала построить runtime-cache с
         surfaces или вызвать `load_surfaces_from_index()`.
         """
@@ -264,6 +264,21 @@ class ResourceManager:
             return cls._cache_anim[key]
         except KeyError as error:
             raise KeyError(f"Анимация не загружена в frame-кэш: {key}") from error
+
+    @classmethod
+    def get_frames(cls, key_or_path):
+        """Получить ресурс как список кадров.
+
+        Это основной API для GuiActor. На уровне actor-а больше нет деления на
+        статику и анимацию: обычный PNG возвращается как список из одного
+        Surface, а spritesheet - как список кадров.
+        """
+        key = cls.resolve_resource_key(key_or_path)
+        if key in cls._cache_anim:
+            return cls._cache_anim[key]
+        if key in cls._cache_static:
+            return [cls._cache_static[key]]
+        raise KeyError(f"Ресурс не загружен в frame-кэш ResourceManager: {key}")
 
     @classmethod
     def resolve_resource_key(cls, key_or_path):

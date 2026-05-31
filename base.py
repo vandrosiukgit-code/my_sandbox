@@ -150,8 +150,10 @@ class BaseGuiActor(ABC):
     """Базовый контракт GUI/game-actor-а.
 
     GuiActor является пассивным визуальным объектом. Он хранит rect,
-    обязательный hit_rect и набор слоев, но не должен принимать игровые
-    решения. Любая сложная временная логика должна жить в Activity.
+    обязательный hit_rect, scale_factor и набор слоев-кадров, но не должен
+    принимать игровые решения. У слоя нет offset, visible и alpha. Если часть
+    интерфейса должна иметь отдельное положение или поведение, она оформляется
+    отдельным GuiActor.
     """
 
     @property
@@ -163,13 +165,13 @@ class BaseGuiActor(ABC):
     @property
     @abstractmethod
     def rect(self):
-        """Базовый rect actor-а в координатах экрана."""
+        """Локальный rect холста actor-а."""
         pass
 
     @property
     @abstractmethod
     def hit_rect(self):
-        """Область взаимодействия actor-а в координатах экрана."""
+        """Локальная область взаимодействия actor-а."""
         pass
 
     @abstractmethod
@@ -188,7 +190,7 @@ class BaseGuiActor(ABC):
 
     @abstractmethod
     def set_position(self, x, y):
-        """Поставить базовый rect actor-а в координаты общего экрана."""
+        """Переместить actor в координатах экрана."""
         pass
 
     @abstractmethod
@@ -197,21 +199,16 @@ class BaseGuiActor(ABC):
         pass
 
     @abstractmethod
-    def set_layer_offset(self, layer_name, offset):
-        """Сдвинуть слой относительно базового rect actor-а."""
-        pass
-
-    @abstractmethod
-    def set_layer_alpha(self, layer_name, alpha):
-        """Изменить прозрачность слоя."""
-        pass
-
-    @abstractmethod
-    def set_layer_visible(self, layer_name, visible):
-        """Показать или скрыть слой."""
+    def set_scale_factor(self, scale_factor):
+        """Задать масштаб всего actor-а."""
         pass
 
     @abstractmethod
     def set_layer_frame(self, layer_name, frame_index):
-        """Установить текущий кадр слоя, если слой кадровый."""
+        """Установить текущий кадр слоя."""
+        pass
+
+    @abstractmethod
+    def set_layer_frames(self, layer_name, frames):
+        """Заменить список кадров слоя."""
         pass
