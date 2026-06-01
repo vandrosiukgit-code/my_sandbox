@@ -3,6 +3,7 @@
 import pygame
 
 from base import BaseGameScreen
+from game_screen.active_zone import ActiveZone
 from game_screen.events import ScreenInputEvent, VisualCommand, ZoneHit
 
 
@@ -33,11 +34,57 @@ class GameScreen(BaseGameScreen):
     def set_game_controller(self, game_controller):
         self.game_controller = game_controller
 
+    def create_zone(self, zone_id, rect, hit_rect=None, padding=0, spacing=12, parent_zone_id=None):
+        """Create an ActiveZone and register it on this screen."""
+        parent_zone = self.get_screen_zone(parent_zone_id) if parent_zone_id else None
+        zone = ActiveZone(
+            zone_id=zone_id,
+            rect=rect,
+            hit_rect=hit_rect,
+            padding=padding,
+            spacing=spacing,
+            parent_zone=parent_zone,
+        )
+        self.add_screen_zone(zone_id, zone)
+        if parent_zone is not None:
+            parent_zone.add_child_zone(zone)
+        return zone
+
     def add_screen_zone(self, zone_id, zone_config):
         self.screen_zones[zone_id] = zone_config
+        return zone_config
 
     def get_screen_zone(self, zone_id):
         return self.screen_zones[zone_id]
+
+    def put_zone_in_zone(self, child_zone_id, parent_zone_id, position=None):
+        """Attach an existing registered zone as a child of another zone."""
+        child_zone = self.get_screen_zone(child_zone_id)
+        parent_zone = self.get_screen_zone(parent_zone_id)
+        if child_zone.parent_zone is not None:
+            child_zone.parent_zone.child_zones.pop(child_zone.id, None)
+        if position is not None:
+            child_zone.set_local_position(*position)
+        parent_zone.add_child_zone(child_zone)
+        return child_zone
+
+    def put_actor_in_zone(self, actor_id, zone_id, position=(0, 0)):
+        """Put an already active actor at a local position inside a zone."""
+        actor = self.get_actor(actor_id)
+        zone = self.get_screen_zone(zone_id)
+        zone.add_actor_id(actor_id)
+
+        screen_position = zone.to_screen(position)
+        actor.set_position(*screen_position)
+        zone.actor_origins[actor_id] = screen_position
+        return actor
+
+    def apply_zone_layout(self, zone_id):
+        if self.actor_store is None:
+            raise RuntimeError("GameScreen.actor_store is not connected")
+        zone = self.get_screen_zone(zone_id)
+        zone.apply_layout(self.actor_store)
+        return zone
 
     def activate_actor(self, actor_id):
         if actor_id not in self.active_actor_ids:
@@ -133,7 +180,7 @@ class GameScreen(BaseGameScreen):
         if self.actor_store is None:
             return ZoneHit(None, None, tuple(screen_pos), None)
 
-        for zone in reversed(tuple(self.screen_zones.values())):
+        for zone in reversed(tuple(self.iter_root_zones())):
             if hasattr(zone, "hit_test"):
                 hit = zone.hit_test(screen_pos, self.actor_store)
                 if hit is not None:
@@ -192,9 +239,14 @@ class GameScreen(BaseGameScreen):
             actor.update(dt)
 
     def update_screen_zones(self, dt):
-        for zone in self.screen_zones.values():
+        for zone in self.iter_root_zones():
             if hasattr(zone, "update_actions"):
                 zone.update_actions(dt)
+
+    def iter_root_zones(self):
+        for zone in self.screen_zones.values():
+            if getattr(zone, "parent_zone", None) is None:
+                yield zone
 
     def update_activities(self, dt):
         running_activities = []

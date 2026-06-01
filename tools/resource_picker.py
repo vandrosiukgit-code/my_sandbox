@@ -223,12 +223,18 @@ class ResourcePickerApp:
         """Перечитать manifest и пересобрать metadata-index."""
         self.manifest = ResourceManager.load_or_generate_manifest(self.assets_dir)
         ResourceManager.build_index(self.assets_dir)
+        self.manifest = ResourceManager._manifest
+        manifest_warnings = ResourceManager.get_manifest_warnings()
         self.records = list(ResourceManager.get_runtime_cache().values())
         self.visible_records = self.filter_records()
         self.raw_assets = self.load_raw_assets()
         self.visible_raw_assets = self.filter_raw_assets()
         self.populate_tree(self.visible_records)
         self.populate_raw_assets_tree(self.visible_raw_assets)
+        if manifest_warnings:
+            warning_text = "\n\n".join(manifest_warnings)
+            self.status_var.set("Manifest repaired from PNG sizes; update PNG metadata")
+            messagebox.showwarning("PNG metadata review needed", warning_text)
 
     def generate_manifest(self):
         """Сгенерировать manifest из всех PNG и сохранить его на диск."""

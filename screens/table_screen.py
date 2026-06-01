@@ -1,7 +1,6 @@
 from game_screen.game_screen import GameScreen
 
 
-
 class TableScreen(GameScreen):
     """Первый черновой игровой экран стола."""
 
@@ -14,10 +13,16 @@ class TableScreen(GameScreen):
             game_controller=game_controller,
             background_color=self.BG_COLOR,
         )
-        self.activate_initial_actors()
-        # self.screen_zones["table"] = ActiveZone(zone_id="table", rect=())
 
-    def activate_initial_actors(self):
-        """Включить actor-ы, которые должны быть видны сразу после старта."""
+        self.create_zone("game_table", rect=(0, 0, 1280, 720))
+        self.create_zone("left_player_az", rect=(0, 0, 260, 300))
+        self.create_zone("left_player_portrait", rect=(0, 0, 200, 200))
+
+        self.put_zone_in_zone("left_player_az", "game_table", position=(0, 210))
+        self.put_zone_in_zone("left_player_portrait", "left_player_az", position=(20, 46))
+
         self.activate_actor("table_actor")
+        self.activate_actor("left_player")
 
+        self.put_actor_in_zone("table_actor", "game_table", position=(0, 0))
+        self.put_actor_in_zone("left_player", "left_player_portrait", position=(0, 0))

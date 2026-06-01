@@ -1,5 +1,25 @@
 {
   "resources": {
+    "main_screen.avatars.portrait_2": {
+      "path": "main_screen/avatars/portrait_2.png",
+      "frame_width": 200,
+      "frame_height": 200
+    },
+    "main_screen.p_name_bg": {
+      "path": "main_screen/p_name_bg.png",
+      "frame_width": 200,
+      "frame_height": 68
+    },
+    "main_screen.p_portrait_bg": {
+      "path": "main_screen/p_portrait_bg.png",
+      "frame_width": 200,
+      "frame_height": 200
+    },
+    "main_screen.portrait_frame": {
+      "path": "main_screen/portrait_frame.png",
+      "frame_width": 200,
+      "frame_height": 200
+    },
     "main_screen.table": {
       "path": "main_screen/table.png",
       "frame_width": 1280,

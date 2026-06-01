@@ -6,13 +6,15 @@ GuiActorStore - это общий склад визуальных объекто
 GameScreen по запросу.
 """
 
+import pkgutil
 from importlib import import_module
 
 
 class GuiActorStore:
     """Единый контейнер GuiActor-ов, доступных по actor ID."""
 
-    DEFAULT_BUILDER_MODULES = ("gui_actors_store.table_actor",)
+    DEFAULT_BUILDER_PACKAGE = "gui_actors_store"
+    DEFAULT_BUILDER_MODULES = ()
 
     def __init__(self, resource_manager=None, builders=None, builder_modules=None):
         """Создать пустой склад графических объектов.
@@ -36,7 +38,11 @@ class GuiActorStore:
         self._actors = {}
         self.resource_manager = resource_manager
         self.builders = tuple(builders or ())
-        self.builder_modules = tuple(builder_modules or self.DEFAULT_BUILDER_MODULES)
+        self.builder_modules = (
+            tuple(builder_modules)
+            if builder_modules is not None
+            else self.discover_builder_modules()
+        )
 
     def build(self):
         """Собрать все зарегистрированные GuiActor-ы.
@@ -69,7 +75,26 @@ class GuiActorStore:
 
         for module_path in self.builder_modules:
             module = import_module(module_path)
-            yield module.create
+            builder = getattr(module, "create", None)
+            if builder is not None:
+                yield builder
+
+    @classmethod
+    def discover_builder_modules(cls, package_name=None):
+        """Find actor builder modules inside gui_actors_store automatically."""
+        package_name = package_name or cls.DEFAULT_BUILDER_PACKAGE
+        package = import_module(package_name)
+        return tuple(
+            sorted(
+                module_info.name
+                for module_info in pkgutil.iter_modules(
+                    package.__path__,
+                    f"{package.__name__}.",
+                )
+                if not module_info.ispkg
+                and not module_info.name.rsplit(".", 1)[-1].startswith("_")
+            )
+        )
 
     def add_many(self, actors):
         """Добавить один GuiActor или коллекцию GuiActor-ов.
