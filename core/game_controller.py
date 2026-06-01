@@ -48,6 +48,22 @@ class GameController(BaseGameController):
         """
         self.clicked_actor_ids.append(actor_id)
 
+    def handle_input(self, input_event):
+        """Receive normalized input from GameScreen and return visual commands.
+
+        This draft controller records input but does not implement rules yet.
+        Later this method will validate intents against GameState, mutate state,
+        and return VisualCommand objects such as play_card or deal_cards.
+        """
+        if not hasattr(self, "input_events"):
+            self.input_events = []
+        self.input_events.append(input_event)
+
+        if input_event.actor_id and input_event.type in ("click", "double_click"):
+            self.on_actor_clicked(input_event.actor_id)
+
+        return ()
+
     def get_state(self):
         """Вернуть текущий snapshot состояния.
 

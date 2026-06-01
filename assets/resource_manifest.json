@@ -1,0 +1,14 @@
+{
+  "resources": {
+    "main_screen.table": {
+      "path": "main_screen/table.png",
+      "frame_width": 1280,
+      "frame_height": 720
+    },
+    "main_screen.tressure_map": {
+      "path": "main_screen/tressure_map.png",
+      "frame_width": 1280,
+      "frame_height": 720
+    }
+  }
+}

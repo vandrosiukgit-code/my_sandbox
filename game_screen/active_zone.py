@@ -9,6 +9,7 @@ ActiveZone - это экранный контейнер для GuiActor-ов. О
 import pygame
 
 from base import BaseActiveZone
+from game_screen.events import ZoneHit
 
 
 class ActiveZone(BaseActiveZone):
@@ -32,6 +33,7 @@ class ActiveZone(BaseActiveZone):
         self.padding = padding
         self.spacing = spacing
         self.actor_origins = {}
+        self.actions = []
 
     @property
     def id(self):
@@ -73,8 +75,13 @@ class ActiveZone(BaseActiveZone):
         как безопасная заготовка. Позже здесь можно заменить алгоритм на веер,
         центрирование, стопку колоды или любую другую схему.
         """
-        x = self.rect.x + self.padding + index * self.get_actor_step(actor)
-        y = self.rect.y + self.padding
+        return self.to_screen(self.calculate_actor_local_position(index, actor_count, actor))
+
+    def calculate_actor_local_position(self, index, actor_count, actor=None):
+        """Return actor position in the zone local coordinate system."""
+        _ = actor_count
+        x = self.padding + index * self.get_actor_step(actor)
+        y = self.padding
         return x, y
 
     def apply_layout(self, actor_store):
@@ -89,6 +96,60 @@ class ActiveZone(BaseActiveZone):
             position = self.calculate_actor_position(index, actor_count, actor)
             actor.set_position(*position)
             self.actor_origins[actor_id] = position
+
+    def add_action(self, action):
+        """Add a visual Action owned by this zone."""
+        self.actions.append(action)
+        if hasattr(action, "start"):
+            action.start()
+        return action
+
+    def update_actions(self, dt):
+        """Update active visual Actions and drop finished ones."""
+        running_actions = []
+        for action in self.actions:
+            action.update(dt)
+            if not self.is_action_finished(action):
+                running_actions.append(action)
+        self.actions = running_actions
+
+    @staticmethod
+    def is_action_finished(action):
+        is_finished = getattr(action, "is_finished", False)
+        if callable(is_finished):
+            return is_finished()
+        return bool(is_finished)
+
+    def to_local(self, screen_pos):
+        """Convert screen coordinates to this zone local coordinates."""
+        return (int(screen_pos[0] - self.rect.x), int(screen_pos[1] - self.rect.y))
+
+    def to_screen(self, local_pos):
+        """Convert local zone coordinates to screen coordinates."""
+        return (int(self.rect.x + local_pos[0]), int(self.rect.y + local_pos[1]))
+
+    def hit_test(self, screen_pos, actor_store):
+        """Return ZoneHit for the topmost actor under screen_pos inside this zone."""
+        if not self.contains_point(screen_pos):
+            return None
+
+        local_pos = self.to_local(screen_pos)
+        for actor_id in reversed(self.actor_ids):
+            actor = actor_store.get(actor_id)
+            if actor.hit_rect.collidepoint(screen_pos):
+                return ZoneHit(
+                    zone_id=self.id,
+                    actor_id=actor_id,
+                    screen_pos=tuple(screen_pos),
+                    local_pos=local_pos,
+                )
+
+        return ZoneHit(
+            zone_id=self.id,
+            actor_id=None,
+            screen_pos=tuple(screen_pos),
+            local_pos=local_pos,
+        )
 
     def get_actor_origin(self, actor_id):
         """Вернуть последнюю рассчитанную экранную точку actor-а."""
@@ -117,6 +178,7 @@ class ActiveZone(BaseActiveZone):
             "hit_rect": tuple(self.hit_rect),
             "actor_ids": tuple(self.actor_ids),
             "actor_origins": dict(self.actor_origins),
+            "action_count": len(self.actions),
             "padding": self.padding,
             "spacing": self.spacing,
         }

@@ -263,3 +263,31 @@ ResourceManager -> low-level resource cache
 
 Сейчас проект готов к следующему шагу: созданию первых конкретных Activity и
 позднее сборке первого актуального игрового экрана.
+## Visual input/action flow
+
+Актуальная граница ввода и визуальной механики описана в
+`docs/visual_input_flow.md`.
+
+Коротко:
+
+```text
+pygame event
+    -> GameScreen normalizes input
+    -> ActiveZone hit-test
+    -> ScreenInputEvent
+    -> GameController.handle_input()
+    -> GameState update
+    -> VisualCommand
+    -> GameScreen dispatch
+    -> ActiveZone Action
+    -> Animation
+    -> GuiActor
+```
+
+`GameScreen` не решает, является ли двойной клик ходом. Он только сообщает
+`GameController`, что произошел `double_click` по `actor_id` в `zone_id`.
+Игровой смысл, проверка правил и изменение `GameState` остаются в
+`GameController`.
+
+`ActiveZone` принадлежит экрану и владеет локальными визуальными `Action`.
+`Action` владеет набором `Animation`. Оба слоя не знают правил игры.

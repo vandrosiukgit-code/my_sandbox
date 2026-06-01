@@ -1,8 +1,10 @@
 from game_screen.game_screen import GameScreen
-from game_screen.active_zone import ActiveZone
+
 
 
 class TableScreen(GameScreen):
+    """Первый черновой игровой экран стола."""
+
     SCREEN_SIZE = (1280, 720)
     BG_COLOR = (30, 30, 30)
 
@@ -12,5 +14,10 @@ class TableScreen(GameScreen):
             game_controller=game_controller,
             background_color=self.BG_COLOR,
         )
+        self.activate_initial_actors()
         # self.screen_zones["table"] = ActiveZone(zone_id="table", rect=())
+
+    def activate_initial_actors(self):
+        """Включить actor-ы, которые должны быть видны сразу после старта."""
+        self.activate_actor("table_actor")
 
