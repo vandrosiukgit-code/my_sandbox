@@ -6,6 +6,7 @@ main.py сейчас не запускает полноценный RenderEngine
 """
 
 from core import GameController
+from core.resource import ResourceManager
 from gui_actor import GuiActorStore
 
 
@@ -24,7 +25,7 @@ def build_app_context():
     - игровые экраны будут подключены позже отдельным этапом.
     """
     game_controller = GameController(GameController.create_fixture_state())
-    actor_store = GuiActorStore()
+    actor_store = GuiActorStore(resource_manager=ResourceManager)
 
     return {
         "game_controller": game_controller,

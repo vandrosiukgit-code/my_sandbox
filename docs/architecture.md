@@ -31,6 +31,9 @@ gui_actor/
     gui_actor.py
     gui_actor_store.py
 
+gui_actors_store/
+    table_actor.py
+
 activities/
     base_activity.py
 
@@ -48,7 +51,7 @@ docs/
 Сейчас делает только базовую сборку контекста:
 
 - создает `GameController` с fixture-состоянием;
-- создает пустой `GuiActorStore`;
+- создает `GuiActorStore` с подключенным `ResourceManager`;
 - фиксирует `SCREEN_SIZE` и `WINDOW_TITLE`;
 - не запускает `RenderEngine`, потому что актуальные игровые экраны еще не
   собраны.
@@ -149,13 +152,37 @@ PNG возвращается как список из одного `Surface`, sp
 
 Хранит actor-ы по стабильному ID и предоставляет:
 
+- `build()`;
+- `add_many(actors)`;
 - `add(actor)`;
 - `get(actor_id)`;
 - `has(actor_id)`;
 - `remove(actor_id)`;
 - `all_ids()`.
 
-Store не знает правил игры, экранных зон и активностей.
+Store не знает правил игры, экранных зон и активностей. При этом он является
+точкой массовой сборки графических объектов: метод `build()` вызывает
+builder-функции из `gui_actors_store/` и складывает созданные actor-ы в общий
+словарь.
+
+Конкретные actor-модули подключаются в `GuiActorStore` как пути к модулям и
+импортируются лениво во время `build()`. Это защищает базовый пакет `gui_actor`
+от жесткой связи с конкретными объектами игры при обычном импорте.
+
+`build()` нужно вызывать только после того, как `ResourceManager` собрал
+runtime-кэш с pygame Surface/frames.
+
+## gui_actors_store/table_actor.py
+
+Модуль конкретного GuiActor-а.
+
+Содержит функцию:
+
+- `create(resource_manager)`.
+
+Функция описывает слои `table_actor`, получает кадры через переданный
+`resource_manager` и возвращает готовый `GuiActor`. Она не импортирует `main.py`
+и не мутирует `GuiActorStore` напрямую.
 
 ## game_screen/game_screen.py
 
@@ -224,6 +251,7 @@ Dev tool для просмотра ресурсов.
 ```text
 GameController -> logical state fixture
 GuiActorStore  -> all GuiActor instances
+gui_actors_store/* -> concrete GuiActor builders
 GameScreen     -> active actor IDs, activities, screen zones
 ActiveZone     -> screen rect/hit_rect and layout for actor IDs
 Activity       -> temporary visual process
