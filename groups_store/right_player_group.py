@@ -1,15 +1,10 @@
-"""Сборка Group-а левого игрока.
-
-Модуль не хранит общий GroupStore и не импортирует main.py. Его задача -
-описать конкретный визуальный объект и вернуть готовый Group тому, кто
-собирает общий склад графики.
-"""
+"""Build the right player Group."""
 
 from group import Group, TextStyle, create_text_layer
 
 HIDE_RECT = True
-GROUP_ID = "left_player"
-DEFAULT_NAME_TEXT = "Player 1"
+GROUP_ID = "right_player"
+DEFAULT_NAME_TEXT = "Player 3"
 NAME_TEXT_STYLE = TextStyle(
     font_path="assets/fonts/ingrid-darling/IngridDarling-Regular.ttf",
     font_size=28,
@@ -40,7 +35,7 @@ def create(resource_manager):
             size=(200, 68),
             style=NAME_TEXT_STYLE,
             position=(0, 132),
-            text_key="player.left.name",
+            text_key="player.right.name",
             fit_mode="contain",
         )
     )

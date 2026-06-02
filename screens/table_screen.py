@@ -15,14 +15,24 @@ class TableScreen(GameScreen):
         )
 
         self.create_frame("game_table", rect=(0, 0, 1280, 720))
-        self.create_frame("left_player_az", rect=(0, 0, 260, 300))
+
+        self.create_frame("left_player_frame", rect=(0, 0, 260, 300))
         self.create_frame("left_player_portrait", rect=(0, 0, 200, 200))
 
-        self.put_frame_in_frame("left_player_az", "game_table", position=(0, 210))
-        self.put_frame_in_frame("left_player_portrait", "left_player_az", position=(20, 46))
+        self.create_frame("right_player_frame", rect=(0, 0, 260, 300))
+        self.create_frame("right_player_portrait", rect=(0, 0, 200, 200))
+
+        self.put_frame_in_frame("left_player_frame", "game_table", position=(0, 210))
+        self.put_frame_in_frame("left_player_portrait", "left_player_frame", position=(20, 46))
+
+        self.put_frame_in_frame("right_player_frame", "game_table", position=(1020, 210))
+        self.put_frame_in_frame("right_player_portrait", "right_player_frame", position=(20, 46))
 
         self.activate_group("table_group")
         self.activate_group("left_player")
+        self.activate_group("right_player")
 
         self.put_group_in_frame("table_group", "game_table", position=(0, 0))
         self.put_group_in_frame("left_player", "left_player_portrait", position=(0, 0))
+
+        self.put_group_in_frame("right_player", "right_player_portrait", position=(0, 0))

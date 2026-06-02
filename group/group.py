@@ -6,6 +6,7 @@ Group - это простой визуальный кирпичик. Он не �
 """
 
 from dataclasses import dataclass
+import os
 
 import pygame
 
@@ -31,6 +32,7 @@ class Layer:
     text_key: str | None = None
     default_text: str | None = None
     size: tuple[int, int] | None = None
+    fit_mode: str | None = None
     style: object | None = None
 
     def get_current_frame(self):
@@ -63,6 +65,14 @@ class Layer:
             payload["default_text"] = self.default_text
         if self.size is not None:
             payload["size"] = list(self.size)
+            payload["rect"] = [
+                int(self.position[0]),
+                int(self.position[1]),
+                int(self.size[0]),
+                int(self.size[1]),
+            ]
+        if self.fit_mode is not None:
+            payload["fit_mode"] = self.fit_mode
         if self.style is not None and hasattr(self.style, "to_manifest_entry"):
             payload["style"] = self.style.to_manifest_entry()
         return payload
@@ -73,6 +83,7 @@ class TextStyle:
     """Visual text settings used to render text into a Layer surface."""
 
     font_name: str | None = None
+    font_path: str | None = None
     font_size: int = 24
     color: tuple[int, int, int] = (255, 255, 255)
     antialias: bool = True
@@ -81,29 +92,39 @@ class TextStyle:
         """Return serializable text style metadata for GuiManifest."""
         return {
             "font_name": self.font_name,
+            "font_path": self.font_path,
             "font_size": self.font_size,
             "color": list(self.color),
             "antialias": self.antialias,
         }
 
 
-def create_text_layer(layer_name, text, size=None, style=None, position=(0, 0), text_key=None):
+def create_text_layer(
+    layer_name,
+    text,
+    size=None,
+    style=None,
+    position=(0, 0),
+    text_key=None,
+    fit_mode="none",
+):
     """Create a normal Layer whose frame is a rendered text surface."""
     style = style or TextStyle()
     return Layer(
         name=layer_name,
-        frames=[render_text_surface(text, style, size)],
+        frames=[render_text_surface(text, style, size, fit_mode)],
         position=position,
         layer_type="text",
         text_key=text_key,
         default_text=str(text),
         size=size,
+        fit_mode=fit_mode,
         style=style,
     )
 
 
-def render_text_surface(text, style, size=None):
-    """Render text into a pygame.Surface, optionally centered in a fixed size."""
+def render_text_surface(text, style, size=None, fit_mode="none"):
+    """Render text into a pygame.Surface, optionally fitted into a fixed rect."""
     if not pygame.font.get_init():
         pygame.font.init()
 
@@ -112,16 +133,86 @@ def render_text_surface(text, style, size=None):
     if size is None:
         return text_surface
 
+    size = normalize_text_rect_size(size)
     surface = pygame.Surface(size, pygame.SRCALPHA)
-    surface.blit(text_surface, text_surface.get_rect(center=surface.get_rect().center))
+    fitted_surface = fit_text_surface(text_surface, size, fit_mode)
+    surface.blit(fitted_surface, fitted_surface.get_rect(center=surface.get_rect().center))
     return surface
 
 
 def get_text_font(style):
     """Return a pygame Font from a TextStyle."""
+    if style.font_path:
+        return pygame.font.Font(resolve_project_path(style.font_path), style.font_size)
     if style.font_name:
         return pygame.font.SysFont(style.font_name, style.font_size)
     return pygame.font.Font(None, style.font_size)
+
+
+def resolve_project_path(path):
+    """Resolve project-relative paths used by GUI layer metadata."""
+    if os.path.isabs(path):
+        return path
+    project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(project_dir, path)
+
+
+def normalize_text_rect_size(size):
+    """Return a safe pygame size tuple for a text layer rect."""
+    width, height = size
+    return max(1, int(width)), max(1, int(height))
+
+
+def fit_text_surface(surface, target_size, fit_mode="none"):
+    """Scale rendered text using pygame transforms according to fit_mode."""
+    fit_mode = normalize_text_fit_mode(fit_mode)
+    if fit_mode == "none":
+        return surface
+
+    source_width, source_height = surface.get_size()
+    if source_width <= 0 or source_height <= 0:
+        return surface
+
+    target_width, target_height = target_size
+    if fit_mode == "width":
+        scale = target_width / source_width
+        size = (target_width, max(1, round(source_height * scale)))
+    elif fit_mode == "height":
+        scale = target_height / source_height
+        size = (max(1, round(source_width * scale)), target_height)
+    elif fit_mode == "contain":
+        scale = min(target_width / source_width, target_height / source_height)
+        size = (
+            max(1, round(source_width * scale)),
+            max(1, round(source_height * scale)),
+        )
+    elif fit_mode == "stretch":
+        size = (target_width, target_height)
+    else:
+        raise ValueError(f"Unsupported text fit mode: {fit_mode}")
+
+    if size == surface.get_size():
+        return surface
+    return pygame.transform.smoothscale(surface, size)
+
+
+def normalize_text_fit_mode(fit_mode):
+    """Normalize text fit mode aliases used by GUI builders and manifests."""
+    if fit_mode is None:
+        return "none"
+
+    fit_mode = str(fit_mode).strip().lower()
+    aliases = {
+        "": "none",
+        "no": "none",
+        "off": "none",
+        "both": "contain",
+        "box": "contain",
+        "width_height": "contain",
+        "width+height": "contain",
+        "fill": "stretch",
+    }
+    return aliases.get(fit_mode, fit_mode)
 
 
 class Group(BaseGroup):
