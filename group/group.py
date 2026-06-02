@@ -26,6 +26,12 @@ class Layer:
     frames: list
     position: tuple[int, int] = (0, 0)
     current_frame_index: int = 0
+    layer_type: str = "surface"
+    resource_key: str | None = None
+    text_key: str | None = None
+    default_text: str | None = None
+    size: tuple[int, int] | None = None
+    style: object | None = None
 
     def get_current_frame(self):
         """Вернуть текущий pygame.Surface слоя."""
@@ -40,6 +46,27 @@ class Layer:
             return
         self.current_frame_index = max(0, min(int(frame_index), len(self.frames) - 1))
 
+    def to_manifest_entry(self):
+        """Return serializable layer metadata for GuiManifest."""
+        payload = {
+            "id": self.name,
+            "type": self.layer_type,
+            "position": list(self.position),
+            "current_frame_index": self.current_frame_index,
+            "frame_count": len(self.frames),
+        }
+        if self.resource_key is not None:
+            payload["resource_key"] = self.resource_key
+        if self.text_key is not None:
+            payload["text_key"] = self.text_key
+        if self.default_text is not None:
+            payload["default_text"] = self.default_text
+        if self.size is not None:
+            payload["size"] = list(self.size)
+        if self.style is not None and hasattr(self.style, "to_manifest_entry"):
+            payload["style"] = self.style.to_manifest_entry()
+        return payload
+
 
 @dataclass(frozen=True)
 class TextStyle:
@@ -50,13 +77,28 @@ class TextStyle:
     color: tuple[int, int, int] = (255, 255, 255)
     antialias: bool = True
 
+    def to_manifest_entry(self):
+        """Return serializable text style metadata for GuiManifest."""
+        return {
+            "font_name": self.font_name,
+            "font_size": self.font_size,
+            "color": list(self.color),
+            "antialias": self.antialias,
+        }
 
-def create_text_layer(layer_name, text, size=None, style=None, position=(0, 0)):
+
+def create_text_layer(layer_name, text, size=None, style=None, position=(0, 0), text_key=None):
     """Create a normal Layer whose frame is a rendered text surface."""
+    style = style or TextStyle()
     return Layer(
         name=layer_name,
-        frames=[render_text_surface(text, style or TextStyle(), size)],
+        frames=[render_text_surface(text, style, size)],
         position=position,
+        layer_type="text",
+        text_key=text_key,
+        default_text=str(text),
+        size=size,
+        style=style,
     )
 
 
@@ -141,7 +183,15 @@ class Group(BaseGroup):
         layers = []
         for graphic in graphics:
             layer_name, resource_key, position = cls.normalize_graphic(graphic)
-            layers.append(Layer(layer_name, resource_manager.get_frames(resource_key), position))
+            layers.append(
+                Layer(
+                    layer_name,
+                    resource_manager.get_frames(resource_key),
+                    position,
+                    layer_type="resource",
+                    resource_key=resource_key,
+                )
+            )
         return cls(group_id=group_id, rect=rect, layers=layers)
 
     @staticmethod
@@ -354,6 +404,26 @@ class Group(BaseGroup):
         for layer in self.layers:
             if layer.name in self.rect_debug_layer_ids:
                 yield layer
+
+    def to_manifest_entry(self):
+        """Return serializable group metadata for GuiManifest."""
+        return {
+            "id": self.id,
+            "rect": list(self.rect),
+            "hit_rect": list(self.hit_rect),
+            "scale_factor": self.scale_factor,
+            "hide_rect": self.hide_rect,
+            "rect_debug_layer_ids": (
+                sorted(self.rect_debug_layer_ids)
+                if self.rect_debug_layer_ids is not None
+                else None
+            ),
+            "layer_order": [layer.name for layer in self.layers],
+            "layers": {
+                layer.name: layer.to_manifest_entry()
+                for layer in self.layers
+            },
+        }
 
     @staticmethod
     def scale_rect(rect, scale_factor):

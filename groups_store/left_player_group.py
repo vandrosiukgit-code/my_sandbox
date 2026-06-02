@@ -36,6 +36,7 @@ def create(resource_manager):
             size=(200, 68),
             style=NAME_TEXT_STYLE,
             position=(0, 132),
+            text_key="player.left.name",
         )
     )
     return group.set_rect_visibility(HIDE_RECT, ("p_name_bg", "player_name_text"))

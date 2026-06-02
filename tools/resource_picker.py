@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import json
 import importlib
 import os
 import re
@@ -18,10 +19,14 @@ if PROJECT_DIR not in sys.path:
     sys.path.insert(0, PROJECT_DIR)
 
 from core.resource import ResourceManager  # noqa: E402
+from core import GameController  # noqa: E402
+from group import GroupStore  # noqa: E402
+from screens.table_screen import TableScreen  # noqa: E402
 
 
 FRAME_WIDTH_KEY = "frame_width"
 FRAME_HEIGHT_KEY = "frame_height"
+GUI_MANIFEST_FILE_NAME = "gui_manifest.json"
 
 
 @dataclass(frozen=True)
@@ -82,6 +87,48 @@ class OperationReport:
         if not self.lines:
             return self.title
         return "\n".join([self.title, "", *self.lines])
+
+
+class PlaceholderResourceManager:
+    """Resource manager facade for GuiManifest builds without a pygame display."""
+
+    _records = {}
+    _frames = {}
+    _assets_dir = None
+
+    @classmethod
+    def build_index(cls, assets_dir):
+        cls._assets_dir = os.path.abspath(assets_dir)
+        cls._frames = {}
+        cls._records = ResourceManager.build_index(cls._assets_dir)
+        return cls._records
+
+    @classmethod
+    def get_frames(cls, key_or_path):
+        import pygame
+
+        key = ResourceManager.resolve_resource_key(key_or_path)
+        if key in cls._frames:
+            return cls._frames[key]
+
+        record = cls.get_or_create_record(key)
+        surface = pygame.Surface(record.frame_size, pygame.SRCALPHA)
+        cls._frames[key] = [surface for _index in ResourceManager.get_frame_grid(record)]
+        return cls._frames[key]
+
+    @classmethod
+    def get_or_create_record(cls, resource_key):
+        if resource_key in cls._records:
+            return cls._records[resource_key]
+
+        file_path = ResourceManager.find_asset_path_for_key(resource_key)
+        if file_path is None:
+            raise KeyError(f"PNG not found for GuiManifest resource layer: {resource_key}")
+
+        entry = ResourceManager.create_default_manifest_entry(file_path, cls._assets_dir)
+        record = ResourceManager.create_record(resource_key, entry, cls._assets_dir)
+        cls._records[resource_key] = record
+        return record
 
 
 class ResourcePickerService:
@@ -311,6 +358,168 @@ class ResourcePickerService:
             update_report.extend(changed)
         return new_manifest, update_report
 
+    def get_gui_manifest_path(self):
+        return os.path.join(self.assets_dir, GUI_MANIFEST_FILE_NAME)
+
+    def load_gui_manifest_if_exists(self):
+        manifest_path = self.get_gui_manifest_path()
+        if not os.path.exists(manifest_path):
+            return self.empty_gui_manifest()
+        with open(manifest_path, "r", encoding="utf-8") as file:
+            return json.load(file)
+
+    def save_gui_manifest(self, manifest):
+        manifest_path = self.get_gui_manifest_path()
+        with open(manifest_path, "w", encoding="utf-8") as file:
+            json.dump(manifest, file, ensure_ascii=False, indent=2)
+            file.write("\n")
+
+    @staticmethod
+    def empty_gui_manifest():
+        return {
+            "version": 1,
+            "screens": {},
+            "frames": {},
+            "groups": {},
+            "hierarchy": {},
+        }
+
+    def build_gui_manifest(self):
+        PlaceholderResourceManager.build_index(self.assets_dir)
+        group_store = GroupStore(resource_manager=PlaceholderResourceManager)
+        group_store.build()
+        screen = TableScreen(
+            group_store=group_store,
+            game_controller=GameController(GameController.create_fixture_state()),
+        )
+
+        manifest = self.create_gui_manifest_from_screen("table_screen", screen, group_store)
+        report = OperationReport("Build GuiManifest")
+        report.add(f"Screens: {len(manifest['screens'])}")
+        report.add(f"Frames: {len(manifest['frames'])}")
+        report.add(f"Groups: {len(manifest['groups'])}")
+        report.add(
+            "Layers: "
+            f"{sum(len(group.get('layers', {})) for group in manifest['groups'].values())}"
+        )
+        return manifest, report
+
+    def update_gui_manifest(self):
+        old_manifest = self.load_gui_manifest_if_exists()
+        new_manifest, report = self.build_gui_manifest()
+
+        old_objects = self.collect_gui_object_ids(old_manifest)
+        new_objects = self.collect_gui_object_ids(new_manifest)
+        added = sorted(new_objects - old_objects)
+        removed = sorted(old_objects - new_objects)
+
+        update_report = OperationReport("GuiManifest Update")
+        update_report.add(report.to_text())
+        update_report.add("")
+        update_report.add(f"Added objects: {len(added)}")
+        update_report.add(f"Removed objects: {len(removed)}")
+        if added:
+            update_report.add("")
+            update_report.add("Added:")
+            update_report.extend(added)
+        if removed:
+            update_report.add("")
+            update_report.add("Removed:")
+            update_report.extend(removed)
+        return new_manifest, update_report
+
+    @staticmethod
+    def collect_gui_object_ids(manifest):
+        object_ids = set()
+        for screen_id in manifest.get("screens", {}):
+            object_ids.add(f"screen:{screen_id}")
+        for frame_id in manifest.get("frames", {}):
+            object_ids.add(f"frame:{frame_id}")
+        for group_id, group in manifest.get("groups", {}).items():
+            object_ids.add(f"group:{group_id}")
+            for layer_id in group.get("layers", {}):
+                object_ids.add(f"layer:{group_id}.{layer_id}")
+        return object_ids
+
+    def create_gui_manifest_from_screen(self, screen_id, screen, group_store):
+        frames = {
+            frame_id: self.create_frame_manifest_entry(frame)
+            for frame_id, frame in sorted(screen.screen_frames.items())
+        }
+        group_locations = self.collect_group_locations(frames)
+        groups = {
+            group_id: self.create_group_manifest_entry(group_store.get(group_id), group_locations)
+            for group_id in group_store.all_ids()
+        }
+        root_frame_ids = [
+            frame.id
+            for frame in screen.iter_root_frames()
+        ]
+        return {
+            "version": 1,
+            "screens": {
+                screen_id: {
+                    "id": screen_id,
+                    "class": f"{screen.__class__.__module__}.{screen.__class__.__name__}",
+                    "background_color": list(screen.background_color),
+                    "root_frame_ids": root_frame_ids,
+                    "active_group_ids": list(screen.active_group_ids),
+                }
+            },
+            "frames": frames,
+            "groups": groups,
+            "hierarchy": {
+                screen_id: {
+                    "root_frame_ids": root_frame_ids,
+                    "active_group_ids": list(screen.active_group_ids),
+                }
+            },
+        }
+
+    @staticmethod
+    def create_frame_manifest_entry(frame):
+        payload = frame.to_payload()
+        return {
+            "id": payload["frame_id"],
+            "parent_frame_id": payload["parent_frame_id"],
+            "local_rect": list(payload["local_rect"]),
+            "rect": list(payload["rect"]),
+            "hit_rect": list(payload["hit_rect"]),
+            "group_ids": list(payload["group_ids"]),
+            "child_frame_ids": list(payload["child_frame_ids"]),
+            "group_origins": {
+                group_id: list(position)
+                for group_id, position in payload["group_origins"].items()
+            },
+            "action_count": payload["action_count"],
+            "padding": payload["padding"],
+            "spacing": payload["spacing"],
+        }
+
+    @staticmethod
+    def collect_group_locations(frames):
+        locations = {}
+        for frame_id, frame in frames.items():
+            for group_id in frame.get("group_ids", ()):
+                locations.setdefault(group_id, []).append(frame_id)
+        return locations
+
+    @staticmethod
+    def create_group_manifest_entry(group, group_locations):
+        payload = group.to_manifest_entry()
+        payload["frame_ids"] = group_locations.get(group.id, [])
+        return payload
+
+    @staticmethod
+    def format_gui_object_details(object_type, object_id, payload):
+        lines = [
+            f"Type: {object_type}",
+            f"ID: {object_id}",
+            "",
+            json.dumps(payload, ensure_ascii=False, indent=2),
+        ]
+        return "\n".join(lines)
+
     def load_manifest_if_exists(self):
         manifest_path = ResourceManager.get_manifest_path(self.assets_dir)
         if not os.path.exists(manifest_path):
@@ -339,6 +548,7 @@ class ResourcePickerApp:
         self.assets_dir = os.path.abspath(assets_dir)
         self.service = ResourcePickerService(PROJECT_DIR, self.assets_dir)
         self.manifest = {"resources": {}}
+        self.gui_manifest = self.service.empty_gui_manifest()
         self.png_assets = []
         self.visible_png_assets = []
         self.graphics_entries = []
@@ -347,6 +557,7 @@ class ResourcePickerApp:
         self.graphics_by_item = {}
         self.png_folder_items = {}
         self.group_items = {}
+        self.gui_manifest_by_item = {}
         self.preview_image = None
         self.selected_asset = None
         self.selected_graphic = None
@@ -407,6 +618,12 @@ class ResourcePickerApp:
         ttk.Button(toolbar, text="Manifest Update", command=self.update_manifest).grid(
             row=0, column=1, sticky="ew", padx=(4, 0)
         )
+        ttk.Button(toolbar, text="Build GuiManifest", command=self.build_gui_manifest).grid(
+            row=1, column=0, sticky="ew", padx=(0, 4), pady=(6, 0)
+        )
+        ttk.Button(toolbar, text="GuiManifest Update", command=self.update_gui_manifest).grid(
+            row=1, column=1, sticky="ew", padx=(4, 0), pady=(6, 0)
+        )
 
     def create_search(self, parent):
         search_frame = ttk.Frame(parent)
@@ -425,16 +642,21 @@ class ResourcePickerApp:
 
         png_tab = ttk.Frame(self.tabs)
         manifest_tab = ttk.Frame(self.tabs)
+        gui_manifest_tab = ttk.Frame(self.tabs)
         png_tab.rowconfigure(0, weight=1)
         png_tab.columnconfigure(0, weight=1)
         manifest_tab.rowconfigure(0, weight=1)
         manifest_tab.columnconfigure(0, weight=1)
+        gui_manifest_tab.rowconfigure(0, weight=1)
+        gui_manifest_tab.columnconfigure(0, weight=1)
 
         self.tabs.add(png_tab, text="PNG Explorer")
         self.tabs.add(manifest_tab, text="Manifest Explorer")
+        self.tabs.add(gui_manifest_tab, text="GuiManifest")
 
         self.create_png_tree(png_tab)
         self.create_manifest_tree(manifest_tab)
+        self.create_gui_manifest_tree(gui_manifest_tab)
 
     def create_png_tree(self, parent):
         self.png_tree = ttk.Treeview(parent, columns=("key", "frame", "size"), show="tree headings", height=16)
@@ -471,6 +693,21 @@ class ResourcePickerApp:
         tree_scroll = ttk.Scrollbar(parent, orient="vertical", command=self.manifest_tree.yview)
         tree_scroll.grid(row=0, column=1, sticky="ns")
         self.manifest_tree.configure(yscrollcommand=tree_scroll.set)
+
+    def create_gui_manifest_tree(self, parent):
+        self.gui_manifest_tree = ttk.Treeview(parent, columns=("type", "path"), show="tree headings", height=16)
+        self.gui_manifest_tree.heading("#0", text="GUI object")
+        self.gui_manifest_tree.heading("type", text="Type")
+        self.gui_manifest_tree.heading("path", text="Controller target")
+        self.gui_manifest_tree.column("#0", width=240)
+        self.gui_manifest_tree.column("type", width=90, anchor="center")
+        self.gui_manifest_tree.column("path", width=340)
+        self.gui_manifest_tree.grid(row=0, column=0, sticky="nsew")
+        self.gui_manifest_tree.bind("<<TreeviewSelect>>", self.on_gui_manifest_select)
+
+        tree_scroll = ttk.Scrollbar(parent, orient="vertical", command=self.gui_manifest_tree.yview)
+        tree_scroll.grid(row=0, column=1, sticky="ns")
+        self.gui_manifest_tree.configure(yscrollcommand=tree_scroll.set)
 
     def create_metadata_editor(self, parent):
         form = ttk.LabelFrame(parent, text="PNG Metadata Editor", padding=8)
@@ -530,6 +767,7 @@ class ResourcePickerApp:
 
     def reload_index(self):
         self.manifest = self.service.load_manifest_if_exists()
+        self.gui_manifest = self.service.load_gui_manifest_if_exists()
         self.png_assets = self.service.load_png_assets()
         assets_by_key = {asset.resource_key: asset for asset in self.png_assets}
         self.graphics_entries = self.service.load_graphics_entries(assets_by_key=assets_by_key, manifest=self.manifest)
@@ -537,6 +775,7 @@ class ResourcePickerApp:
         self.visible_graphics_entries = self.filter_graphics_entries()
         self.populate_png_tree(self.visible_png_assets)
         self.populate_manifest_tree(self.visible_graphics_entries)
+        self.populate_gui_manifest_tree(self.gui_manifest)
         self.update_result_label()
 
     def populate_png_tree(self, assets):
@@ -591,6 +830,73 @@ class ResourcePickerApp:
             )
             self.graphics_by_item[item_id] = entry
 
+    def populate_gui_manifest_tree(self, manifest):
+        self.gui_manifest_tree.delete(*self.gui_manifest_tree.get_children())
+        self.gui_manifest_by_item = {}
+
+        for screen_id, screen in sorted(manifest.get("screens", {}).items()):
+            screen_item = self.insert_gui_manifest_item(
+                "",
+                screen_id,
+                "screen",
+                screen_id,
+                screen,
+                open=True,
+            )
+            for frame_id in screen.get("root_frame_ids", ()):
+                self.populate_gui_frame_node(screen_item, frame_id, manifest, screen_id)
+
+    def populate_gui_frame_node(self, parent_item, frame_id, manifest, screen_id):
+        frame = manifest.get("frames", {}).get(frame_id)
+        if frame is None:
+            return
+
+        frame_item = self.insert_gui_manifest_item(
+            parent_item,
+            frame_id,
+            "frame",
+            f"{screen_id}.{frame_id}",
+            frame,
+            open=True,
+        )
+        for group_id in frame.get("group_ids", ()):
+            group = manifest.get("groups", {}).get(group_id)
+            if group is None:
+                continue
+            group_item = self.insert_gui_manifest_item(
+                frame_item,
+                group_id,
+                "group",
+                f"{screen_id}.{frame_id}.{group_id}",
+                group,
+                open=True,
+            )
+            for layer_id in group.get("layer_order", ()):
+                layer = group.get("layers", {}).get(layer_id)
+                if layer is None:
+                    continue
+                self.insert_gui_manifest_item(
+                    group_item,
+                    layer_id,
+                    layer.get("type", "layer"),
+                    f"{group_id}.{layer_id}",
+                    layer,
+                )
+
+        for child_frame_id in frame.get("child_frame_ids", ()):
+            self.populate_gui_frame_node(frame_item, child_frame_id, manifest, screen_id)
+
+    def insert_gui_manifest_item(self, parent_id, object_id, object_type, target_path, payload, open=False):
+        item_id = self.gui_manifest_tree.insert(
+            parent_id,
+            "end",
+            text=object_id,
+            values=(object_type, target_path),
+            open=open,
+        )
+        self.gui_manifest_by_item[item_id] = (object_type, object_id, payload)
+        return item_id
+
     def ensure_png_folder_path(self, relative_path):
         parent_id = ""
         folder_parts = os.path.dirname(relative_path).replace("\\", "/").split("/")
@@ -617,6 +923,7 @@ class ResourcePickerApp:
         self.clear_selection(clear_output=False)
         self.populate_png_tree(self.visible_png_assets)
         self.populate_manifest_tree(self.visible_graphics_entries)
+        self.populate_gui_manifest_tree(self.gui_manifest)
         self.update_result_label()
 
     def on_tab_changed(self, _event):
@@ -660,7 +967,11 @@ class ResourcePickerApp:
     def update_result_label(self):
         tab_name = self.tabs.tab(self.tabs.select(), "text") if hasattr(self, "tabs") else "PNG Explorer"
         query = self.search_var.get().strip()
-        if tab_name == "Manifest Explorer":
+        if tab_name == "GuiManifest":
+            total = self.count_gui_manifest_objects(self.gui_manifest)
+            visible = total
+            noun = "GUI objects"
+        elif tab_name == "Manifest Explorer":
             total = len(self.graphics_entries)
             visible = len(self.visible_graphics_entries)
             noun = "manifest resources"
@@ -669,6 +980,19 @@ class ResourcePickerApp:
             visible = len(self.visible_png_assets)
             noun = "PNG resources"
         self.result_var.set(f"Found: {visible} / {total} {noun}" if query else f"{total} {noun}")
+
+    @staticmethod
+    def count_gui_manifest_objects(manifest):
+        layer_count = sum(
+            len(group.get("layers", {}))
+            for group in manifest.get("groups", {}).values()
+        )
+        return (
+            len(manifest.get("screens", {}))
+            + len(manifest.get("frames", {}))
+            + len(manifest.get("groups", {}))
+            + layer_count
+        )
 
     def on_png_select(self, _event):
         selection = self.png_tree.selection()
@@ -698,6 +1022,24 @@ class ResourcePickerApp:
             self.show_output("\n".join(self.selected_graphic.warnings))
             return
         self.show_asset(self.selected_asset, self.selected_graphic)
+
+    def on_gui_manifest_select(self, _event):
+        selection = self.gui_manifest_tree.selection()
+        if not selection:
+            return
+        item_id = selection[0]
+        if item_id not in self.gui_manifest_by_item:
+            self.clear_selection(clear_output=False)
+            return
+
+        object_type, object_id, payload = self.gui_manifest_by_item[item_id]
+        self.selected_asset = None
+        self.selected_graphic = None
+        self.preview_image = None
+        self.preview_label.configure(image="", text=f"{object_type}: {object_id}")
+        self.clear_metadata_fields()
+        self.status_var.set(f"GuiManifest {object_type} selected")
+        self.show_output(self.service.format_gui_object_details(object_type, object_id, payload))
 
     def clear_selection(self, clear_output=True):
         self.selected_asset = None
@@ -803,6 +1145,34 @@ class ResourcePickerApp:
         self.reload_index()
         self.show_output(report.to_text())
         self.status_var.set("Manifest updated from groups_store GRAPHICS")
+
+    def build_gui_manifest(self):
+        try:
+            manifest, report = self.service.build_gui_manifest()
+            self.service.save_gui_manifest(manifest)
+        except Exception as error:
+            self.status_var.set("GuiManifest was not built")
+            self.show_output(str(error))
+            messagebox.showerror("GuiManifest error", str(error))
+            return
+
+        self.reload_index()
+        self.show_output(report.to_text())
+        self.status_var.set("GuiManifest built from Screen / Frame / Group")
+
+    def update_gui_manifest(self):
+        try:
+            manifest, report = self.service.update_gui_manifest()
+            self.service.save_gui_manifest(manifest)
+        except Exception as error:
+            self.status_var.set("GuiManifest was not updated")
+            self.show_output(str(error))
+            messagebox.showerror("GuiManifest error", str(error))
+            return
+
+        self.reload_index()
+        self.show_output(report.to_text())
+        self.status_var.set("GuiManifest updated from Screen / Frame / Group")
 
     def show_output(self, text):
         self.output_text.configure(state="normal")
