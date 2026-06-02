@@ -5,10 +5,12 @@
 собирает общий склад графики.
 """
 
-from group import Group
+from group import Group, TextStyle, create_text_layer
 
 HIDE_RECT = False
 GROUP_ID = "left_player"
+DEFAULT_NAME_TEXT = "Player 1"
+NAME_TEXT_STYLE = TextStyle(font_size=28, color=(255, 238, 196))
 
 GRAPHICS = (
     ("p_portrait_bg", "main_screen.p_portrait_bg", (0, 0)),
@@ -27,5 +29,13 @@ def create(resource_manager):
         rect=GROUP_RECT,
         resource_manager=resource_manager,
     )
-    return group.set_rect_visibility(HIDE_RECT, "p_name_bg")
-
+    group.add_layer(
+        create_text_layer(
+            "player_name_text",
+            DEFAULT_NAME_TEXT,
+            size=(200, 68),
+            style=NAME_TEXT_STYLE,
+            position=(0, 132),
+        )
+    )
+    return group.set_rect_visibility(HIDE_RECT, ("p_name_bg", "player_name_text"))

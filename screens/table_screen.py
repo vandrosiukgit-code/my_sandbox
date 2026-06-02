@@ -26,5 +26,3 @@ class TableScreen(GameScreen):
 
         self.put_group_in_frame("table_group", "game_table", position=(0, 0))
         self.put_group_in_frame("left_player", "left_player_portrait", position=(0, 0))
-
-

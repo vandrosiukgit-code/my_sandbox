@@ -41,6 +41,47 @@ class Layer:
         self.current_frame_index = max(0, min(int(frame_index), len(self.frames) - 1))
 
 
+@dataclass(frozen=True)
+class TextStyle:
+    """Visual text settings used to render text into a Layer surface."""
+
+    font_name: str | None = None
+    font_size: int = 24
+    color: tuple[int, int, int] = (255, 255, 255)
+    antialias: bool = True
+
+
+def create_text_layer(layer_name, text, size=None, style=None, position=(0, 0)):
+    """Create a normal Layer whose frame is a rendered text surface."""
+    return Layer(
+        name=layer_name,
+        frames=[render_text_surface(text, style or TextStyle(), size)],
+        position=position,
+    )
+
+
+def render_text_surface(text, style, size=None):
+    """Render text into a pygame.Surface, optionally centered in a fixed size."""
+    if not pygame.font.get_init():
+        pygame.font.init()
+
+    font = get_text_font(style)
+    text_surface = font.render(str(text), style.antialias, style.color)
+    if size is None:
+        return text_surface
+
+    surface = pygame.Surface(size, pygame.SRCALPHA)
+    surface.blit(text_surface, text_surface.get_rect(center=surface.get_rect().center))
+    return surface
+
+
+def get_text_font(style):
+    """Return a pygame Font from a TextStyle."""
+    if style.font_name:
+        return pygame.font.SysFont(style.font_name, style.font_size)
+    return pygame.font.Font(None, style.font_size)
+
+
 class Group(BaseGroup):
     """Пассивный drawable-объект с rect, hit_rect, scale_factor и слоями кадров.
 
