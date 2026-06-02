@@ -1,16 +1,16 @@
-"""Base visual action.
+﻿"""Base visual action.
 
 An Action owns a short visual script and delegates frame-by-frame changes to
-Animation objects. It is started by an ActiveZone after GameController has
+Animation objects. It is started by an Frame after GameController has
 already accepted the game intent and returned a visual command.
 """
 
 
 class Action:
-    """Composable visual script executed by an ActiveZone."""
+    """Composable visual script executed by an Frame."""
 
-    def __init__(self, actor_ids=None, animations=None):
-        self.actor_ids = tuple(actor_ids or ())
+    def __init__(self, group_ids=None, animations=None):
+        self.group_ids = tuple(group_ids or ())
         self.animations = list(animations or ())
         self.started = False
         self._finished = False
@@ -51,3 +51,5 @@ class Action:
         if callable(is_finished):
             return is_finished()
         return bool(is_finished)
+
+

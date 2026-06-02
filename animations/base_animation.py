@@ -1,6 +1,6 @@
-"""Base animation primitive.
+﻿"""Base animation primitive.
 
-Animation changes visual actor state over time: position, scale, frame index,
+Animation changes visual group state over time: position, scale, frame index,
 or another drawable property. It does not know game rules or controller state.
 """
 
@@ -45,3 +45,5 @@ class Animation:
         if self.duration <= 0:
             return 1.0
         return max(0.0, min(1.0, self.elapsed / self.duration))
+
+

@@ -419,7 +419,7 @@ class ResourceManager:
     def load_manifest(cls, assets_dir):
         """РџСЂРѕС‡РёС‚Р°С‚СЊ resource_manifest.json."""
         manifest_path = cls.get_manifest_path(assets_dir)
-        with open(manifest_path, "r", encoding="utf-8") as file:
+        with open(manifest_path, "r", encoding="utf-8-sig") as file:
             manifest = json.load(file)
         manifest.setdefault("resources", {})
         return manifest
@@ -485,3 +485,5 @@ class ResourceManager:
             if clean:
                 parts.append(clean)
         return ".".join(parts)
+
+

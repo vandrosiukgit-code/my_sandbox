@@ -1,18 +1,18 @@
-"""Графический runtime проекта: окно, события, update/draw loop."""
+﻿"""Р“СЂР°С„РёС‡РµСЃРєРёР№ runtime РїСЂРѕРµРєС‚Р°: РѕРєРЅРѕ, СЃРѕР±С‹С‚РёСЏ, update/draw loop."""
 
 import pygame
 
 
 class RenderEngine:
-    """Pygame runner для одного активного экрана игры."""
+    """Pygame runner РґР»СЏ РѕРґРЅРѕРіРѕ Р°РєС‚РёРІРЅРѕРіРѕ СЌРєСЂР°РЅР° РёРіСЂС‹."""
 
     def __init__(self, screen_factory, screen_size=(800, 600), title="Sandbox"):
-        """Создать окно и активный экран.
+        """РЎРѕР·РґР°С‚СЊ РѕРєРЅРѕ Рё Р°РєС‚РёРІРЅС‹Р№ СЌРєСЂР°РЅ.
 
         Args:
-            screen_factory: Фабрика экрана. Вызывается после создания display.
-            screen_size: Размер окна Pygame в пикселях.
-            title: Заголовок окна.
+            screen_factory: Р¤Р°Р±СЂРёРєР° СЌРєСЂР°РЅР°. Р’С‹Р·С‹РІР°РµС‚СЃСЏ РїРѕСЃР»Рµ СЃРѕР·РґР°РЅРёСЏ display.
+            screen_size: Р Р°Р·РјРµСЂ РѕРєРЅР° Pygame РІ РїРёРєСЃРµР»СЏС….
+            title: Р—Р°РіРѕР»РѕРІРѕРє РѕРєРЅР°.
         """
         pygame.init()
         self.screen = pygame.display.set_mode(screen_size)
@@ -21,7 +21,7 @@ class RenderEngine:
         self.game_screen = screen_factory()
 
     def run(self):
-        """Запустить главный графический цикл."""
+        """Р—Р°РїСѓСЃС‚РёС‚СЊ РіР»Р°РІРЅС‹Р№ РіСЂР°С„РёС‡РµСЃРєРёР№ С†РёРєР»."""
         running = True
         while running:
             dt = self.clock.tick(60) / 1000.0
@@ -37,3 +37,5 @@ class RenderEngine:
             pygame.display.flip()
 
         pygame.quit()
+
+

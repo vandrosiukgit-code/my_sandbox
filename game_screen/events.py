@@ -1,4 +1,4 @@
-"""Screen/controller boundary payloads.
+﻿"""Screen/controller boundary payloads.
 
 GameScreen converts raw pygame events into ScreenInputEvent objects.
 GameController interprets them, mutates game state, and can return
@@ -9,11 +9,11 @@ from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
-class ZoneHit:
-    """Result of hit-testing a point against screen zones and actors."""
+class FrameHit:
+    """Result of hit-testing a point against screen frames and groups."""
 
-    zone_id: str | None
-    actor_id: str | None
+    frame_id: str | None
+    group_id: str | None
     screen_pos: tuple[int, int]
     local_pos: tuple[int, int] | None = None
 
@@ -24,8 +24,8 @@ class ScreenInputEvent:
 
     type: str
     button: str | None = None
-    actor_id: str | None = None
-    zone_id: str | None = None
+    group_id: str | None = None
+    frame_id: str | None = None
     screen_pos: tuple[int, int] | None = None
     local_pos: tuple[int, int] | None = None
     raw_event: object | None = None
@@ -36,7 +36,9 @@ class VisualCommand:
     """Controller response that asks GameScreen to run a visual change."""
 
     type: str
-    actor_id: str | None = None
-    from_zone: str | None = None
-    to_zone: str | None = None
+    group_id: str | None = None
+    from_frame: str | None = None
+    to_frame: str | None = None
     payload: dict = field(default_factory=dict)
+
+

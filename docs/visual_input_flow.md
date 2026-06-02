@@ -1,143 +1,145 @@
-# Visual Input Flow
+﻿# Visual Input Flow
 
-Этот документ фиксирует границу между игровой логикой и визуальной механикой
-экрана.
+Р­С‚РѕС‚ РґРѕРєСѓРјРµРЅС‚ С„РёРєСЃРёСЂСѓРµС‚ РіСЂР°РЅРёС†Сѓ РјРµР¶РґСѓ РёРіСЂРѕРІРѕР№ Р»РѕРіРёРєРѕР№ Рё РІРёР·СѓР°Р»СЊРЅРѕР№ РјРµС…Р°РЅРёРєРѕР№
+СЌРєСЂР°РЅР°.
 
-## Главный принцип
+## Р“Р»Р°РІРЅС‹Р№ РїСЂРёРЅС†РёРї
 
-`GameScreen` не решает правила игры. Он обрабатывает pygame-события только как
-технический input: клик, двойной клик, кнопка мыши, позиция, actor под курсором,
-активная зона.
+`GameScreen` РЅРµ СЂРµС€Р°РµС‚ РїСЂР°РІРёР»Р° РёРіСЂС‹. РћРЅ РѕР±СЂР°Р±Р°С‚С‹РІР°РµС‚ pygame-СЃРѕР±С‹С‚РёСЏ С‚РѕР»СЊРєРѕ РєР°Рє
+С‚РµС…РЅРёС‡РµСЃРєРёР№ input: РєР»РёРє, РґРІРѕР№РЅРѕР№ РєР»РёРє, РєРЅРѕРїРєР° РјС‹С€Рё, РїРѕР·РёС†РёСЏ, group РїРѕРґ РєСѓСЂСЃРѕСЂРѕРј,
+Р°РєС‚РёРІРЅР°СЏ Р·РѕРЅР°.
 
-`GameController` получает нормализованное событие, решает его игровой смысл,
-меняет `GameState` и возвращает визуальные команды.
+`GameController` РїРѕР»СѓС‡Р°РµС‚ РЅРѕСЂРјР°Р»РёР·РѕРІР°РЅРЅРѕРµ СЃРѕР±С‹С‚РёРµ, СЂРµС€Р°РµС‚ РµРіРѕ РёРіСЂРѕРІРѕР№ СЃРјС‹СЃР»,
+РјРµРЅСЏРµС‚ `GameState` Рё РІРѕР·РІСЂР°С‰Р°РµС‚ РІРёР·СѓР°Р»СЊРЅС‹Рµ РєРѕРјР°РЅРґС‹.
 
 ```text
 pygame event
     -> GameScreen
-    -> ActiveZone hit-test
+    -> Frame hit-test
     -> ScreenInputEvent
     -> GameController.handle_input(event)
     -> GameState update
     -> VisualCommand
     -> GameScreen.dispatch_visual_command(command)
-    -> ActiveZone.add_action(action)
+    -> Frame.add_action(action)
     -> Action.update(dt)
     -> Animation.update(dt)
-    -> GuiActor visual state
+    -> Group visual state
 ```
 
 ## ScreenInputEvent
 
-`ScreenInputEvent` находится в `game_screen/events.py`.
+`ScreenInputEvent` РЅР°С…РѕРґРёС‚СЃСЏ РІ `game_screen/events.py`.
 
-Он описывает не смысл игры, а только факт пользовательского ввода:
+РћРЅ РѕРїРёСЃС‹РІР°РµС‚ РЅРµ СЃРјС‹СЃР» РёРіСЂС‹, Р° С‚РѕР»СЊРєРѕ С„Р°РєС‚ РїРѕР»СЊР·РѕРІР°С‚РµР»СЊСЃРєРѕРіРѕ РІРІРѕРґР°:
 
 ```text
 type        click | double_click | ...
 button      left | right | middle | ...
-actor_id    GuiActor под курсором, если есть
-zone_id     ActiveZone под курсором, если есть
-screen_pos  координаты pygame-экрана
-local_pos   координаты внутри ActiveZone
+group_id    Group РїРѕРґ РєСѓСЂСЃРѕСЂРѕРј, РµСЃР»Рё РµСЃС‚СЊ
+frame_id     Frame РїРѕРґ РєСѓСЂСЃРѕСЂРѕРј, РµСЃР»Рё РµСЃС‚СЊ
+screen_pos  РєРѕРѕСЂРґРёРЅР°С‚С‹ pygame-СЌРєСЂР°РЅР°
+local_pos   РєРѕРѕСЂРґРёРЅР°С‚С‹ РІРЅСѓС‚СЂРё Frame
 ```
 
-Пример: двойной клик ЛКМ по карте в руке игрока:
+РџСЂРёРјРµСЂ: РґРІРѕР№РЅРѕР№ РєР»РёРє Р›РљРњ РїРѕ РєР°СЂС‚Рµ РІ СЂСѓРєРµ РёРіСЂРѕРєР°:
 
 ```text
 type = double_click
 button = left
-actor_id = card_6_clubs
-zone_id = bottom_hand
+group_id = card_6_clubs
+frame_id = bottom_hand
 screen_pos = (430, 610)
 local_pos = (120, 18)
 ```
 
-`GameScreen` не говорит "игрок сделал ход". Он говорит только: "был двойной
-клик ЛКМ по actor в зоне".
+`GameScreen` РЅРµ РіРѕРІРѕСЂРёС‚ "РёРіСЂРѕРє СЃРґРµР»Р°Р» С…РѕРґ". РћРЅ РіРѕРІРѕСЂРёС‚ С‚РѕР»СЊРєРѕ: "Р±С‹Р» РґРІРѕР№РЅРѕР№
+РєР»РёРє Р›РљРњ РїРѕ group РІ Р·РѕРЅРµ".
 
 ## GameController
 
-`GameController.handle_input(event)` интерпретирует событие:
+`GameController.handle_input(event)` РёРЅС‚РµСЂРїСЂРµС‚РёСЂСѓРµС‚ СЃРѕР±С‹С‚РёРµ:
 
 ```text
-если event.type == double_click
-если event.button == left
-если event.zone_id == bottom_hand
-если event.actor_id является картой текущего игрока
-если правила разрешают ход
-тогда обновить GameState и вернуть VisualCommand
+РµСЃР»Рё event.type == double_click
+РµСЃР»Рё event.button == left
+РµСЃР»Рё event.frame_id == bottom_hand
+РµСЃР»Рё event.group_id СЏРІР»СЏРµС‚СЃСЏ РєР°СЂС‚РѕР№ С‚РµРєСѓС‰РµРіРѕ РёРіСЂРѕРєР°
+РµСЃР»Рё РїСЂР°РІРёР»Р° СЂР°Р·СЂРµС€Р°СЋС‚ С…РѕРґ
+С‚РѕРіРґР° РѕР±РЅРѕРІРёС‚СЊ GameState Рё РІРµСЂРЅСѓС‚СЊ VisualCommand
 ```
 
-На текущем этапе метод существует как draft: он записывает input и возвращает
-пустой список команд. Правила игры будут добавлены позже.
+РќР° С‚РµРєСѓС‰РµРј СЌС‚Р°РїРµ РјРµС‚РѕРґ СЃСѓС‰РµСЃС‚РІСѓРµС‚ РєР°Рє draft: РѕРЅ Р·Р°РїРёСЃС‹РІР°РµС‚ input Рё РІРѕР·РІСЂР°С‰Р°РµС‚
+РїСѓСЃС‚РѕР№ СЃРїРёСЃРѕРє РєРѕРјР°РЅРґ. РџСЂР°РІРёР»Р° РёРіСЂС‹ Р±СѓРґСѓС‚ РґРѕР±Р°РІР»РµРЅС‹ РїРѕР·Р¶Рµ.
 
 ## VisualCommand
 
-`VisualCommand` также находится в `game_screen/events.py`.
+`VisualCommand` С‚Р°РєР¶Рµ РЅР°С…РѕРґРёС‚СЃСЏ РІ `game_screen/events.py`.
 
-Это ответ контроллера экрану. Команда сообщает, какое визуальное действие нужно
-запустить, но не содержит pygame-кода.
+Р­С‚Рѕ РѕС‚РІРµС‚ РєРѕРЅС‚СЂРѕР»Р»РµСЂР° СЌРєСЂР°РЅСѓ. РљРѕРјР°РЅРґР° СЃРѕРѕР±С‰Р°РµС‚, РєР°РєРѕРµ РІРёР·СѓР°Р»СЊРЅРѕРµ РґРµР№СЃС‚РІРёРµ РЅСѓР¶РЅРѕ
+Р·Р°РїСѓСЃС‚РёС‚СЊ, РЅРѕ РЅРµ СЃРѕРґРµСЂР¶РёС‚ pygame-РєРѕРґР°.
 
-Пример будущей команды:
+РџСЂРёРјРµСЂ Р±СѓРґСѓС‰РµР№ РєРѕРјР°РЅРґС‹:
 
 ```text
 type = play_card
-actor_id = card_6_clubs
-from_zone = bottom_hand
-to_zone = battle_table
+group_id = card_6_clubs
+from_frame = bottom_hand
+to_frame = battle_table
 ```
 
-`GameScreen.dispatch_visual_command()` принимает команду и передает ее в
-визуальную систему: выбирает зоны, создает `Action`, запускает его в зоне.
+`GameScreen.dispatch_visual_command()` РїСЂРёРЅРёРјР°РµС‚ РєРѕРјР°РЅРґСѓ Рё РїРµСЂРµРґР°РµС‚ РµРµ РІ
+РІРёР·СѓР°Р»СЊРЅСѓСЋ СЃРёСЃС‚РµРјСѓ: РІС‹Р±РёСЂР°РµС‚ Р·РѕРЅС‹, СЃРѕР·РґР°РµС‚ `Action`, Р·Р°РїСѓСЃРєР°РµС‚ РµРіРѕ РІ Р·РѕРЅРµ.
 
-## ActiveZone
+## Frame
 
-`ActiveZone` принадлежит `GameScreen`.
+`Frame` РїСЂРёРЅР°РґР»РµР¶РёС‚ `GameScreen`.
 
-Зона:
+Р—РѕРЅР°:
 
-- хранит `actor_ids`;
-- размещает actor-ы в локальной системе координат;
-- переводит `screen_pos` в `local_pos`;
-- делает hit-test actor-ов внутри зоны;
-- владеет активными `Action`;
-- обновляет `Action` каждый кадр.
+- С…СЂР°РЅРёС‚ `group_ids`;
+- СЂР°Р·РјРµС‰Р°РµС‚ group-С‹ РІ Р»РѕРєР°Р»СЊРЅРѕР№ СЃРёСЃС‚РµРјРµ РєРѕРѕСЂРґРёРЅР°С‚;
+- РїРµСЂРµРІРѕРґРёС‚ `screen_pos` РІ `local_pos`;
+- РґРµР»Р°РµС‚ hit-test group-РѕРІ РІРЅСѓС‚СЂРё Р·РѕРЅС‹;
+- РІР»Р°РґРµРµС‚ Р°РєС‚РёРІРЅС‹РјРё `Action`;
+- РѕР±РЅРѕРІР»СЏРµС‚ `Action` РєР°Р¶РґС‹Р№ РєР°РґСЂ.
 
-Важно: `ActiveZone` не решает правила игры. Она знает только экранную геометрию
-и визуальные процессы внутри своей области.
+Р’Р°Р¶РЅРѕ: `Frame` РЅРµ СЂРµС€Р°РµС‚ РїСЂР°РІРёР»Р° РёРіСЂС‹. РћРЅР° Р·РЅР°РµС‚ С‚РѕР»СЊРєРѕ СЌРєСЂР°РЅРЅСѓСЋ РіРµРѕРјРµС‚СЂРёСЋ
+Рё РІРёР·СѓР°Р»СЊРЅС‹Рµ РїСЂРѕС†РµСЃСЃС‹ РІРЅСѓС‚СЂРё СЃРІРѕРµР№ РѕР±Р»Р°СЃС‚Рё.
 
 ## Action
 
-`Action` находится в пакете `actions/`.
+`Action` РЅР°С…РѕРґРёС‚СЃСЏ РІ РїР°РєРµС‚Рµ `actions/`.
 
-Action описывает один визуальный сценарий: ход карты, раздача, сброс,
-перемещение набора карт. Action может состоять из нескольких Animation.
+Action РѕРїРёСЃС‹РІР°РµС‚ РѕРґРёРЅ РІРёР·СѓР°Р»СЊРЅС‹Р№ СЃС†РµРЅР°СЂРёР№: С…РѕРґ РєР°СЂС‚С‹, СЂР°Р·РґР°С‡Р°, СЃР±СЂРѕСЃ,
+РїРµСЂРµРјРµС‰РµРЅРёРµ РЅР°Р±РѕСЂР° РєР°СЂС‚. Action РјРѕР¶РµС‚ СЃРѕСЃС‚РѕСЏС‚СЊ РёР· РЅРµСЃРєРѕР»СЊРєРёС… Animation.
 
-Action запускается только после того, как `GameController` уже разрешил
-действие и вернул `VisualCommand`.
+Action Р·Р°РїСѓСЃРєР°РµС‚СЃСЏ С‚РѕР»СЊРєРѕ РїРѕСЃР»Рµ С‚РѕРіРѕ, РєР°Рє `GameController` СѓР¶Рµ СЂР°Р·СЂРµС€РёР»
+РґРµР№СЃС‚РІРёРµ Рё РІРµСЂРЅСѓР» `VisualCommand`.
 
 ## Animation
 
-`Animation` находится в пакете `animations/`.
+`Animation` РЅР°С…РѕРґРёС‚СЃСЏ РІ РїР°РєРµС‚Рµ `animations/`.
 
-Animation делает конкретное изменение во времени:
+Animation РґРµР»Р°РµС‚ РєРѕРЅРєСЂРµС‚РЅРѕРµ РёР·РјРµРЅРµРЅРёРµ РІРѕ РІСЂРµРјРµРЅРё:
 
-- перемещение actor;
-- масштаб;
-- смена кадра;
-- появление или исчезновение;
-- переворот карты.
+- РїРµСЂРµРјРµС‰РµРЅРёРµ group;
+- РјР°СЃС€С‚Р°Р±;
+- СЃРјРµРЅР° РєР°РґСЂР°;
+- РїРѕСЏРІР»РµРЅРёРµ РёР»Рё РёСЃС‡РµР·РЅРѕРІРµРЅРёРµ;
+- РїРµСЂРµРІРѕСЂРѕС‚ РєР°СЂС‚С‹.
 
-Animation не знает о правилах игры, `GameState` и `GameController`.
+Animation РЅРµ Р·РЅР°РµС‚ Рѕ РїСЂР°РІРёР»Р°С… РёРіСЂС‹, `GameState` Рё `GameController`.
 
 ## Ownership
 
 ```text
 GameController -> rules, GameState, input interpretation, VisualCommand
-GameScreen     -> pygame adapter, screen zones, command dispatch
-ActiveZone     -> local layout, hit-test, zone-owned Action list
+GameScreen     -> pygame adapter, screen frames, command dispatch
+Frame     -> local layout, hit-test, frame-owned Action list
 Action         -> visual scenario composed from animations
 Animation      -> frame-by-frame visual state change
-GuiActor       -> passive drawable object
+Group       -> passive drawable object
 ```
+
+

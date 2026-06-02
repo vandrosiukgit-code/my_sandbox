@@ -1,16 +1,16 @@
-"""Base screen scene for zones, input normalization, and active actors."""
+﻿"""Base screen scene for frames, input normalization, and active groups."""
 
 import pygame
 
 from base import BaseGameScreen
-from game_screen.active_zone import ActiveZone
-from game_screen.events import ScreenInputEvent, VisualCommand, ZoneHit
+from game_screen.frame import Frame
+from game_screen.events import ScreenInputEvent, VisualCommand, FrameHit
 
 
 class GameScreen(BaseGameScreen):
     """Pygame-facing scene.
 
-    GameScreen owns screen zones and visual orchestration. It does not decide
+    GameScreen owns screen frames and visual orchestration. It does not decide
     game rules: raw pygame input is normalized into ScreenInputEvent and sent
     to GameController. Controller responses come back as VisualCommand objects.
     """
@@ -19,90 +19,90 @@ class GameScreen(BaseGameScreen):
     DOUBLE_CLICK_SECONDS = 0.35
     DOUBLE_CLICK_DISTANCE = 6
 
-    def __init__(self, actor_store=None, game_controller=None, background_color=None):
-        self.actor_store = actor_store
+    def __init__(self, group_store=None, game_controller=None, background_color=None):
+        self.group_store = group_store
         self.game_controller = game_controller
         self.background_color = background_color or self.BG_COLOR
-        self.active_actor_ids = []
+        self.active_group_ids = []
         self.active_activities = []
-        self.screen_zones = {}
+        self.screen_frames = {}
         self._last_click = None
 
-    def set_actor_store(self, actor_store):
-        self.actor_store = actor_store
+    def set_group_store(self, group_store):
+        self.group_store = group_store
 
     def set_game_controller(self, game_controller):
         self.game_controller = game_controller
 
-    def create_zone(self, zone_id, rect, hit_rect=None, padding=0, spacing=12, parent_zone_id=None):
-        """Create an ActiveZone and register it on this screen."""
-        parent_zone = self.get_screen_zone(parent_zone_id) if parent_zone_id else None
-        zone = ActiveZone(
-            zone_id=zone_id,
+    def create_frame(self, frame_id, rect, hit_rect=None, padding=0, spacing=12, parent_frame_id=None):
+        """Create an Frame and register it on this screen."""
+        parent_frame = self.get_screen_frame(parent_frame_id) if parent_frame_id else None
+        frame = Frame(
+            frame_id=frame_id,
             rect=rect,
             hit_rect=hit_rect,
             padding=padding,
             spacing=spacing,
-            parent_zone=parent_zone,
+            parent_frame=parent_frame,
         )
-        self.add_screen_zone(zone_id, zone)
-        if parent_zone is not None:
-            parent_zone.add_child_zone(zone)
-        return zone
+        self.add_screen_frame(frame_id, frame)
+        if parent_frame is not None:
+            parent_frame.add_child_frame(frame)
+        return frame
 
-    def add_screen_zone(self, zone_id, zone_config):
-        self.screen_zones[zone_id] = zone_config
-        return zone_config
+    def add_screen_frame(self, frame_id, frame_config):
+        self.screen_frames[frame_id] = frame_config
+        return frame_config
 
-    def get_screen_zone(self, zone_id):
-        return self.screen_zones[zone_id]
+    def get_screen_frame(self, frame_id):
+        return self.screen_frames[frame_id]
 
-    def put_zone_in_zone(self, child_zone_id, parent_zone_id, position=None):
-        """Attach an existing registered zone as a child of another zone."""
-        child_zone = self.get_screen_zone(child_zone_id)
-        parent_zone = self.get_screen_zone(parent_zone_id)
-        if child_zone.parent_zone is not None:
-            child_zone.parent_zone.child_zones.pop(child_zone.id, None)
+    def put_frame_in_frame(self, child_frame_id, parent_frame_id, position=None):
+        """Attach an existing registered frame as a child of another frame."""
+        child_frame = self.get_screen_frame(child_frame_id)
+        parent_frame = self.get_screen_frame(parent_frame_id)
+        if child_frame.parent_frame is not None:
+            child_frame.parent_frame.child_frames.pop(child_frame.id, None)
         if position is not None:
-            child_zone.set_local_position(*position)
-        parent_zone.add_child_zone(child_zone)
-        return child_zone
+            child_frame.set_local_position(*position)
+        parent_frame.add_child_frame(child_frame)
+        return child_frame
 
-    def put_actor_in_zone(self, actor_id, zone_id, position=(0, 0)):
-        """Put an already active actor at a local position inside a zone."""
-        actor = self.get_actor(actor_id)
-        zone = self.get_screen_zone(zone_id)
-        zone.add_actor_id(actor_id)
+    def put_group_in_frame(self, group_id, frame_id, position=(0, 0)):
+        """Put an already active group at a local position inside a frame."""
+        group = self.get_group(group_id)
+        frame = self.get_screen_frame(frame_id)
+        frame.add_group_id(group_id)
 
-        screen_position = zone.to_screen(position)
-        actor.set_position(*screen_position)
-        zone.actor_origins[actor_id] = screen_position
-        return actor
+        screen_position = frame.to_screen(position)
+        group.set_position(*screen_position)
+        frame.group_origins[group_id] = screen_position
+        return group
 
-    def apply_zone_layout(self, zone_id):
-        if self.actor_store is None:
-            raise RuntimeError("GameScreen.actor_store is not connected")
-        zone = self.get_screen_zone(zone_id)
-        zone.apply_layout(self.actor_store)
-        return zone
+    def apply_frame_layout(self, frame_id):
+        if self.group_store is None:
+            raise RuntimeError("GameScreen.group_store is not connected")
+        frame = self.get_screen_frame(frame_id)
+        frame.apply_layout(self.group_store)
+        return frame
 
-    def activate_actor(self, actor_id):
-        if actor_id not in self.active_actor_ids:
-            self.active_actor_ids.append(actor_id)
-        return self.get_actor(actor_id)
+    def activate_group(self, group_id):
+        if group_id not in self.active_group_ids:
+            self.active_group_ids.append(group_id)
+        return self.get_group(group_id)
 
-    def deactivate_actor(self, actor_id):
-        if actor_id in self.active_actor_ids:
-            self.active_actor_ids.remove(actor_id)
+    def deactivate_group(self, group_id):
+        if group_id in self.active_group_ids:
+            self.active_group_ids.remove(group_id)
 
-    def get_actor(self, actor_id):
-        if self.actor_store is None:
-            raise RuntimeError("GameScreen.actor_store is not connected")
-        return self.actor_store.get(actor_id)
+    def get_group(self, group_id):
+        if self.group_store is None:
+            raise RuntimeError("GameScreen.group_store is not connected")
+        return self.group_store.get(group_id)
 
-    def iter_active_actors(self):
-        for actor_id in self.active_actor_ids:
-            yield self.get_actor(actor_id)
+    def iter_active_groups(self):
+        for group_id in self.active_group_ids:
+            yield self.get_group(group_id)
 
     def add_activity(self, activity):
         self.active_activities.append(activity)
@@ -131,8 +131,8 @@ class GameScreen(BaseGameScreen):
         return ScreenInputEvent(
             type=click_type,
             button=button,
-            actor_id=hit.actor_id if hit else None,
-            zone_id=hit.zone_id if hit else None,
+            group_id=hit.group_id if hit else None,
+            frame_id=hit.frame_id if hit else None,
             screen_pos=tuple(event.pos),
             local_pos=hit.local_pos if hit else None,
             raw_event=event,
@@ -152,8 +152,8 @@ class GameScreen(BaseGameScreen):
         now = pygame.time.get_ticks() / 1000.0
         signature = (
             button,
-            hit.zone_id if hit else None,
-            hit.actor_id if hit else None,
+            hit.frame_id if hit else None,
+            hit.group_id if hit else None,
         )
         last_signature, last_time, last_pos = self._last_click or (None, 0.0, None)
         self._last_click = (signature, now, tuple(screen_pos))
@@ -176,22 +176,22 @@ class GameScreen(BaseGameScreen):
         )
 
     def hit_test(self, screen_pos):
-        """Find the topmost active zone/actor at screen_pos."""
-        if self.actor_store is None:
-            return ZoneHit(None, None, tuple(screen_pos), None)
+        """Find the topmost active frame/group at screen_pos."""
+        if self.group_store is None:
+            return FrameHit(None, None, tuple(screen_pos), None)
 
-        for zone in reversed(tuple(self.iter_root_zones())):
-            if hasattr(zone, "hit_test"):
-                hit = zone.hit_test(screen_pos, self.actor_store)
+        for frame in reversed(tuple(self.iter_root_frames())):
+            if hasattr(frame, "hit_test"):
+                hit = frame.hit_test(screen_pos, self.group_store)
                 if hit is not None:
                     return hit
 
-        for actor_id in reversed(self.active_actor_ids):
-            actor = self.get_actor(actor_id)
-            if actor.hit_rect.collidepoint(screen_pos):
-                return ZoneHit(None, actor_id, tuple(screen_pos), None)
+        for group_id in reversed(self.active_group_ids):
+            group = self.get_group(group_id)
+            if group.hit_rect.collidepoint(screen_pos):
+                return FrameHit(None, group_id, tuple(screen_pos), None)
 
-        return ZoneHit(None, None, tuple(screen_pos), None)
+        return FrameHit(None, None, tuple(screen_pos), None)
 
     def forward_input_to_controller(self, input_event):
         """Send normalized input to GameController and return visual commands."""
@@ -201,8 +201,8 @@ class GameScreen(BaseGameScreen):
         if hasattr(self.game_controller, "handle_input"):
             return self.game_controller.handle_input(input_event) or ()
 
-        if input_event.actor_id and hasattr(self.game_controller, "on_actor_clicked"):
-            self.game_controller.on_actor_clicked(input_event.actor_id)
+        if input_event.group_id and hasattr(self.game_controller, "on_group_clicked"):
+            self.game_controller.on_group_clicked(input_event.group_id)
         return ()
 
     def dispatch_visual_commands(self, visual_commands):
@@ -216,12 +216,12 @@ class GameScreen(BaseGameScreen):
         Action objects, for example PlayCardAction.
         """
         command_type = self.get_command_value(command, "type")
-        actor_id = self.get_command_value(command, "actor_id")
+        group_id = self.get_command_value(command, "group_id")
 
-        if command_type == "activate_actor" and actor_id:
-            self.activate_actor(actor_id)
-        elif command_type == "deactivate_actor" and actor_id:
-            self.deactivate_actor(actor_id)
+        if command_type == "activate_group" and group_id:
+            self.activate_group(group_id)
+        elif command_type == "deactivate_group" and group_id:
+            self.deactivate_group(group_id)
 
     @staticmethod
     def get_command_value(command, key, default=None):
@@ -232,21 +232,21 @@ class GameScreen(BaseGameScreen):
         return getattr(command, key, default)
 
     def update(self, dt):
-        self.update_screen_zones(dt)
+        self.update_screen_frames(dt)
         self.update_activities(dt)
 
-        for actor in self.iter_active_actors():
-            actor.update(dt)
+        for group in self.iter_active_groups():
+            group.update(dt)
 
-    def update_screen_zones(self, dt):
-        for zone in self.iter_root_zones():
-            if hasattr(zone, "update_actions"):
-                zone.update_actions(dt)
+    def update_screen_frames(self, dt):
+        for frame in self.iter_root_frames():
+            if hasattr(frame, "update_actions"):
+                frame.update_actions(dt)
 
-    def iter_root_zones(self):
-        for zone in self.screen_zones.values():
-            if getattr(zone, "parent_zone", None) is None:
-                yield zone
+    def iter_root_frames(self):
+        for frame in self.screen_frames.values():
+            if getattr(frame, "parent_frame", None) is None:
+                yield frame
 
     def update_activities(self, dt):
         running_activities = []
@@ -265,5 +265,7 @@ class GameScreen(BaseGameScreen):
 
     def draw(self, screen):
         screen.fill(self.background_color)
-        for actor in self.iter_active_actors():
-            actor.draw(screen)
+        for group in self.iter_active_groups():
+            group.draw(screen)
+
+
