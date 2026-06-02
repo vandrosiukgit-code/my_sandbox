@@ -1,4 +1,4 @@
-﻿"""Core-РїР°РєРµС‚ РіСЂР°С„РёС‡РµСЃРєРѕРіРѕ runtime, СЂРµСЃСѓСЂСЃРѕРІ Рё С‡РµСЂРЅРѕРІРѕР№ РёРіСЂРѕРІРѕР№ Р»РѕРіРёРєРё."""
+"""Core-пакет графического runtime, ресурсов и черновой игровой логики."""
 
 from core.game_controller import GameController
 from core.game_state import CardState, GameState

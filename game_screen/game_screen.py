@@ -267,5 +267,7 @@ class GameScreen(BaseGameScreen):
         screen.fill(self.background_color)
         for group in self.iter_active_groups():
             group.draw(screen)
+        for frame in self.iter_root_frames():
+            frame.draw_debug_tree(screen)
 
 

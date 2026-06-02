@@ -1,8 +1,8 @@
-﻿"""РўРѕС‡РєР° РІС…РѕРґР° РїСЂРѕРµРєС‚Р° The Fool's Reef.
+"""Точка входа проекта The Fool's Reef.
 
-main.py СЏРІР»СЏРµС‚СЃСЏ composition root: Р·РґРµСЃСЊ СЃРѕР·РґР°СЋС‚СЃСЏ РєСЂСѓРїРЅС‹Рµ Р·Р°РІРёСЃРёРјРѕСЃС‚Рё
-РїСЂРёР»РѕР¶РµРЅРёСЏ Рё Р·Р°РґР°РµС‚СЃСЏ РїРѕСЂСЏРґРѕРє СЃС‚Р°СЂС‚Р° runtime. РРіСЂРѕРІС‹Рµ РїСЂР°РІРёР»Р°, РѕС‚СЂРёСЃРѕРІРєР°
-group-РѕРІ Рё РїРѕРґРіРѕС‚РѕРІРєР° РєРѕРЅРєСЂРµС‚РЅС‹С… СЂРµСЃСѓСЂСЃРѕРІ Р¶РёРІСѓС‚ РІ СЃРІРѕРёС… РјРѕРґСѓР»СЏС….
+main.py является composition root: здесь создаются крупные зависимости
+приложения и задается порядок старта runtime. Игровые правила, отрисовка
+group-ов и подготовка конкретных ресурсов живут в своих модулях.
 """
 
 import os
@@ -21,14 +21,14 @@ WINDOW_TITLE = "The Fool's Reef"
 
 
 def build_app_context():
-    """РЎРѕР±СЂР°С‚СЊ РјРёРЅРёРјР°Р»СЊРЅС‹Р№ РєРѕРЅС‚РµРєСЃС‚ РїСЂРёР»РѕР¶РµРЅРёСЏ.
+    """Собрать минимальный контекст приложения.
 
-    Р—РґРµСЃСЊ СЃРѕР·РґР°СЋС‚СЃСЏ РѕР±СЉРµРєС‚С‹ РІРµСЂС…РЅРµРіРѕ СѓСЂРѕРІРЅСЏ, РєРѕС‚РѕСЂС‹Рµ РґРѕР»Р¶РЅС‹ Р±С‹С‚СЊ РѕР±С‰РёРјРё РґР»СЏ
+    Здесь создаются объекты верхнего уровня, которые должны быть общими для
     runtime:
 
-    - GameController С…СЂР°РЅРёС‚ fixture-СЃРѕСЃС‚РѕСЏРЅРёРµ;
-    - GroupStore С…СЂР°РЅРёС‚ СЃРѕР·РґР°РЅРЅС‹Рµ Group;
-    - ResourceManager РїРµСЂРµРґР°РµС‚СЃСЏ РІ store РєР°Рє РёСЃС‚РѕС‡РЅРёРє РєР°РґСЂРѕРІ.
+    - GameController хранит fixture-состояние;
+    - GroupStore хранит созданные Group;
+    - ResourceManager передается в store как источник кадров.
     """
     game_controller = GameController(GameController.create_fixture_state())
     group_store = GroupStore(resource_manager=ResourceManager)
@@ -43,11 +43,11 @@ def build_app_context():
 
 
 def create_screen_factory(app_context):
-    """Р’РµСЂРЅСѓС‚СЊ С„Р°Р±СЂРёРєСѓ СЃС‚Р°СЂС‚РѕРІРѕРіРѕ СЌРєСЂР°РЅР°.
+    """Вернуть фабрику стартового экрана.
 
-    RenderEngine РІС‹Р·С‹РІР°РµС‚ СЌС‚Сѓ С„Р°Р±СЂРёРєСѓ РїРѕСЃР»Рµ СЃРѕР·РґР°РЅРёСЏ pygame display. Р­С‚Рѕ РІР°Р¶РЅРѕ:
-    ResourceManager Р·Р°РіСЂСѓР¶Р°РµС‚ PNG С‡РµСЂРµР· convert_alpha(), Р° РѕРЅ С‚СЂРµР±СѓРµС‚ СѓР¶Рµ
-    СЃРѕР·РґР°РЅРЅРѕРµ РѕРєРЅРѕ. РџРѕСЌС‚РѕРјСѓ runtime-РєСЌС€ Рё GroupStore СЃРѕР±РёСЂР°СЋС‚СЃСЏ РёРјРµРЅРЅРѕ С‚СѓС‚.
+    RenderEngine вызывает эту фабрику после создания pygame display. Это важно:
+    ResourceManager загружает PNG через convert_alpha(), а он требует уже
+    созданное окно. Поэтому runtime-кэш и GroupStore собираются именно тут.
     """
     def screen_factory():
         ResourceManager.build_runtime_cache(app_context["assets_dir"])
@@ -61,7 +61,7 @@ def create_screen_factory(app_context):
 
 
 def main():
-    """Р—Р°РїСѓСЃС‚РёС‚СЊ РіСЂР°С„РёС‡РµСЃРєРёР№ runtime СЃ С‚РµРєСѓС‰РёРј СЃС‚Р°СЂС‚РѕРІС‹Рј СЌРєСЂР°РЅРѕРј."""
+    """Запустить графический runtime с текущим стартовым экраном."""
     app_context = build_app_context()
     screen_factory = create_screen_factory(app_context)
     render_engine = RenderEngine(

@@ -1,4 +1,4 @@
-﻿"""РџР°РєРµС‚ СѓРЅРёРІРµСЂСЃР°Р»СЊРЅС‹С… GUI group-РѕРІ."""
+"""Пакет универсальных GUI group-ов."""
 
 from group.group import Group, Layer
 from group.group_store import GroupStore

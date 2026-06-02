@@ -1,4 +1,4 @@
-﻿"""РџР°РєРµС‚ Р±Р°Р·РѕРІС‹С… СЌРєСЂР°РЅРѕРІ РёРіСЂС‹."""
+"""Пакет базовых экранов игры."""
 
 from game_screen.frame import Frame
 from game_screen.events import ScreenInputEvent, VisualCommand, FrameHit

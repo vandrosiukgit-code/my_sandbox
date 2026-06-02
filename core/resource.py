@@ -1,8 +1,8 @@
-﻿"""Р—Р°РіСЂСѓР·РєР° PNG-СЂРµСЃСѓСЂСЃРѕРІ С‡РµСЂРµР· manifest Рё СЃР±РѕСЂРєР° runtime-РєСЌС€Р° РєР°РґСЂРѕРІ.
+"""Загрузка PNG-ресурсов через manifest и сборка runtime-кэша кадров.
 
-`assets/resource_manifest.json` СЏРІР»СЏРµС‚СЃСЏ РєРѕРЅС‚СЂР°РєС‚РѕРј РјРµР¶РґСѓ СЃС‹СЂС‹РјРё PNG Рё
-ResourceManager. Р’ manifest С…СЂР°РЅРёС‚СЃСЏ С‚РѕР»СЊРєРѕ РѕРїРёСЃР°РЅРёРµ С‚РѕРіРѕ, РєР°Рє РїРѕР»СѓС‡РёС‚СЊ РєР°РґСЂС‹
-РёР· С„Р°Р№Р»Р°: resource_key, РїСѓС‚СЊ Рє PNG Рё СЂР°Р·РјРµСЂ РѕРґРЅРѕРіРѕ РєР°РґСЂР°.
+`assets/resource_manifest.json` является контрактом между сырыми PNG и
+ResourceManager. В manifest хранится только описание того, как получить кадры
+из файла: resource_key, путь к PNG и размер одного кадра.
 """
 
 import json
@@ -16,7 +16,7 @@ from PIL import Image
 
 @dataclass
 class ResourceRecord:
-    """РћРїРёСЃР°РЅРёРµ РѕРґРЅРѕРіРѕ СЂРµСЃСѓСЂСЃР° РёР· manifest."""
+    """Описание одного ресурса из manifest."""
 
     key: str
     path: str
@@ -30,11 +30,11 @@ class ResourceRecord:
 
     @property
     def frame_size(self):
-        """Р Р°Р·РјРµСЂ РѕРґРЅРѕРіРѕ РєР°РґСЂР° СЂРµСЃСѓСЂСЃР°."""
+        """Размер одного кадра ресурса."""
         return self.frame_width, self.frame_height
 
     def to_manifest_entry(self):
-        """Р’РµСЂРЅСѓС‚СЊ Р·Р°РїРёСЃСЊ, РєРѕС‚РѕСЂСѓСЋ РјРѕР¶РЅРѕ СЃРѕС…СЂР°РЅРёС‚СЊ РІ resource_manifest.json."""
+        """Вернуть запись, которую можно сохранить в resource_manifest.json."""
         return {
             "path": self.relative_path.replace("\\", "/"),
             "frame_width": self.frame_width,
@@ -42,7 +42,7 @@ class ResourceRecord:
         }
 
     def to_payload(self):
-        """Р’РµСЂРЅСѓС‚СЊ СЃР»РѕРІР°СЂСЊ РґР»СЏ dev tools Рё РѕС‚Р»Р°РґРєРё."""
+        """Вернуть словарь для dev tools и отладки."""
         return {
             "resource_key": self.key,
             "path": self.path,
@@ -57,7 +57,7 @@ class ResourceRecord:
 
 
 class ResourceManager:
-    """РћР±С‰РёР№ РЅРёР·РєРѕСѓСЂРѕРІРЅРµРІС‹Р№ СЃРєР»Р°Рґ РіСЂР°С„РёС‡РµСЃРєРёС… СЂРµСЃСѓСЂСЃРѕРІ РїСЂРѕРµРєС‚Р°."""
+    """Общий низкоуровневый склад графических ресурсов проекта."""
 
     MANIFEST_FILE_NAME = "resource_manifest.json"
 
@@ -69,7 +69,7 @@ class ResourceManager:
 
     @classmethod
     def build_cache(cls, assets_dir, load_surfaces=True):
-        """РџРѕСЃС‚СЂРѕРёС‚СЊ runtime-index РїРѕ manifest Рё РїСЂРё РЅРµРѕР±С…РѕРґРёРјРѕСЃС‚Рё Р·Р°РіСЂСѓР·РёС‚СЊ РєР°РґСЂС‹."""
+        """Построить runtime-index по manifest и при необходимости загрузить кадры."""
         cls.clear_cache()
         cls._assets_dir = os.path.abspath(assets_dir)
         cls._manifest = cls.load_or_generate_manifest(cls._assets_dir)
@@ -93,24 +93,24 @@ class ResourceManager:
 
     @classmethod
     def build_index(cls, assets_dir):
-        """РџРѕСЃС‚СЂРѕРёС‚СЊ metadata-only index Р±РµР· Р·Р°РіСЂСѓР·РєРё pygame.Surface."""
+        """Построить metadata-only index без загрузки pygame.Surface."""
         return cls.build_cache(assets_dir, load_surfaces=False)
 
     @classmethod
     def build_runtime_cache(cls, assets_dir):
-        """РџРѕСЃС‚СЂРѕРёС‚СЊ runtime-index Рё Р·Р°РіСЂСѓР·РёС‚СЊ РєР°РґСЂС‹ РїРѕСЃР»Рµ СЃРѕР·РґР°РЅРёСЏ display."""
+        """Построить runtime-index и загрузить кадры после создания display."""
         return cls.build_cache(assets_dir, load_surfaces=True)
 
     @classmethod
     def load_surfaces_from_index(cls):
-        """Р”РѕРіСЂСѓР·РёС‚СЊ pygame.Surface РґР»СЏ СѓР¶Рµ РїРѕСЃС‚СЂРѕРµРЅРЅРѕРіРѕ runtime-index."""
+        """Догрузить pygame.Surface для уже построенного runtime-index."""
         for record in cls._runtime_cache.values():
             cls.add_to_cache_frames_file(record.path, record.key)
         return cls._cache_frames
 
     @classmethod
     def clear_cache(cls):
-        """РћС‡РёСЃС‚РёС‚СЊ runtime-index Рё Р·Р°РіСЂСѓР¶РµРЅРЅС‹Рµ РєР°РґСЂС‹."""
+        """Очистить runtime-index и загруженные кадры."""
         cls._cache_frames = {}
         cls._runtime_cache = {}
         cls._assets_dir = None
@@ -119,12 +119,12 @@ class ResourceManager:
 
     @classmethod
     def get_runtime_cache(cls):
-        """Р’РµСЂРЅСѓС‚СЊ runtime-index key -> ResourceRecord."""
+        """Вернуть runtime-index key -> ResourceRecord."""
         return cls._runtime_cache
 
     @classmethod
     def get_runtime_payloads(cls):
-        """Р’РµСЂРЅСѓС‚СЊ runtime-index РІ РІРёРґРµ РїСЂРѕСЃС‚С‹С… СЃР»РѕРІР°СЂРµР№."""
+        """Вернуть runtime-index в виде простых словарей."""
         return {key: record.to_payload() for key, record in cls._runtime_cache.items()}
 
     @classmethod
@@ -134,16 +134,16 @@ class ResourceManager:
 
     @classmethod
     def get_record(cls, key_or_path):
-        """РџРѕР»СѓС‡РёС‚СЊ ResourceRecord РїРѕ resource_key РёР»Рё РїСѓС‚Рё С„Р°Р№Р»Р°."""
+        """Получить ResourceRecord по resource_key или пути файла."""
         key = cls.resolve_resource_key(key_or_path)
         try:
             return cls._runtime_cache[key]
         except KeyError as error:
-            raise KeyError(f"Р РµСЃСѓСЂСЃ РЅРµ РЅР°Р№РґРµРЅ РІ runtime-index: {key}") from error
+            raise KeyError(f"Ресурс не найден в runtime-index: {key}") from error
 
     @classmethod
     def get__cache_static(cls):
-        """РЎРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ СЃРѕ СЃС‚Р°СЂС‹Рј API: РІРµСЂРЅСѓС‚СЊ РїРµСЂРІС‹Р№ РєР°РґСЂ РєР°Р¶РґРѕРіРѕ СЂРµСЃСѓСЂСЃР°."""
+        """Совместимость со старым API: вернуть первый кадр каждого ресурса."""
         return {
             key: frames[0]
             for key, frames in cls._cache_frames.items()
@@ -152,38 +152,38 @@ class ResourceManager:
 
     @classmethod
     def get__cache_anim(cls):
-        """РЎРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ СЃРѕ СЃС‚Р°СЂС‹Рј API: РІРµСЂРЅСѓС‚СЊ РІСЃРµ СЃРїРёСЃРєРё РєР°РґСЂРѕРІ."""
+        """Совместимость со старым API: вернуть все списки кадров."""
         return cls._cache_frames
 
     @classmethod
     def add_to_cache_static(cls, path):
-        """РЎРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ: Р·Р°РіСЂСѓР·РёС‚СЊ PNG РёР· РїР°РїРєРё РєР°Рє СЃРїРёСЃРєРё РєР°РґСЂРѕРІ."""
+        """Совместимость: загрузить PNG из папки как списки кадров."""
         for file_path in cls.get_files_in_dir(path):
             cls.add_to_cache_frames_file(file_path)
         return cls.get__cache_static()
 
     @classmethod
     def add_to_cache_anim(cls, path):
-        """РЎРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ: Р·Р°РіСЂСѓР·РёС‚СЊ PNG РёР· РїР°РїРєРё РєР°Рє СЃРїРёСЃРєРё РєР°РґСЂРѕРІ."""
+        """Совместимость: загрузить PNG из папки как списки кадров."""
         for file_path in cls.get_files_in_dir(path):
             cls.add_to_cache_frames_file(file_path)
         return cls._cache_frames
 
     @classmethod
     def add_to_cache_static_file(cls, file_path, resource_key=None):
-        """РЎРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ: Р·Р°РіСЂСѓР·РёС‚СЊ РѕРґРёРЅ PNG Рё РІРµСЂРЅСѓС‚СЊ static-view РєСЌС€Р°."""
+        """Совместимость: загрузить один PNG и вернуть static-view кэша."""
         cls.add_to_cache_frames_file(file_path, resource_key)
         return cls.get__cache_static()
 
     @classmethod
     def add_to_cache_anim_file(cls, file_path, resource_key=None):
-        """РЎРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ: Р·Р°РіСЂСѓР·РёС‚СЊ РѕРґРёРЅ PNG Рё РІРµСЂРЅСѓС‚СЊ frame-cache."""
+        """Совместимость: загрузить один PNG и вернуть frame-cache."""
         cls.add_to_cache_frames_file(file_path, resource_key)
         return cls._cache_frames
 
     @classmethod
     def add_to_cache_frames_file(cls, file_path, resource_key=None):
-        """Р—Р°РіСЂСѓР·РёС‚СЊ РѕРґРёРЅ PNG, РЅР°СЂРµР·Р°С‚СЊ РµРіРѕ РЅР° РєР°РґСЂС‹ Рё РїРѕР»РѕР¶РёС‚СЊ РІ РѕР±С‰РёР№ РєСЌС€."""
+        """Загрузить один PNG, нарезать его на кадры и положить в общий кэш."""
         key = resource_key or cls.resolve_resource_key(file_path)
         if key in cls._cache_frames:
             return cls._cache_frames
@@ -198,15 +198,15 @@ class ResourceManager:
 
     @classmethod
     def get_static(cls, key_or_path):
-        """РЎРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ: РІРµСЂРЅСѓС‚СЊ РїРµСЂРІС‹Р№ РєР°РґСЂ СЂРµСЃСѓСЂСЃР°."""
+        """Совместимость: вернуть первый кадр ресурса."""
         frames = cls.get_frames(key_or_path)
         if not frames:
-            raise KeyError(f"Р РµСЃСѓСЂСЃ РЅРµ СЃРѕРґРµСЂР¶РёС‚ РєР°РґСЂРѕРІ: {key_or_path}")
+            raise KeyError(f"Ресурс не содержит кадров: {key_or_path}")
         return frames[0]
 
     @classmethod
     def get_animation(cls, key_or_path):
-        """РЎРѕРІРјРµСЃС‚РёРјРѕСЃС‚СЊ: РІРµСЂРЅСѓС‚СЊ СЃРїРёСЃРѕРє РєР°РґСЂРѕРІ СЂРµСЃСѓСЂСЃР°."""
+        """Совместимость: вернуть список кадров ресурса."""
         return cls.get_frames(key_or_path)
 
     @classmethod
@@ -253,7 +253,7 @@ class ResourceManager:
 
     @classmethod
     def resolve_resource_key(cls, key_or_path):
-        """РџСЂРµРѕР±СЂР°Р·РѕРІР°С‚СЊ resource_key РёР»Рё РїСѓС‚СЊ С„Р°Р№Р»Р° РІ РєР»СЋС‡ runtime-index."""
+        """Преобразовать resource_key или путь файла в ключ runtime-index."""
         if key_or_path in cls._runtime_cache:
             return key_or_path
 
@@ -266,12 +266,12 @@ class ResourceManager:
 
     @staticmethod
     def get_cache_key(path):
-        """РџРѕСЃС‚СЂРѕРёС‚СЊ С‚РµС…РЅРёС‡РµСЃРєРёР№ РєР»СЋС‡ РґР»СЏ СЃСЂР°РІРЅРµРЅРёСЏ РїСѓС‚РµР№."""
+        """Построить технический ключ для сравнения путей."""
         return os.path.normcase(os.path.abspath(path))
 
     @classmethod
     def get_or_create_record(cls, file_path, resource_key=None):
-        """Р’РµСЂРЅСѓС‚СЊ СЃСѓС‰РµСЃС‚РІСѓСЋС‰РёР№ record РёР»Рё СЃРѕР·РґР°С‚СЊ fallback-record РґР»СЏ РїСЂСЏРјРѕР№ Р·Р°РіСЂСѓР·РєРё."""
+        """Вернуть существующий record или создать fallback-record для прямой загрузки."""
         if resource_key and resource_key in cls._runtime_cache:
             return cls._runtime_cache[resource_key]
 
@@ -283,7 +283,7 @@ class ResourceManager:
 
     @classmethod
     def create_record(cls, resource_key, entry, assets_dir):
-        """РЎРѕР·РґР°С‚СЊ ResourceRecord РёР· Р·Р°РїРёСЃРё manifest."""
+        """Создать ResourceRecord из записи manifest."""
         relative_path = cls.normalize_manifest_path(entry["path"])
         file_path = os.path.abspath(os.path.join(assets_dir, relative_path))
         frame_width = int(entry["frame_width"])
@@ -307,25 +307,25 @@ class ResourceManager:
 
     @classmethod
     def calculate_rows(cls, file_path, image_size, frame_width, frame_height):
-        """РџРѕСЃС‡РёС‚Р°С‚СЊ rows Рё РїСЂРѕРІРµСЂРёС‚СЊ, С‡С‚Рѕ PNG РјРѕР¶РЅРѕ РЅР°СЂРµР·Р°С‚СЊ Р±РµР· РѕСЃС‚Р°С‚РєР°."""
+        """Посчитать rows и проверить, что PNG можно нарезать без остатка."""
         image_width, image_height = image_size
         if frame_width != image_width:
             raise ValueError(
-                f"РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ manifest РґР»СЏ {file_path}: frame_width={frame_width}, "
-                f"РЅРѕ С€РёСЂРёРЅР° РёР·РѕР±СЂР°Р¶РµРЅРёСЏ {image_width}. РЎРµР№С‡Р°СЃ РїРѕРґРґРµСЂР¶РёРІР°РµС‚СЃСЏ РѕРґРЅР° РєРѕР»РѕРЅРєР°."
+                f"Некорректный manifest для {file_path}: frame_width={frame_width}, "
+                f"но ширина изображения {image_width}. Сейчас поддерживается одна колонка."
             )
         if frame_height <= 0:
-            raise ValueError(f"РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ manifest РґР»СЏ {file_path}: frame_height РґРѕР»Р¶РµРЅ Р±С‹С‚СЊ > 0.")
+            raise ValueError(f"Некорректный manifest для {file_path}: frame_height должен быть > 0.")
         if image_height % frame_height != 0:
             raise ValueError(
-                f"РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ manifest РґР»СЏ {file_path}: РІС‹СЃРѕС‚Р° РёР·РѕР±СЂР°Р¶РµРЅРёСЏ "
-                f"{image_height} РЅРµ РґРµР»РёС‚СЃСЏ РЅР° frame_height={frame_height}."
+                f"Некорректный manifest для {file_path}: высота изображения "
+                f"{image_height} не делится на frame_height={frame_height}."
             )
         return image_height // frame_height
 
     @staticmethod
     def get_frame_grid(record):
-        """РџРѕСЃС‚СЂРѕРёС‚СЊ РІРµСЂС‚РёРєР°Р»СЊРЅСѓСЋ СЃРµС‚РєСѓ РєР°РґСЂРѕРІ РїРѕ ResourceRecord."""
+        """Построить вертикальную сетку кадров по ResourceRecord."""
         return [
             pygame.Rect(0, row * record.frame_height, record.frame_width, record.frame_height)
             for row in range(record.rows)
@@ -333,7 +333,7 @@ class ResourceManager:
 
     @staticmethod
     def get_png_files(directory):
-        """Р РµРєСѓСЂСЃРёРІРЅРѕ РІРµСЂРЅСѓС‚СЊ PNG-С„Р°Р№Р»С‹ РёР· directory, РєСЂРѕРјРµ СЃР»СѓР¶РµР±РЅС‹С… С„Р°Р№Р»РѕРІ."""
+        """Рекурсивно вернуть PNG-файлы из directory, кроме служебных файлов."""
         png_files = []
         for root, _dirs, files in os.walk(directory):
             for file_name in files:
@@ -343,7 +343,7 @@ class ResourceManager:
 
     @staticmethod
     def get_files_in_dir(directory, extension=".png"):
-        """Р’РµСЂРЅСѓС‚СЊ PNG-С„Р°Р№Р»С‹ С‚РѕР»СЊРєРѕ РёР· РѕРґРЅРѕР№ РїР°РїРєРё. РћСЃС‚Р°РІР»РµРЅРѕ РґР»СЏ СЃРѕРІРјРµСЃС‚РёРјРѕСЃС‚Рё."""
+        """Вернуть PNG-файлы только из одной папки. Оставлено для совместимости."""
         return sorted(
             os.path.join(directory, filename)
             for filename in os.listdir(directory)
@@ -352,12 +352,12 @@ class ResourceManager:
 
     @classmethod
     def get_manifest_path(cls, assets_dir):
-        """Р’РµСЂРЅСѓС‚СЊ РїСѓС‚СЊ Рє resource_manifest.json."""
+        """Вернуть путь к resource_manifest.json."""
         return os.path.join(os.path.abspath(assets_dir), cls.MANIFEST_FILE_NAME)
 
     @classmethod
     def load_or_generate_manifest(cls, assets_dir):
-        """Р—Р°РіСЂСѓР·РёС‚СЊ manifest РёР»Рё СЃРѕР·РґР°С‚СЊ РІСЂРµРјРµРЅРЅС‹Р№ manifest РёР· РІСЃРµС… PNG."""
+        """Загрузить manifest или создать временный manifest из всех PNG."""
         manifest_path = cls.get_manifest_path(assets_dir)
         if os.path.exists(manifest_path):
             return cls.load_manifest(assets_dir)
@@ -417,7 +417,7 @@ class ResourceManager:
 
     @classmethod
     def load_manifest(cls, assets_dir):
-        """РџСЂРѕС‡РёС‚Р°С‚СЊ resource_manifest.json."""
+        """Прочитать resource_manifest.json."""
         manifest_path = cls.get_manifest_path(assets_dir)
         with open(manifest_path, "r", encoding="utf-8-sig") as file:
             manifest = json.load(file)
@@ -426,7 +426,7 @@ class ResourceManager:
 
     @classmethod
     def save_manifest(cls, assets_dir, manifest):
-        """РЎРѕС…СЂР°РЅРёС‚СЊ resource_manifest.json."""
+        """Сохранить resource_manifest.json."""
         manifest_path = cls.get_manifest_path(assets_dir)
         manifest = cls.normalize_manifest(manifest)
         with open(manifest_path, "w", encoding="utf-8") as file:
@@ -436,7 +436,7 @@ class ResourceManager:
 
     @classmethod
     def generate_manifest(cls, assets_dir):
-        """РЎРѕР·РґР°С‚СЊ manifest РёР· РІСЃРµС… PNG, СЃС‡РёС‚Р°СЏ РєР°Р¶РґС‹Р№ PNG РѕРґРЅРёРј РєР°РґСЂРѕРј."""
+        """Создать manifest из всех PNG, считая каждый PNG одним кадром."""
         assets_dir = os.path.abspath(assets_dir)
         resources = {}
         for file_path in cls.get_png_files(assets_dir):
@@ -447,7 +447,7 @@ class ResourceManager:
 
     @classmethod
     def create_default_manifest_entry(cls, file_path, assets_dir):
-        """РЎРѕР·РґР°С‚СЊ manifest-Р·Р°РїРёСЃСЊ РґР»СЏ PNG РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ."""
+        """Создать manifest-запись для PNG по умолчанию."""
         with Image.open(file_path) as image:
             width, height = image.size
         return {
@@ -458,7 +458,7 @@ class ResourceManager:
 
     @classmethod
     def normalize_manifest(cls, manifest):
-        """РџСЂРёРІРµСЃС‚Рё manifest Рє СЃС‚Р°Р±РёР»СЊРЅРѕРјСѓ РІРёРґСѓ РїРµСЂРµРґ СЃРѕС…СЂР°РЅРµРЅРёРµРј."""
+        """Привести manifest к стабильному виду перед сохранением."""
         resources = manifest.get("resources", {})
         normalized = {}
         for resource_key in sorted(resources):
@@ -472,12 +472,12 @@ class ResourceManager:
 
     @staticmethod
     def normalize_manifest_path(path):
-        """РќРѕСЂРјР°Р»РёР·РѕРІР°С‚СЊ РїСѓС‚СЊ РІРЅСѓС‚СЂРё assets/."""
+        """Нормализовать путь внутри assets/."""
         return str(path).replace("\\", "/")
 
     @staticmethod
     def build_resource_key(relative_path):
-        """РџРѕСЃС‚СЂРѕРёС‚СЊ С‡РµР»РѕРІРµРєРѕС‡РёС‚Р°РµРјС‹Р№ РєР»СЋС‡ РїРѕ СЃС‚СЂСѓРєС‚СѓСЂРµ assets/."""
+        """Построить человекочитаемый ключ по структуре assets/."""
         without_ext, _ext = os.path.splitext(relative_path)
         parts = []
         for part in without_ext.replace("\\", "/").split("/"):

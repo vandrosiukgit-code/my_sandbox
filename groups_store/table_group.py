@@ -1,30 +1,31 @@
-﻿"""РЎР±РѕСЂРєР° Group-Р° РёРіСЂРѕРІРѕРіРѕ СЃС‚РѕР»Р°.
+"""Сборка Group-а игрового стола.
 
-РњРѕРґСѓР»СЊ РЅРµ С…СЂР°РЅРёС‚ РѕР±С‰РёР№ GroupStore Рё РЅРµ РёРјРїРѕСЂС‚РёСЂСѓРµС‚ main.py. Р•РіРѕ Р·Р°РґР°С‡Р° -
-РѕРїРёСЃР°С‚СЊ РєРѕРЅРєСЂРµС‚РЅС‹Р№ РІРёР·СѓР°Р»СЊРЅС‹Р№ РѕР±СЉРµРєС‚ Рё РІРµСЂРЅСѓС‚СЊ РіРѕС‚РѕРІС‹Р№ Group С‚РѕРјСѓ, РєС‚Рѕ
-СЃРѕР±РёСЂР°РµС‚ РѕР±С‰РёР№ СЃРєР»Р°Рґ РіСЂР°С„РёРєРё.
+Модуль не хранит общий GroupStore и не импортирует main.py. Его задача -
+описать конкретный визуальный объект и вернуть готовый Group тому, кто
+собирает общий склад графики.
 """
 
 from group import Group
 
 
 GROUP_ID = "table_group"
+HIDE_RECT = False
 
 GRAPHICS = (
-    ("table", "main_screen.table"),
-    ("tressure_map", "main_screen.tressure_map"),
+    ("table", "main_screen.table", (0, 0)),
+    ("tressure_map", "main_screen.tressure_map", (0, 0)),
 )
 
-RECT = (0, 0, 1280, 720)
+GROUP_RECT = (0, 0, 1280, 720)
 
 
 def create(resource_manager):
-    """РЎРѕР·РґР°С‚СЊ Group СЃС‚РѕР»Р° РёР· СЂРµСЃСѓСЂСЃРѕРІ РіР»Р°РІРЅРѕРіРѕ СЌРєСЂР°РЅР°."""
-    return Group.create_group(
+    """Создать Group стола из ресурсов главного экрана."""
+    group = Group.create_group(
         GROUP_ID,
         GRAPHICS,
-        rect=RECT,
+        rect=GROUP_RECT,
         resource_manager=resource_manager,
     )
-
+    return group.set_rect_visibility(HIDE_RECT)
 

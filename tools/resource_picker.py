@@ -57,13 +57,14 @@ class GraphicEntry:
     group_file: str
     local_name: str
     resource_key: str
+    position: tuple[int, int]
     asset: PngAsset | None
     status: str
     warnings: tuple[str, ...] = ()
 
     @property
     def display_name(self):
-        return f"({self.local_name!r}, {self.resource_key!r})"
+        return f"({self.local_name!r}, {self.resource_key!r}, {self.position!r})"
 
 
 @dataclass
@@ -123,7 +124,7 @@ class ResourcePickerService:
 
             module_name = f"groups_store.{os.path.splitext(file_name)[0]}"
             module = importlib.import_module(module_name)
-            for local_name, resource_key in self.iter_graphics(getattr(module, "GRAPHICS", ())):
+            for local_name, resource_key, position in self.iter_graphics(getattr(module, "GRAPHICS", ())):
                 asset = assets_by_key.get(resource_key)
                 warnings = []
                 if asset is None:
@@ -143,6 +144,7 @@ class ResourcePickerService:
                         group_file=file_name,
                         local_name=local_name,
                         resource_key=resource_key,
+                        position=position,
                         asset=asset,
                         status=status,
                         warnings=tuple(warnings),
@@ -156,13 +158,25 @@ class ResourcePickerService:
             if isinstance(item, dict):
                 local_name = item.get("name") or item.get("layer_name") or item.get("local_name")
                 resource_key = item.get("resource_key")
+                position = item.get("position", item.get("local_position", (0, 0)))
             elif isinstance(item, (tuple, list)) and len(item) >= 2:
                 local_name, resource_key = item[0], item[1]
+                position = item[2] if len(item) >= 3 else (0, 0)
             else:
                 continue
 
             if local_name and resource_key:
-                yield str(local_name), str(resource_key)
+                yield str(local_name), str(resource_key), ResourcePickerService.normalize_layer_position(position)
+
+    @staticmethod
+    def normalize_layer_position(position):
+        if position is None:
+            return (0, 0)
+        if isinstance(position, dict):
+            return (int(position.get("x", 0)), int(position.get("y", 0)))
+        if isinstance(position, (tuple, list)) and len(position) >= 2:
+            return (int(position[0]), int(position[1]))
+        return (0, 0)
 
     @staticmethod
     def read_png_metadata(file_path, image_size=None):
@@ -306,7 +320,7 @@ class ResourcePickerService:
     @staticmethod
     def create_graphics_snippet(asset):
         local_name = ResourcePickerService.create_local_name_from_file(asset.file_name)
-        return f"({local_name!r}, {asset.resource_key!r}),"
+        return f"({local_name!r}, {asset.resource_key!r}, (0, 0)),"
 
     @staticmethod
     def create_local_name_from_file(file_name):

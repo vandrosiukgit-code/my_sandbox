@@ -1,30 +1,31 @@
-﻿"""РЎР±РѕСЂРєР° Group-Р° Р»РµРІРѕРіРѕ РёРіСЂРѕРєР°.
+"""Сборка Group-а левого игрока.
 
-РњРѕРґСѓР»СЊ РЅРµ С…СЂР°РЅРёС‚ РѕР±С‰РёР№ GroupStore Рё РЅРµ РёРјРїРѕСЂС‚РёСЂСѓРµС‚ main.py. Р•РіРѕ Р·Р°РґР°С‡Р° -
-РѕРїРёСЃР°С‚СЊ РєРѕРЅРєСЂРµС‚РЅС‹Р№ РІРёР·СѓР°Р»СЊРЅС‹Р№ РѕР±СЉРµРєС‚ Рё РІРµСЂРЅСѓС‚СЊ РіРѕС‚РѕРІС‹Р№ Group С‚РѕРјСѓ, РєС‚Рѕ
-СЃРѕР±РёСЂР°РµС‚ РѕР±С‰РёР№ СЃРєР»Р°Рґ РіСЂР°С„РёРєРё.
+Модуль не хранит общий GroupStore и не импортирует main.py. Его задача -
+описать конкретный визуальный объект и вернуть готовый Group тому, кто
+собирает общий склад графики.
 """
 
 from group import Group
 
-
+HIDE_RECT = False
 GROUP_ID = "left_player"
 
 GRAPHICS = (
-    ('p_portrait_bg', 'main_screen.p_portrait_bg'),
-    ('portrait_2', 'main_screen.avatars.portrait_2'),
-    ('portrait_frame', 'main_screen.portrait_frame'),
-    ('p_name_bg', 'main_screen.p_name_bg'),
+    ("p_portrait_bg", "main_screen.p_portrait_bg", (0, 0)),
+    ("portrait_2", "main_screen.avatars.portrait_2", (0, 0)),
+    ("portrait_frame", "main_screen.portrait_frame", (0, 0)),
+    ("p_name_bg", "main_screen.p_name_bg", (0, 132)),
 )
 
-RECT = (0, 0, 160, 160)
+GROUP_RECT = (0, 0, 200, 200)
+
 
 def create(resource_manager):
-    return Group.create_group(
+    group = Group.create_group(
         GROUP_ID,
         GRAPHICS,
-        rect=RECT,
+        rect=GROUP_RECT,
         resource_manager=resource_manager,
     )
-
+    return group.set_rect_visibility(HIDE_RECT, "p_name_bg")
 

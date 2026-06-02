@@ -1,19 +1,20 @@
-﻿"""РђРєС‚РёРІРЅР°СЏ СЌРєСЂР°РЅРЅР°СЏ Р·РѕРЅР°.
+"""Активная экранная зона.
 
-Frame - СЌС‚Рѕ СЌРєСЂР°РЅРЅС‹Р№ РєРѕРЅС‚РµР№РЅРµСЂ РґР»СЏ Group-РѕРІ. РћРЅР° РЅРµ Р·РЅР°РµС‚ РїСЂР°РІРёР»
-РёРіСЂС‹ Рё РЅРµ СЂРµС€Р°РµС‚, РїРѕС‡РµРјСѓ РєР°СЂС‚Р° РЅР°С…РѕРґРёС‚СЃСЏ РІ СЂСѓРєРµ РёР»Рё РЅР° СЃС‚РѕР»Рµ. РћРЅР° РѕС‚РІРµС‡Р°РµС‚
-С‚РѕР»СЊРєРѕ Р·Р° СЌРєСЂР°РЅРЅСѓСЋ РіРµРѕРјРµС‚СЂРёСЋ: РіРґРµ Р·РѕРЅР° СЂР°СЃРїРѕР»РѕР¶РµРЅР°, РєР°РєРёРµ group ID СЃРµР№С‡Р°СЃ
-РѕС‚РЅРѕСЃСЏС‚СЃСЏ Рє Р·РѕРЅРµ Рё РєР°Рє РїРѕСЃС‚Р°РІРёС‚СЊ СЌС‚Рё group-С‹ РІРЅСѓС‚СЂРё СЃРІРѕРµРіРѕ rect.
+Frame - это экранный контейнер для Group-ов. Она не знает правил
+игры и не решает, почему карта находится в руке или на столе. Она отвечает
+только за экранную геометрию: где зона расположена, какие group ID сейчас
+относятся к зоне и как поставить эти group-ы внутри своего rect.
 """
 
 import pygame
 
 from base import BaseFrame
+from game_screen import debug_overlay
 from game_screen.events import FrameHit
 
 
 class Frame(BaseFrame):
-    """Р­РєСЂР°РЅРЅР°СЏ Р·РѕРЅР°, РєРѕС‚РѕСЂР°СЏ СЂР°Р·РјРµС‰Р°РµС‚ group-С‹ РІРЅСѓС‚СЂРё СЃРІРѕРµРіРѕ rect."""
+    """Экранная зона, которая размещает group-ы внутри своего rect."""
 
     def __init__(
         self,
@@ -25,15 +26,15 @@ class Frame(BaseFrame):
         spacing=12,
         parent_frame=None,
     ):
-        """РЎРѕР·РґР°С‚СЊ Р°РєС‚РёРІРЅСѓСЋ СЌРєСЂР°РЅРЅСѓСЋ Р·РѕРЅСѓ.
+        """Создать активную экранную зону.
 
         Args:
-            frame_id: РЎС‚Р°Р±РёР»СЊРЅС‹Р№ ID Р·РѕРЅС‹, РЅР°РїСЂРёРјРµСЂ "bottom_hand".
-            rect: РџРѕР·РёС†РёСЏ Рё СЂР°Р·РјРµСЂ Р·РѕРЅС‹ РІ РєРѕРѕСЂРґРёРЅР°С‚Р°С… СЌРєСЂР°РЅР°.
-            hit_rect: РћР±Р»Р°СЃС‚СЊ РєР»РёРєР°/РІР·Р°РёРјРѕРґРµР№СЃС‚РІРёСЏ. Р•СЃР»Рё РЅРµ Р·Р°РґР°РЅР°, СЂР°РІРЅР° rect.
-            group_ids: РќР°С‡Р°Р»СЊРЅС‹Р№ СЃРїРёСЃРѕРє group ID РІРЅСѓС‚СЂРё Р·РѕРЅС‹.
-            padding: Р’РЅСѓС‚СЂРµРЅРЅРёР№ РѕС‚СЃС‚СѓРї РґР»СЏ Р±Р°Р·РѕРІРѕР№ СЂР°СЃРєР»Р°РґРєРё.
-            spacing: Р Р°СЃСЃС‚РѕСЏРЅРёРµ РјРµР¶РґСѓ group-Р°РјРё РІ Р±Р°Р·РѕРІРѕР№ СЂР°СЃРєР»Р°РґРєРµ.
+            frame_id: Стабильный ID зоны, например "bottom_hand".
+            rect: Позиция и размер зоны в координатах экрана.
+            hit_rect: Область клика/взаимодействия. Если не задана, равна rect.
+            group_ids: Начальный список group ID внутри зоны.
+            padding: Внутренний отступ для базовой раскладки.
+            spacing: Расстояние между group-ами в базовой раскладке.
         """
         self.frame_id = frame_id
         self._rect = pygame.Rect(rect)
@@ -45,20 +46,21 @@ class Frame(BaseFrame):
         self.spacing = spacing
         self.group_origins = {}
         self.actions = []
+        self.hide_rect = True
 
     @property
     def id(self):
-        """РЎС‚Р°Р±РёР»СЊРЅС‹Р№ ID СЌРєСЂР°РЅРЅРѕР№ Р·РѕРЅС‹."""
+        """Стабильный ID экранной зоны."""
         return self.frame_id
 
     @property
     def rect(self):
-        """РџСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРє Р·РѕРЅС‹ РІ РєРѕРѕСЂРґРёРЅР°С‚Р°С… СЌРєСЂР°РЅР°."""
+        """Прямоугольник зоны в координатах экрана."""
         return self._to_screen_rect(self._rect)
 
     @property
     def hit_rect(self):
-        """РћР±Р»Р°СЃС‚СЊ РІР·Р°РёРјРѕРґРµР№СЃС‚РІРёСЏ Р·РѕРЅС‹ РІ РєРѕРѕСЂРґРёРЅР°С‚Р°С… СЌРєСЂР°РЅР°."""
+        """Область взаимодействия зоны в координатах экрана."""
         return self._to_screen_rect(self._hit_rect)
 
     @property
@@ -88,29 +90,29 @@ class Frame(BaseFrame):
         )
 
     def set_group_ids(self, group_ids):
-        """Р—Р°РґР°С‚СЊ РїРѕР»РЅС‹Р№ СЃРїРёСЃРѕРє group ID РІ Р·РѕРЅРµ.
+        """Задать полный список group ID в зоне.
 
-        Р­С‚РѕС‚ РјРµС‚РѕРґ СѓРґРѕР±РµРЅ, РєРѕРіРґР° GameScreen С‡РёС‚Р°РµС‚ fixture РёР· GameController:
-        РѕРЅ Р±РµСЂРµС‚ СЃРїРёСЃРѕРє card_id РёР· Р»РѕРіРёС‡РµСЃРєРѕР№ Р·РѕРЅС‹ Рё РїРµСЂРµРґР°РµС‚ РµРіРѕ СЃСЋРґР°.
+        Этот метод удобен, когда GameScreen читает fixture из GameController:
+        он берет список card_id из логической зоны и передает его сюда.
         """
         self.group_ids = list(group_ids)
 
     def add_group_id(self, group_id):
-        """Р”РѕР±Р°РІРёС‚СЊ group ID РІ Р·РѕРЅСѓ Р±РµР· РґСѓР±Р»РµР№."""
+        """Добавить group ID в зону без дублей."""
         if group_id not in self.group_ids:
             self.group_ids.append(group_id)
 
     def remove_group_id(self, group_id):
-        """РЈР±СЂР°С‚СЊ group ID РёР· Р·РѕРЅС‹, РµСЃР»Рё РѕРЅ С‚Р°Рј РµСЃС‚СЊ."""
+        """Убрать group ID из зоны, если он там есть."""
         if group_id in self.group_ids:
             self.group_ids.remove(group_id)
 
     def calculate_group_position(self, index, group_count, group=None):
-        """Р Р°СЃСЃС‡РёС‚Р°С‚СЊ РїРѕР·РёС†РёСЋ group-Р° РІРЅСѓС‚СЂРё Р·РѕРЅС‹.
+        """Рассчитать позицию group-а внутри зоны.
 
-        РЎРµР№С‡Р°СЃ СЌС‚Рѕ РїСЂРѕСЃС‚Р°СЏ РіРѕСЂРёР·РѕРЅС‚Р°Р»СЊРЅР°СЏ СЂР°СЃРєР»Р°РґРєР° СЃР»РµРІР° РЅР°РїСЂР°РІРѕ. РћРЅР° РЅСѓР¶РЅР°
-        РєР°Рє Р±РµР·РѕРїР°СЃРЅР°СЏ Р·Р°РіРѕС‚РѕРІРєР°. РџРѕР·Р¶Рµ Р·РґРµСЃСЊ РјРѕР¶РЅРѕ Р·Р°РјРµРЅРёС‚СЊ Р°Р»РіРѕСЂРёС‚Рј РЅР° РІРµРµСЂ,
-        С†РµРЅС‚СЂРёСЂРѕРІР°РЅРёРµ, СЃС‚РѕРїРєСѓ РєРѕР»РѕРґС‹ РёР»Рё Р»СЋР±СѓСЋ РґСЂСѓРіСѓСЋ СЃС…РµРјСѓ.
+        Сейчас это простая горизонтальная раскладка слева направо. Она нужна
+        как безопасная заготовка. Позже здесь можно заменить алгоритм на веер,
+        центрирование, стопку колоды или любую другую схему.
         """
         return self.to_screen(self.calculate_group_local_position(index, group_count, group))
 
@@ -122,10 +124,10 @@ class Frame(BaseFrame):
         return x, y
 
     def apply_layout(self, group_store):
-        """РџРѕСЃС‚Р°РІРёС‚СЊ group-С‹ РёР· group_store РЅР° РїРѕР·РёС†РёРё РІРЅСѓС‚СЂРё Р·РѕРЅС‹.
+        """Поставить group-ы из group_store на позиции внутри зоны.
 
-        Frame СЂР°Р±РѕС‚Р°РµС‚ С‚РѕР»СЊРєРѕ СЃ ID. РЎР°РјРё Group РѕРЅР° РїРѕР»СѓС‡Р°РµС‚ С‡РµСЂРµР·
-        group_store, РїРѕСЌС‚РѕРјСѓ РЅРµ СЃС‚Р°РЅРѕРІРёС‚СЃСЏ РІР»Р°РґРµР»СЊС†РµРј РіСЂР°С„РёС‡РµСЃРєРёС… РѕР±СЉРµРєС‚РѕРІ.
+        Frame работает только с ID. Сами Group она получает через
+        group_store, поэтому не становится владельцем графических объектов.
         """
         group_count = len(self.group_ids)
         for index, group_id in enumerate(self.group_ids):
@@ -205,26 +207,26 @@ class Frame(BaseFrame):
         )
 
     def get_group_origin(self, group_id):
-        """Р’РµСЂРЅСѓС‚СЊ РїРѕСЃР»РµРґРЅСЋСЋ СЂР°СЃСЃС‡РёС‚Р°РЅРЅСѓСЋ СЌРєСЂР°РЅРЅСѓСЋ С‚РѕС‡РєСѓ group-Р°."""
+        """Вернуть последнюю рассчитанную экранную точку group-а."""
         return self.group_origins.get(group_id, self.rect.topleft)
 
     def contains_point(self, point):
-        """РџСЂРѕРІРµСЂРёС‚СЊ РїРѕРїР°РґР°РЅРёРµ С‚РѕС‡РєРё РІ hit_rect Р·РѕРЅС‹."""
+        """Проверить попадание точки в hit_rect зоны."""
         return self.hit_rect.collidepoint(point)
 
     def get_group_step(self, group):
-        """Р’РµСЂРЅСѓС‚СЊ С€Р°Рі РјРµР¶РґСѓ group-Р°РјРё РґР»СЏ Р±Р°Р·РѕРІРѕР№ СЂР°СЃРєР»Р°РґРєРё.
+        """Вернуть шаг между group-ами для базовой раскладки.
 
-        Р•СЃР»Рё group СѓР¶Рµ РёРјРµРµС‚ rect, С€Р°Рі СЂР°РІРµРЅ РµРіРѕ С€РёСЂРёРЅРµ РїР»СЋСЃ spacing. Р•СЃР»Рё
-        group РЅРµ РїРµСЂРµРґР°РЅ, РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ С‚РѕР»СЊРєРѕ spacing. Р­С‚Рѕ РїРѕР·РІРѕР»СЏРµС‚ РјРµС‚РѕРґСѓ
-        СЂР°Р±РѕС‚Р°С‚СЊ Рё РІ СЂР°РЅРЅРёС… С‡РµСЂРЅРѕРІС‹С… СЃС†РµРЅР°СЂРёСЏС….
+        Если group уже имеет rect, шаг равен его ширине плюс spacing. Если
+        group не передан, используется только spacing. Это позволяет методу
+        работать и в ранних черновых сценариях.
         """
         if group is None:
             return self.spacing
         return group.rect.width + self.spacing
 
     def to_payload(self):
-        """Р’РµСЂРЅСѓС‚СЊ СЃР»РѕРІР°СЂСЊ СЃ РїР°СЂР°РјРµС‚СЂР°РјРё Р·РѕРЅС‹ РґР»СЏ РѕС‚Р»Р°РґРєРё Рё РґРѕРєСѓРјРµРЅС‚Р°С†РёРё."""
+        """Вернуть словарь с параметрами зоны для отладки и документации."""
         return {
             "frame_id": self.id,
             "parent_frame_id": self.parent_frame.id if self.parent_frame is not None else None,
@@ -239,9 +241,26 @@ class Frame(BaseFrame):
             "spacing": self.spacing,
         }
 
+    def draw_debug_rects(self, screen, depth=0):
+        pygame.draw.rect(screen, debug_overlay.get_rect_color(depth), self.rect, 2)
+
+    def draw_debug_tree(self, screen, depth=0):
+        if self.should_draw_debug_rects():
+            self.draw_debug_rects(screen, depth)
+        for child_frame in self.child_frames.values():
+            child_frame.draw_debug_tree(screen, depth + 1)
+
+    def set_rect_visibility(self, hide_rect=True):
+        """Set whether this Frame hides its debug rect overlay."""
+        self.hide_rect = bool(hide_rect)
+        return self
+
+    def should_draw_debug_rects(self):
+        """Return True when this Frame should draw debug rects."""
+        return debug_overlay.DEBUG_RECTS or not self.hide_rect
+
     def _to_screen_rect(self, rect):
         """Convert a rect from parent-frame coordinates to screen coordinates."""
         screen_pos = self.to_screen((rect.x - self._rect.x, rect.y - self._rect.y))
         return pygame.Rect(screen_pos, rect.size)
-
 

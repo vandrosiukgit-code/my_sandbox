@@ -1,8 +1,8 @@
-﻿from game_screen.game_screen import GameScreen
+from game_screen.game_screen import GameScreen
 
 
 class TableScreen(GameScreen):
-    """РџРµСЂРІС‹Р№ С‡РµСЂРЅРѕРІРѕР№ РёРіСЂРѕРІРѕР№ СЌРєСЂР°РЅ СЃС‚РѕР»Р°."""
+    """Первый черновой игровой экран стола."""
 
     SCREEN_SIZE = (1280, 720)
     BG_COLOR = (30, 30, 30)
