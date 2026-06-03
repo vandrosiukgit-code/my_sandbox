@@ -9,6 +9,10 @@ GameScreen по запросу.
 import pkgutil
 from importlib import import_module
 
+from core.gui_manifest import GuiTarget
+import group_config
+from group.group import Group
+
 
 class GroupStore:
     """Единый контейнер Group-ов, доступных по group ID."""
@@ -38,11 +42,7 @@ class GroupStore:
         self._groups = {}
         self.resource_manager = resource_manager
         self.builders = tuple(builders or ())
-        self.builder_modules = (
-            tuple(builder_modules)
-            if builder_modules is not None
-            else self.discover_builder_modules()
-        )
+        self.builder_modules = tuple(builder_modules or ())
 
     def build(self):
         """Собрать все зарегистрированные Group-ы.
@@ -58,6 +58,9 @@ class GroupStore:
         """
         if self.resource_manager is None:
             raise RuntimeError("GroupStore.build() требует подключенный resource_manager")
+
+        for group_id in group_config.iter_group_ids():
+            self.add(Group.from_config(group_id, self.resource_manager))
 
         for builder in self.iter_builders():
             self.add_many(builder(self.resource_manager))
@@ -159,6 +162,60 @@ class GroupStore:
         """Вернуть все group ID в стабильном отсортированном порядке."""
         return tuple(sorted(self._groups))
 
+    def find_by_role(self, role):
+        """Return groups with a public semantic role."""
+        return tuple(
+            group
+            for group in self._groups.values()
+            if getattr(group, "role", None) == role
+        )
+
+    def find_by_tag(self, tag):
+        """Return groups that expose a public semantic tag."""
+        return tuple(
+            group
+            for group in self._groups.values()
+            if tag in getattr(group, "tags", ())
+        )
+
+    def set_group_layer_resource(self, group_id, layer_name, resource_key):
+        """Change one configured image layer and refresh the stored Group."""
+        if self.resource_manager is None:
+            raise RuntimeError("set_group_layer_resource() requires resource_manager")
+        return self.get(group_id).set_layer_resource_from_config(
+            layer_name,
+            resource_key,
+            self.resource_manager,
+        )
+
+    def set_group_layer_text(self, group_id, layer_name, text):
+        """Change one configured text layer and refresh the stored Group."""
+        return self.get(group_id).set_layer_text_from_config(layer_name, text)
+
+    def get_manifest_targets(self):
+        """Return public GUI targets exposed by stored groups."""
+        targets = {}
+        for group in self._groups.values():
+            for target_id, target_spec in getattr(group, "manifest_targets", {}).items():
+                targets[target_id] = GuiTarget(
+                    id=target_id,
+                    type=target_spec["type"],
+                    group_id=target_spec.get("group_id", group.id),
+                    layer=target_spec.get("layer"),
+                    frame_id=target_spec.get("frame_id"),
+                    config_key=target_spec.get("config_key"),
+                    description=target_spec.get("description"),
+                )
+        return targets
+
+    def apply_target_value(self, target, value):
+        """Apply a public manifest target update to the configured group layer."""
+        if target.type == "resource":
+            return self.set_group_layer_resource(target.group_id, target.layer, value)
+        if target.type == "text":
+            return self.set_group_layer_text(target.group_id, target.layer, value)
+        raise ValueError(f"Unsupported GUI target type for value update: {target.type}")
+
     def clear(self):
         """Очистить store.
 
@@ -182,5 +239,3 @@ class GroupStore:
         if not group_id:
             raise ValueError("GroupStore.add() требует group с непустым id")
         return group_id
-
-

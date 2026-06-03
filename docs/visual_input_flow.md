@@ -1,145 +1,69 @@
 # Visual Input Flow
 
-Этот документ фиксирует границу между игровой логикой и визуальной механикой
-экрана.
-
-## Главный принцип
-
-`GameScreen` не решает правила игры. Он обрабатывает pygame-события только как
-технический input: клик, двойной клик, кнопка мыши, позиция, group под курсором,
-активная зона.
-
-`GameController` получает нормализованное событие, решает его игровой смысл,
-меняет `GameState` и возвращает визуальные команды.
+`GameScreen` adapts pygame input to controller input and applies controller
+visual commands through `GuiManifest`.
 
 ```text
 pygame event
     -> GameScreen
     -> Frame hit-test
     -> ScreenInputEvent
-    -> GameController.handle_input(event)
-    -> GameState update
+    -> GameController.handle_input()
     -> VisualCommand
-    -> GameScreen.dispatch_visual_command(command)
-    -> Frame.add_action(action)
-    -> Action.update(dt)
-    -> Animation.update(dt)
-    -> Group visual state
+    -> GuiManifest target/activity resolution
+    -> GroupStore
+    -> Group refresh/draw
 ```
 
-## ScreenInputEvent
+## Input
 
-`ScreenInputEvent` находится в `game_screen/events.py`.
-
-Он описывает не смысл игры, а только факт пользовательского ввода:
+`ScreenInputEvent` describes a raw visual fact:
 
 ```text
-type        click | double_click | ...
-button      left | right | middle | ...
-group_id    Group под курсором, если есть
-frame_id     Frame под курсором, если есть
-screen_pos  координаты pygame-экрана
-local_pos   координаты внутри Frame
+type        click | double_click
+button      left | right | middle
+group_id    group under cursor
+frame_id    frame under cursor
+screen_pos  pygame screen coordinates
+local_pos   frame-local coordinates
 ```
 
-Пример: двойной клик ЛКМ по карте в руке игрока:
+It does not contain game meaning.
+
+## Output
+
+`VisualCommand` uses public GUI terms:
+
+```python
+VisualCommand(
+    type="set_resource",
+    target="player.left.avatar",
+    value="main_screen.avatars.portrait_4",
+)
+```
+
+`GameScreen` resolves `player.left.avatar` to:
 
 ```text
-type = double_click
-button = left
-group_id = card_6_clubs
-frame_id = bottom_hand
-screen_pos = (430, 610)
-local_pos = (120, 18)
+group_id = left_player
+layer    = portrait
 ```
 
-`GameScreen` не говорит "игрок сделал ход". Он говорит только: "был двойной
-клик ЛКМ по group в зоне".
+and delegates to `GroupStore`, which updates `group_config.json` through
+`group_config.py` and refreshes the runtime layer.
 
-## GameController
+## Activity Terms
 
-`GameController.handle_input(event)` интерпретирует событие:
+Activity commands also use public names:
 
-```text
-если event.type == double_click
-если event.button == left
-если event.frame_id == bottom_hand
-если event.group_id является картой текущего игрока
-если правила разрешают ход
-тогда обновить GameState и вернуть VisualCommand
+```python
+VisualCommand(
+    type="start_activity",
+    activity="group.activate",
+    target="table.surface",
+)
 ```
 
-На текущем этапе метод существует как draft: он записывает input и возвращает
-пустой список команд. Правила игры будут добавлены позже.
-
-## VisualCommand
-
-`VisualCommand` также находится в `game_screen/events.py`.
-
-Это ответ контроллера экрану. Команда сообщает, какое визуальное действие нужно
-запустить, но не содержит pygame-кода.
-
-Пример будущей команды:
-
-```text
-type = play_card
-group_id = card_6_clubs
-from_frame = bottom_hand
-to_frame = battle_table
-```
-
-`GameScreen.dispatch_visual_command()` принимает команду и передает ее в
-визуальную систему: выбирает зоны, создает `Action`, запускает его в зоне.
-
-## Frame
-
-`Frame` принадлежит `GameScreen`.
-
-Зона:
-
-- хранит `group_ids`;
-- размещает group-ы в локальной системе координат;
-- переводит `screen_pos` в `local_pos`;
-- делает hit-test group-ов внутри зоны;
-- владеет активными `Action`;
-- обновляет `Action` каждый кадр.
-
-Важно: `Frame` не решает правила игры. Она знает только экранную геометрию
-и визуальные процессы внутри своей области.
-
-## Action
-
-`Action` находится в пакете `actions/`.
-
-Action описывает один визуальный сценарий: ход карты, раздача, сброс,
-перемещение набора карт. Action может состоять из нескольких Animation.
-
-Action запускается только после того, как `GameController` уже разрешил
-действие и вернул `VisualCommand`.
-
-## Animation
-
-`Animation` находится в пакете `animations/`.
-
-Animation делает конкретное изменение во времени:
-
-- перемещение group;
-- масштаб;
-- смена кадра;
-- появление или исчезновение;
-- переворот карты.
-
-Animation не знает о правилах игры, `GameState` и `GameController`.
-
-## Ownership
-
-```text
-GameController -> rules, GameState, input interpretation, VisualCommand
-GameScreen     -> pygame adapter, screen frames, command dispatch
-Frame     -> local layout, hit-test, frame-owned Action list
-Action         -> visual scenario composed from animations
-Animation      -> frame-by-frame visual state change
-Group       -> passive drawable object
-```
-
-
+The base screen supports `group.activate` and `group.deactivate`. Later screens
+can map terms such as `card.move` or `player.highlight` to concrete visual
+processes.

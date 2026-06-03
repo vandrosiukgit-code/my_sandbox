@@ -12,6 +12,7 @@ import pygame
 
 from base import BaseGroup
 from game_screen import debug_overlay
+import group_config
 
 
 @dataclass
@@ -224,7 +225,17 @@ class Group(BaseGroup):
     кадр слоя, позицию group-а и scale_factor, но не правила игры.
     """
 
-    def __init__(self, group_id, rect=(0, 0, 0, 0), layers=None, scale_factor=1.0):
+    def __init__(
+        self,
+        group_id,
+        rect=(0, 0, 0, 0),
+        hit_rect=None,
+        layers=None,
+        scale_factor=1.0,
+        role=None,
+        tags=None,
+        manifest_targets=None,
+    ):
         """Создать Group из готовых списков кадров.
 
         Args:
@@ -240,11 +251,14 @@ class Group(BaseGroup):
         self.group_id = group_id
         self._base_rect = pygame.Rect(rect)
         self._rect = self._base_rect.copy()
-        self._base_hit_rect = self._base_rect.copy()
+        self._base_hit_rect = pygame.Rect(hit_rect) if hit_rect is not None else self._base_rect.copy()
         self._hit_rect = self._base_hit_rect.copy()
         self.scale_factor = float(scale_factor)
         self.hide_rect = True
         self.rect_debug_layer_ids = None
+        self.role = role
+        self.tags = frozenset(tags or ())
+        self.manifest_targets = dict(manifest_targets or {})
         self.layers = []
 
         for layer in layers or []:
@@ -253,6 +267,99 @@ class Group(BaseGroup):
         if self._base_rect.size == (0, 0):
             self.refresh_rect_from_layers()
         self.apply_scale()
+
+    @classmethod
+    def from_config(cls, group_id, resource_manager):
+        """Create a Group by reading its metadata from group_config."""
+        config = group_config.get_group_config(group_id)
+        group = cls(
+            group_id=group_id,
+            rect=config.get("rect", (0, 0, 0, 0)),
+            hit_rect=config.get("hit_rect"),
+            scale_factor=config.get("scale_factor", 1.0),
+            role=config.get("role"),
+            tags=config.get("tags", ()),
+            manifest_targets=cls.resolve_manifest_targets(group_id, config),
+        )
+        group.reload_layers_from_config(resource_manager)
+        group.set_rect_visibility(
+            config.get("hide_rect", True),
+            config.get("rect_debug_layer_ids"),
+        )
+        return group
+
+    @staticmethod
+    def resolve_manifest_targets(group_id, config):
+        """Attach group_id to public targets declared in group_config."""
+        targets = {}
+        for target_id, target_config in config.get("manifest_targets", {}).items():
+            target = dict(target_config)
+            target.setdefault("group_id", group_id)
+            targets[target_id] = target
+        return targets
+
+    def reload_layers_from_config(self, resource_manager):
+        """Rebuild all drawable layers from group_config."""
+        config = group_config.get_group_config(self.id)
+        self.layers = [
+            self.create_layer_from_config(layer_config, resource_manager)
+            for layer_config in config.get("layers", ())
+        ]
+        if self._base_rect.size == (0, 0):
+            self.refresh_rect_from_layers()
+            self.apply_scale()
+        return self
+
+    @classmethod
+    def create_layer_from_config(cls, layer_config, resource_manager):
+        """Create one runtime Layer from a group_config layer entry."""
+        layer_type = layer_config.get("type", "image")
+        if layer_type == "text":
+            return create_text_layer(
+                layer_config["name"],
+                layer_config.get("text", ""),
+                size=layer_config.get("size"),
+                style=cls.create_text_style_from_config(layer_config.get("style", {})),
+                position=cls.normalize_layer_position(layer_config.get("position", (0, 0))),
+                text_key=layer_config.get("text_key"),
+                fit_mode=layer_config.get("fit_mode", "none"),
+            )
+
+        resource_key = layer_config["resource_key"]
+        return Layer(
+            name=layer_config["name"],
+            frames=resource_manager.get_frames(resource_key),
+            position=cls.normalize_layer_position(layer_config.get("position", (0, 0))),
+            layer_type="resource",
+        )
+
+    @staticmethod
+    def create_text_style_from_config(style_config):
+        """Create TextStyle from plain layer metadata."""
+        if isinstance(style_config, TextStyle):
+            return style_config
+        return TextStyle(**dict(style_config))
+
+    def set_layer_resource_from_config(self, layer_name, resource_key, resource_manager):
+        """Update group_config and reload one image layer."""
+        layer_config = group_config.set_layer_resource(self.id, layer_name, resource_key)
+        self.replace_layer(self.create_layer_from_config(layer_config, resource_manager))
+        return self.get_layer(layer_name)
+
+    def set_layer_text_from_config(self, layer_name, text):
+        """Update group_config and reload one text layer."""
+        layer_config = group_config.set_layer_text(self.id, layer_name, text)
+        self.replace_layer(self.create_layer_from_config(layer_config, None))
+        return self.get_layer(layer_name)
+
+    def replace_layer(self, layer):
+        """Replace an existing layer while keeping draw order from group_config."""
+        for index, existing_layer in enumerate(self.layers):
+            if existing_layer.name == layer.name:
+                self.layers[index] = layer
+                return layer
+        self.layers.append(layer)
+        return layer
 
     @classmethod
     def create_group(cls, group_id, graphics, rect=(0, 0, 0, 0), resource_manager=None):
@@ -500,6 +607,9 @@ class Group(BaseGroup):
         """Return serializable group metadata for GuiManifest."""
         return {
             "id": self.id,
+            "role": self.role,
+            "tags": sorted(self.tags),
+            "manifest_targets": self.manifest_targets,
             "rect": list(self.rect),
             "hit_rect": list(self.hit_rect),
             "scale_factor": self.scale_factor,

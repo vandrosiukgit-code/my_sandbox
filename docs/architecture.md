@@ -1,295 +1,150 @@
-# Архитектура The Fool's Reef
+# Architecture
 
-Краткая справка по текущему состоянию кода. Архитектурный манифест остается
-главным документом: `docs/architectural_manifesto_v6.2.md`.
+`The Fool's Reef` uses a data-first GUI model.
 
-## Текущий статус
+## Main Idea
 
-Проект находится в стадии архитектурного рефакторинга. Игровая логика,
-полноценные игровые экраны и переключение экранов еще не собраны.
+`group_config.json` is the source of truth for GUI groups.
 
-`main.py` сейчас является черновым composition root: он создает минимальный
-контекст приложения, но пока не запускает `RenderEngine`.
+It contains group metadata, public manifest targets, and graphical/text layers.
+External modules may read and edit it through `group_config.py`. `Group` no
+longer owns PNG-resource decisions; it reads the current config and draws the
+resulting runtime layers.
 
-## Структура модулей
+```text
+group_config.json
+    -> group_config.py API
+    -> Group.from_config(group_id, ResourceManager)
+        -> runtime Group
+            -> GameScreen.draw()
+```
+
+## Runtime Flow
 
 ```text
 main.py
-base.py
-
-core/
-    game_controller.py
-    game_state.py
-    render_engine.py
-    resource.py
-
-game_screen/
-    frame.py
-    game_screen.py
-
-group/
-    group.py
-    group_store.py
-
-groups_store/
-    table_group.py
-
-activities/
-    base_activity.py
-
-tools/
-    resource_picker.py
-
-assets/
-docs/
+    -> ResourceManager.build_runtime_cache()
+    -> GroupStore.build()
+        -> group_config.iter_group_ids()
+        -> Group.from_config(group_id, ResourceManager)
+    -> TableScreen
+    -> RenderEngine
 ```
 
-## main.py
-
-Черновая точка входа.
-
-Сейчас делает только базовую сборку контекста:
-
-- создает `GameController` с fixture-состоянием;
-- создает `GroupStore` с подключенным `ResourceManager`;
-- фиксирует `SCREEN_SIZE` и `WINDOW_TITLE`;
-- не запускает `RenderEngine`, потому что актуальные игровые экраны еще не
-  собраны.
-
-## base.py
-
-Файл контрактов.
-
-Содержит:
-
-- `BaseGameScreen`;
-- `BaseGameController`;
-- `BaseActivity`;
-- `BaseFrame`;
-- `BaseGroup`.
-
-В этом файле не должно быть игровой логики, загрузки ресурсов или отрисовки.
-
-## core/game_state.py
-
-Черновые структуры fixture-состояния.
-
-Содержит:
-
-- `CardState`;
-- `GameState`.
-
-`GameState` хранит:
-
-- `cards`: описание карт по `card_id`;
-- `frames`: порядок `card_id` внутри логических зон.
-
-## core/game_controller.py
-
-Черновой контроллер без правил игры.
-
-Сейчас он:
-
-- хранит `GameState`;
-- принимает fixture через `load_fixture(state)`;
-- возвращает snapshot через `get_state()`;
-- сохраняет клики по group ID в `clicked_group_ids`.
-
-Он не импортирует `pygame`, `Group` или `ResourceManager`.
-
-## core/render_engine.py
-
-Pygame runtime:
-
-- создает окно;
-- держит FPS;
-- принимает события;
-- вызывает `handle_event/update/draw` активного экрана;
-- обновляет display.
-
-На текущем этапе `main.py` его еще не запускает.
-
-## core/resource.py
-
-Низкоуровневый склад графических ресурсов.
-
-Главные режимы:
-
-- `build_index(assets_dir)` — metadata-only индекс без `pygame.Surface`;
-- `build_runtime_cache(assets_dir)` — индекс плюс загрузка `Surface/frames`;
-- `load_surfaces_from_index()` — догрузка поверхностей после уже построенного
-  index.
-
-`ResourceManager` не знает про `Group`, `GameScreen`, `Activity` и правила
-игры. Для group-ов основной метод получения графики - `get_frames(key)`: статичный
-PNG возвращается как список из одного `Surface`, spritesheet - как список кадров.
-
-## group/group.py
-
-Пассивный визуальный объект.
-
-`Group`:
-
-- имеет `id`;
-- имеет `rect`;
-- имеет `hit_rect`;
-- имеет `scale_factor`;
-- хранит список слоев в порядке отрисовки;
-- каждый слой хранит только `name`, `frames`, `current_frame_index`;
-- рисует текущий кадр каждого слоя из точки `group.rect.topleft`;
-- умеет собрать group через `create_group()` из описаний слоев;
-- получает готовые кадры только через `ResourceManager.get_frames()`;
-- не читает PNG напрямую и не хранит собственный кэш ресурсов;
-- не проигрывает анимацию сам.
-
-У слоя сознательно нет `offset`, `visible` и `alpha`. Смена позиции и масштаба
-идет на уровне всего group-а. Смена анимационного состояния идет через
-`set_layer_frame(layer_name, frame_index)`.
-
-## group/group_store.py
-
-Единый контейнер созданных `Group`.
-
-Хранит group-ы по стабильному ID и предоставляет:
-
-- `build()`;
-- `add_many(groups)`;
-- `add(group)`;
-- `get(group_id)`;
-- `has(group_id)`;
-- `remove(group_id)`;
-- `all_ids()`.
-
-Store не знает правил игры, экранных зон и активностей. При этом он является
-точкой массовой сборки графических объектов: метод `build()` вызывает
-builder-функции из `groups_store/` и складывает созданные group-ы в общий
-словарь.
-
-Конкретные group-модули подключаются в `GroupStore` как пути к модулям и
-импортируются лениво во время `build()`. Это защищает базовый пакет `group`
-от жесткой связи с конкретными объектами игры при обычном импорте.
-
-`build()` нужно вызывать только после того, как `ResourceManager` собрал
-runtime-кэш с pygame Surface/frames.
-
-## groups_store/table_group.py
-
-Модуль конкретного Group-а.
-
-Содержит функцию:
-
-- `create(resource_manager)`.
-
-Функция описывает слои `table_group`, получает кадры через переданный
-`resource_manager` и возвращает готовый `Group`. Она не импортирует `main.py`
-и не мутирует `GroupStore` напрямую.
-
-## game_screen/game_screen.py
-
-Базовая экранная сцена.
-
-`GameScreen` хранит:
-
-- `group_store`;
-- `game_controller`;
-- `active_group_ids`;
-- `active_activities`;
-- `screen_frames`.
-
-Он не является складом всех group-ов. Он активирует нужные group ID и берет
-сами объекты из `GroupStore`.
-
-## game_screen/frame.py
-
-Экранный контейнер для group-ов.
-
-`Frame`:
-
-- хранит `frame_id`;
-- хранит `rect`;
-- хранит `hit_rect`;
-- хранит `group_ids`;
-- умеет применить простой layout к group-ам через `GroupStore` и
-  `group.set_position(...)`.
-
-Это не логическая зона правил игры. Это экранная зона размещения.
-
-## activities/base_activity.py
-
-Базовая визуальная активность.
-
-`Activity`:
-
-- хранит `group_ids`;
-- хранит `duration`;
-- считает `elapsed`;
-- имеет `start()`;
-- имеет `update(dt)`;
-- имеет `finish()`;
-- имеет `is_finished()`;
-- дает `get_progress()`.
-
-Наследники будут использовать `apply(progress)` для движения, появления,
-исчезновения и смены кадров.
-
-## tools/resource_picker.py
-
-Dev tool для просмотра ресурсов.
-
-Работает через `ResourceManager.build_index()`, поэтому не требует
-`pygame.display`.
-
-Умеет:
-
-- показать дерево `assets/`;
-- искать ресурсы по key, имени файла, пути и типу;
-- показывать preview;
-- формировать tuple-слой для настройки `Group.create_group()`.
+## group_config.json
+
+The config contains one entry per group:
+
+```json
+{
+  "groups": {
+    "left_player": {
+        "role": "player_panel",
+        "rect": [0, 0, 200, 200],
+        "manifest_targets": {
+            "player.left.avatar": {
+                "type": "resource",
+                "layer": "portrait",
+            }
+        },
+        "layers": [
+            {
+                "name": "portrait",
+                "type": "image",
+                "resource_key": "main_screen.avatars.portrait_2"
+            }
+        ]
+    }
+  }
+}
+```
+
+If a settings module wants another portrait, it changes:
+
+```python
+group_config.set_layer_resource(
+    "left_player",
+    "portrait",
+    "main_screen.avatars.portrait_4",
+)
+```
+
+Then the running group can refresh that layer through `GroupStore`.
+
+## Group
+
+`Group` is a runtime drawing script:
+
+```text
+read group_config
+load frames through ResourceManager
+render layers
+refresh changed layers when config changes
+```
+
+It stores runtime surfaces and geometry, not the authoritative PNG metadata.
+
+Important methods:
+
+```text
+Group.from_config(group_id, resource_manager)
+group.reload_layers_from_config(resource_manager)
+group.set_layer_resource_from_config(layer_name, resource_key, resource_manager)
+group.set_layer_text_from_config(layer_name, text)
+```
+
+## GroupStore
+
+`GroupStore` stores built `Group` objects and gives external modules a safe API
+for refreshing config-driven groups:
+
+```text
+set_group_layer_resource(group_id, layer_name, resource_key)
+set_group_layer_text(group_id, layer_name, text)
+get_manifest_targets()
+apply_target_value(target, value)
+```
+
+## groups_store/
+
+`GroupStore` no longer needs a builder module for each configured group. It
+builds groups directly from `group_config.json`.
+
+Existing `groups_store/*` modules are thin compatibility adapters only.
+
+## GUI Manifest
+
+The manifest is the public language for controller/settings commands. It does
+not expose all internal layers. It maps readable targets to group-config layers:
+
+```text
+player.left.avatar -> group left_player, layer portrait
+player.left.name   -> group left_player, layer player_name_text
+```
+
+Example command:
+
+```python
+VisualCommand(
+    type="set_resource",
+    target="player.left.avatar",
+    value="main_screen.avatars.portrait_4",
+)
+```
+
+`GameScreen` resolves the target through `GuiManifest` and delegates the change
+to `GroupStore`.
 
 ## Ownership
 
 ```text
-GameController -> logical state fixture
-GroupStore  -> all Group instances
-groups_store/* -> concrete Group builders
-GameScreen     -> active group IDs, activities, screen frames
-Frame     -> screen rect/hit_rect and layout for group IDs
-Activity       -> temporary visual process
-Group       -> passive drawable state
-ResourceManager -> low-level resource cache
+group_config.json -> source of truth for GUI group metadata and layers
+group_config.py   -> load/save/update API for group_config.json
+Group             -> runtime drawing script built from group_config
+GroupStore       -> built groups and refresh/apply API
+groups_store/*   -> thin group_id builders
+GuiManifest      -> public target/activity language
+GameController   -> rules and public VisualCommand terms
+GameScreen       -> pygame adapter and command dispatch
+ResourceManager  -> low-level PNG frame cache
 ```
-
-## Ближайшая точка развития
-
-Сейчас проект готов к следующему шагу: созданию первых конкретных Activity и
-позднее сборке первого актуального игрового экрана.
-## Visual input/action flow
-
-Актуальная граница ввода и визуальной механики описана в
-`docs/visual_input_flow.md`.
-
-Коротко:
-
-```text
-pygame event
-    -> GameScreen normalizes input
-    -> Frame hit-test
-    -> ScreenInputEvent
-    -> GameController.handle_input()
-    -> GameState update
-    -> VisualCommand
-    -> GameScreen dispatch
-    -> Frame Action
-    -> Animation
-    -> Group
-```
-
-`GameScreen` не решает, является ли двойной клик ходом. Он только сообщает
-`GameController`, что произошел `double_click` по `group_id` в `frame_id`.
-Игровой смысл, проверка правил и изменение `GameState` остаются в
-`GameController`.
-
-`Frame` принадлежит экрану и владеет локальными визуальными `Action`.
-`Action` владеет набором `Animation`. Оба слоя не знают правил игры.
-
-

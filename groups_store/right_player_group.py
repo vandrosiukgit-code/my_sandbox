@@ -1,42 +1,10 @@
-"""Build the right player Group."""
+"""Build the right player group from group_config."""
 
-from group import Group, TextStyle, create_text_layer
+from group import Group
 
-HIDE_RECT = True
+
 GROUP_ID = "right_player"
-DEFAULT_NAME_TEXT = "Player 3"
-NAME_TEXT_STYLE = TextStyle(
-    font_path="assets/fonts/ingrid-darling/IngridDarling-Regular.ttf",
-    font_size=28,
-    color=(255, 238, 196),
-)
-
-GRAPHICS = (
-    ("p_portrait_bg", "main_screen.p_portrait_bg", (0, 0)),
-    ("portrait_2", "main_screen.avatars.portrait_2", (0, 0)),
-    ("portrait_frame", "main_screen.portrait_frame", (0, 0)),
-    ("p_name_bg", "main_screen.p_name_bg", (0, 132)),
-)
-
-GROUP_RECT = (0, 0, 200, 200)
 
 
 def create(resource_manager):
-    group = Group.create_group(
-        GROUP_ID,
-        GRAPHICS,
-        rect=GROUP_RECT,
-        resource_manager=resource_manager,
-    )
-    group.add_layer(
-        create_text_layer(
-            "player_name_text",
-            DEFAULT_NAME_TEXT,
-            size=(200, 68),
-            style=NAME_TEXT_STYLE,
-            position=(0, 132),
-            text_key="player.right.name",
-            fit_mode="contain",
-        )
-    )
-    return group.set_rect_visibility(HIDE_RECT, ("p_name_bg", "player_name_text"))
+    return Group.from_config(GROUP_ID, resource_manager)

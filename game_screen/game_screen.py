@@ -5,6 +5,7 @@ import pygame
 from base import BaseGameScreen
 from game_screen.frame import Frame
 from game_screen.events import ScreenInputEvent, VisualCommand, FrameHit
+from core.gui_manifest import DEFAULT_GUI_ACTIVITIES, GuiManifest
 
 
 class GameScreen(BaseGameScreen):
@@ -26,6 +27,7 @@ class GameScreen(BaseGameScreen):
         self.active_group_ids = []
         self.active_activities = []
         self.screen_frames = {}
+        self.gui_activities = dict(DEFAULT_GUI_ACTIVITIES)
         self._last_click = None
 
     def set_group_store(self, group_store):
@@ -216,12 +218,56 @@ class GameScreen(BaseGameScreen):
         Action objects, for example PlayCardAction.
         """
         command_type = self.get_command_value(command, "type")
+        target_id = self.get_command_value(command, "target")
+        value = self.get_command_value(command, "value")
+        activity_id = self.get_command_value(command, "activity")
         group_id = self.get_command_value(command, "group_id")
 
-        if command_type == "activate_group" and group_id:
+        if command_type in ("set_resource", "set_text") and target_id:
+            target = self.get_gui_manifest().get_target(target_id)
+            self.group_store.apply_target_value(target, value)
+        elif command_type == "start_activity" and activity_id:
+            self.dispatch_manifest_activity(activity_id, command)
+        elif command_type == "activate_group" and group_id:
             self.activate_group(group_id)
         elif command_type == "deactivate_group" and group_id:
             self.deactivate_group(group_id)
+
+    def dispatch_manifest_activity(self, activity_id, command):
+        """Dispatch a public manifest activity term.
+
+        Current built-ins only map target groups to active/inactive state.
+        Concrete screens can override this to instantiate real Activity classes.
+        """
+        manifest = self.get_gui_manifest()
+        manifest.get_activity(activity_id)
+        target_id = self.get_command_value(command, "target")
+        target = manifest.get_target(target_id) if target_id else None
+
+        if activity_id == "group.activate" and target and target.group_id:
+            self.activate_group(target.group_id)
+        elif activity_id == "group.deactivate" and target and target.group_id:
+            self.deactivate_group(target.group_id)
+
+    def get_gui_manifest(self):
+        """Return public GUI terms available to controller/settings code."""
+        targets = self.group_store.get_manifest_targets() if self.group_store else {}
+        return GuiManifest(
+            targets=targets,
+            frames=self.get_manifest_frames(),
+            activities=self.gui_activities,
+        )
+
+    def get_manifest_frames(self):
+        """Return public frame data without exposing group layer internals."""
+        return {
+            frame_id: {
+                "id": frame_id,
+                "parent_frame_id": frame.parent_frame.id if frame.parent_frame else None,
+                "group_ids": tuple(frame.group_ids),
+            }
+            for frame_id, frame in self.screen_frames.items()
+        }
 
     @staticmethod
     def get_command_value(command, key, default=None):

@@ -36,6 +36,9 @@ class VisualCommand:
     """Controller response that asks GameScreen to run a visual change."""
 
     type: str
+    target: str | None = None
+    value: object | None = None
+    activity: str | None = None
     group_id: str | None = None
     from_frame: str | None = None
     to_frame: str | None = None
