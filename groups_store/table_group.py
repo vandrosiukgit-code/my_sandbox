@@ -1,9 +1,9 @@
-"""Build the table group from group_config."""
+"""Build this group from group_config.json."""
 
 from group import Group
 
 
-GROUP_ID = "table_group"
+GROUP_ID = 'table_group'
 
 
 def create(resource_manager):

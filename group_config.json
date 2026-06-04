@@ -97,7 +97,11 @@
         {
           "name": "portrait",
           "type": "image",
-          "resource_key": "main_screen.avatars.portrait_2",
+          "resource_key": "main_screen.avatars.portrait_3",
+          "scale_percent": [
+            100,
+            100
+          ],
           "position": [
             0,
             0
@@ -243,6 +247,171 @@
               196
             ]
           }
+        }
+      ]
+    },
+    "table": {
+      "role": "game_table",
+      "tags": [
+        "table",
+        "background"
+      ],
+      "rect": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "hit_rect": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "scale_factor": 1.0,
+      "hide_rect": false,
+      "manifest_targets": {
+        "table.surface": {
+          "type": "group",
+          "description": "Main game table visual object."
+        }
+      },
+      "layers": [
+        {
+          "name": "table",
+          "type": "image",
+          "resource_key": "main_screen.table",
+          "scale_percent": [
+            100,
+            100
+          ],
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "tressure_map",
+          "type": "image",
+          "resource_key": "main_screen.tressure_map",
+          "position": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    "top_player": {
+      "role": "player_panel",
+      "tags": [
+        "player",
+        "right_player",
+        "configurable"
+      ],
+      "rect": [
+        0,
+        0,
+        200,
+        200
+      ],
+      "hit_rect": [
+        0,
+        0,
+        200,
+        200
+      ],
+      "scale_factor": 1.0,
+      "hide_rect": true,
+      "rect_debug_layer_ids": [
+        "p_name_bg",
+        "player_name_text"
+      ],
+      "manifest_targets": {
+        "player.right.avatar": {
+          "type": "resource",
+          "layer": "portrait",
+          "description": "Right player portrait image."
+        },
+        "player.right.name": {
+          "type": "text",
+          "layer": "player_name_text",
+          "description": "Right player display name."
+        }
+      },
+      "layers": [
+        {
+          "name": "p_portrait_bg",
+          "type": "image",
+          "resource_key": "main_screen.p_portrait_bg",
+          "scale_percent": [
+            50,
+            100
+          ],
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "portrait",
+          "type": "image",
+          "resource_key": "main_screen.avatars.portrait_1",
+          "scale_percent": [
+            95,
+            100
+          ],
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "portrait_frame",
+          "type": "image",
+          "resource_key": "main_screen.portrait_frame",
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "p_name_bg",
+          "type": "image",
+          "resource_key": "main_screen.p_name_bg",
+          "position": [
+            0,
+            132
+          ]
+        },
+        {
+          "name": "player_name_text",
+          "type": "text",
+          "text": "Player 2",
+          "text_key": "player.right.name",
+          "size": [
+            200,
+            68
+          ],
+          "position": [
+            0,
+            132
+          ],
+          "fit_mode": "contain",
+          "style": {
+            "font_path": "assets/fonts/ingrid-darling/IngridDarling-Regular.ttf",
+            "font_size": 28,
+            "color": [
+              255,
+              255,
+              255
+            ],
+            "antialias": true
+          },
+          "height": 68,
+          "scale_percent": [
+            80,
+            100
+          ]
         }
       ]
     }

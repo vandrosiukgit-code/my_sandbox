@@ -1,9 +1,9 @@
-"""Build the left player group from group_config."""
+"""Build this group from group_config.json."""
 
 from group import Group
 
 
-GROUP_ID = "left_player"
+GROUP_ID = 'left_player'
 
 
 def create(resource_manager):

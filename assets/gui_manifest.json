@@ -15,7 +15,8 @@
       "active_group_ids": [
         "table_group",
         "left_player",
-        "right_player"
+        "right_player",
+        "top_player"
       ]
     }
   },
@@ -46,7 +47,8 @@
       ],
       "child_frame_ids": [
         "left_player_frame",
-        "right_player_frame"
+        "right_player_frame",
+        "top_player_frame"
       ],
       "group_origins": {
         "table_group": [
@@ -182,6 +184,71 @@
         "right_player": [
           1040,
           256
+        ]
+      },
+      "action_count": 0,
+      "padding": 0,
+      "spacing": 12
+    },
+    "top_player_frame": {
+      "id": "top_player_frame",
+      "parent_frame_id": "game_table",
+      "local_rect": [
+        482,
+        0,
+        300,
+        260
+      ],
+      "rect": [
+        482,
+        0,
+        300,
+        260
+      ],
+      "hit_rect": [
+        482,
+        0,
+        300,
+        260
+      ],
+      "group_ids": [],
+      "child_frame_ids": [
+        "top_player_portrait"
+      ],
+      "group_origins": {},
+      "action_count": 0,
+      "padding": 0,
+      "spacing": 12
+    },
+    "top_player_portrait": {
+      "id": "top_player_portrait",
+      "parent_frame_id": "top_player_frame",
+      "local_rect": [
+        58,
+        20,
+        200,
+        200
+      ],
+      "rect": [
+        540,
+        20,
+        200,
+        200
+      ],
+      "hit_rect": [
+        540,
+        20,
+        200,
+        200
+      ],
+      "group_ids": [
+        "top_player"
+      ],
+      "child_frame_ids": [],
+      "group_origins": {
+        "top_player": [
+          540,
+          20
         ]
       },
       "action_count": 0,
@@ -443,6 +510,63 @@
         "right_player_portrait"
       ]
     },
+    "table": {
+      "id": "table",
+      "role": "game_table",
+      "tags": [
+        "background",
+        "table"
+      ],
+      "manifest_targets": {
+        "table.surface": {
+          "type": "group",
+          "description": "Main game table visual object.",
+          "group_id": "table"
+        }
+      },
+      "rect": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "hit_rect": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "scale_factor": 1.0,
+      "hide_rect": false,
+      "rect_debug_layer_ids": null,
+      "layer_order": [
+        "table",
+        "tressure_map"
+      ],
+      "layers": {
+        "table": {
+          "id": "table",
+          "type": "resource",
+          "position": [
+            0,
+            0
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1
+        },
+        "tressure_map": {
+          "id": "tressure_map",
+          "type": "resource",
+          "position": [
+            0,
+            0
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1
+        }
+      },
+      "frame_ids": []
+    },
     "table_group": {
       "id": "table_group",
       "role": "game_table",
@@ -501,6 +625,133 @@
       "frame_ids": [
         "game_table"
       ]
+    },
+    "top_player": {
+      "id": "top_player",
+      "role": "player_panel",
+      "tags": [
+        "configurable",
+        "player",
+        "right_player"
+      ],
+      "manifest_targets": {
+        "player.right.avatar": {
+          "type": "resource",
+          "layer": "portrait",
+          "description": "Right player portrait image.",
+          "group_id": "top_player"
+        },
+        "player.right.name": {
+          "type": "text",
+          "layer": "player_name_text",
+          "description": "Right player display name.",
+          "group_id": "top_player"
+        }
+      },
+      "rect": [
+        540,
+        20,
+        200,
+        200
+      ],
+      "hit_rect": [
+        540,
+        20,
+        200,
+        200
+      ],
+      "scale_factor": 1.0,
+      "hide_rect": true,
+      "rect_debug_layer_ids": [
+        "p_name_bg",
+        "player_name_text"
+      ],
+      "layer_order": [
+        "p_portrait_bg",
+        "portrait",
+        "portrait_frame",
+        "p_name_bg",
+        "player_name_text"
+      ],
+      "layers": {
+        "p_portrait_bg": {
+          "id": "p_portrait_bg",
+          "type": "resource",
+          "position": [
+            0,
+            0
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1
+        },
+        "portrait": {
+          "id": "portrait",
+          "type": "resource",
+          "position": [
+            0,
+            0
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1
+        },
+        "portrait_frame": {
+          "id": "portrait_frame",
+          "type": "resource",
+          "position": [
+            0,
+            0
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1
+        },
+        "p_name_bg": {
+          "id": "p_name_bg",
+          "type": "resource",
+          "position": [
+            0,
+            132
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1
+        },
+        "player_name_text": {
+          "id": "player_name_text",
+          "type": "text",
+          "position": [
+            0,
+            132
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1,
+          "text_key": "player.right.name",
+          "default_text": "Player 3",
+          "size": [
+            200,
+            68
+          ],
+          "rect": [
+            0,
+            132,
+            200,
+            68
+          ],
+          "fit_mode": "contain",
+          "style": {
+            "font_name": null,
+            "font_path": "assets/fonts/ingrid-darling/IngridDarling-Regular.ttf",
+            "font_size": 28,
+            "color": [
+              255,
+              238,
+              196
+            ],
+            "antialias": true
+          }
+        }
+      },
+      "frame_ids": [
+        "top_player_portrait"
+      ]
     }
   },
   "hierarchy": {
@@ -511,7 +762,8 @@
       "active_group_ids": [
         "table_group",
         "left_player",
-        "right_player"
+        "right_player",
+        "top_player"
       ]
     }
   }

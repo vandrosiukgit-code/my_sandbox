@@ -1,7 +1,17 @@
 {
   "resources": {
+    "main_screen.avatars.portrait_1": {
+      "path": "main_screen/avatars/portrait_1.png",
+      "frame_width": 200,
+      "frame_height": 200
+    },
     "main_screen.avatars.portrait_2": {
       "path": "main_screen/avatars/portrait_2.png",
+      "frame_width": 200,
+      "frame_height": 200
+    },
+    "main_screen.avatars.portrait_3": {
+      "path": "main_screen/avatars/portrait_3.png",
       "frame_width": 200,
       "frame_height": 200
     },

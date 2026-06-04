@@ -3,7 +3,7 @@
 from group import Group
 
 
-GROUP_ID = 'right_player'
+GROUP_ID = 'top_player'
 
 
 def create(resource_manager):
