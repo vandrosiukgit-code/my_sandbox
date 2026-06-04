@@ -667,7 +667,7 @@ class ResourcePickerService:
 class ResourcePickerApp:
     """Tkinter shell for resource picker workflows."""
 
-    WINDOW_SIZE = "1040x700"
+    WINDOW_SIZE = "1040x900"
     PREVIEW_SIZE = (560, 380)
     COLORS = {
         "app_bg": "#1e1e1e",
@@ -676,6 +676,9 @@ class ResourcePickerApp:
         "field_bg": "#323236",
         "field_bg_active": "#3a3a40",
         "preview_bg": "#181818",
+        "zone_bg": "#2b2b31",
+        "zone_border": "#565664",
+        "zone_highlight": "#323238",
         "text": "#f0f0f0",
         "muted_text": "#b8b8b8",
         "heading": "#ffffff",
@@ -690,6 +693,7 @@ class ResourcePickerApp:
         self.assets_dir = os.path.abspath(assets_dir)
         self.service = ResourcePickerService(PROJECT_DIR, self.assets_dir)
         self.manifest = {"resources": {}}
+        self.gui_manifest = self.service.load_gui_manifest_if_exists()
         self.rm_manifest_loaded = False
         self.png_assets = []
         self.png_assets_by_key = {}
@@ -698,6 +702,7 @@ class ResourcePickerApp:
         self.visible_graphics_entries = []
         self.png_assets_by_item = {}
         self.group_config_nav_by_item = {}
+        self.gui_manifest_nav_by_item = {}
         self.group_editor_layer_by_item = {}
         self.is_populating_group_editor_layers = False
         self.png_folder_items = {}
@@ -708,6 +713,11 @@ class ResourcePickerApp:
         self.selected_graphic = None
         self.selected_manifest_resource_key = None
         self.group_edit_source_id = None
+        self.preview_after_id = None
+        self.group_builder_sections = {}
+        self.edit_group_active = False
+        self.edit_group_id = ""
+        self.details_output_hidden = True
 
         self.resource_key_var = tk.StringVar()
         self.path_var = tk.StringVar()
@@ -734,11 +744,13 @@ class ResourcePickerApp:
         self.group_scale_var = tk.StringVar(value="1.0")
         self.group_hide_rect_var = tk.BooleanVar(value=True)
         self.layer_name_var = tk.StringVar()
+        self.graphic_layer_choice_var = tk.StringVar()
         self.layer_x_var = tk.StringVar(value="0")
         self.layer_y_var = tk.StringVar(value="0")
         self.group_role_var = tk.StringVar()
         self.target_id_var = tk.StringVar()
         self.graphic_resource_key_var = tk.StringVar()
+        self.graphic_resource_full_key = ""
         self.text_value_var = tk.StringVar()
         self.text_key_var = tk.StringVar()
         self.text_width_var = tk.StringVar(value="0")
@@ -765,7 +777,7 @@ class ResourcePickerApp:
     def configure_window(self):
         self.root.title("Resource Picker")
         self.root.geometry(self.WINDOW_SIZE)
-        self.root.minsize(980, 640)
+        self.root.minsize(980, 820)
         colors = self.COLORS
         self.root.configure(bg=colors["app_bg"])
         self.configure_fonts()
@@ -785,6 +797,7 @@ class ResourcePickerApp:
         style.configure("TFrame", background=colors["app_bg"])
         style.configure("Card.TFrame", background=colors["card_bg"])
         style.configure("Panel.TFrame", background=colors["panel_bg"])
+        style.configure("Zone.TFrame", background=colors["zone_bg"])
         style.configure("TLabel", background=colors["app_bg"], foreground=colors["text"])
         style.configure("Card.TLabel", background=colors["card_bg"], foreground=colors["text"])
         style.configure(
@@ -836,10 +849,11 @@ class ResourcePickerApp:
         )
         style.configure(
             "TLabelframe",
-            background=colors["card_bg"],
+            background=colors["zone_bg"],
             foreground=colors["muted_text"],
-            bordercolor=colors["border"],
-            relief="flat",
+            bordercolor=colors["zone_border"],
+            relief="groove",
+            borderwidth=1,
         )
         style.configure(
             "TLabelframe.Label",
@@ -911,6 +925,26 @@ class ResourcePickerApp:
             foreground=[("selected", colors["heading"])],
         )
         style.map("TButton", background=[("active", colors["field_bg_active"])])
+        style.map(
+            "TCombobox",
+            fieldbackground=[
+                ("readonly", colors["field_bg"]),
+                ("disabled", colors["panel_bg"]),
+            ],
+            background=[
+                ("readonly", colors["field_bg"]),
+                ("active", colors["field_bg_active"]),
+                ("disabled", colors["panel_bg"]),
+            ],
+            foreground=[
+                ("readonly", colors["text"]),
+                ("disabled", colors["muted_text"]),
+            ],
+            arrowcolor=[
+                ("readonly", colors["muted_text"]),
+                ("active", colors["text"]),
+            ],
+        )
         style.map("Primary.TButton", background=[("active", colors["accent_active"])])
         style.map(
             "TNotebook.Tab",
@@ -952,7 +986,7 @@ class ResourcePickerApp:
         self.create_search(left_panel)
         self.create_mode_tabs(left_panel)
         self.create_right_panel(self.main_pane)
-        self.root.after(100, lambda: self.main_pane.sashpos(0, 440))
+        self.root.after(100, lambda: self.main_pane.sashpos(0, 528))
 
     def create_search(self, parent):
         search_frame = ttk.Frame(parent)
@@ -977,10 +1011,14 @@ class ResourcePickerApp:
         self.create_group_tab = ttk.Frame(self.mode_tabs, padding=14)
         self.create_group_tab.rowconfigure(1, weight=1)
         self.create_group_tab.columnconfigure(0, weight=1)
+        self.edit_group_tab = ttk.Frame(self.mode_tabs, padding=14)
+        self.edit_group_tab.rowconfigure(1, weight=1)
+        self.edit_group_tab.columnconfigure(0, weight=1)
 
         self.mode_tabs.add(self.png_data_tab, text="PNG DATA")
         self.mode_tabs.add(self.check_rm_tab, text="CHECK RM MANIFEST")
         self.mode_tabs.add(self.create_group_tab, text="CREATE GROUP")
+        self.mode_tabs.add(self.edit_group_tab, text="EDIT GROUP")
 
         ttk.Label(
             self.png_data_tab,
@@ -1000,24 +1038,60 @@ class ResourcePickerApp:
             text="CREATE GROUP",
             wraplength=360,
         ).grid(row=0, column=0, sticky="nw")
-        self.create_group_builder(self.create_group_tab)
+        self.create_group_builder(self.create_group_tab, builder_key="create")
+        ttk.Label(
+            self.edit_group_tab,
+            text="EDIT GROUP",
+            wraplength=360,
+        ).grid(row=0, column=0, sticky="nw")
+        self.edit_group_empty_label = ttk.Label(
+            self.edit_group_tab,
+            text="Select a group in GUI Manifest and press Edit.",
+            wraplength=420,
+            style="Muted.TLabel",
+        )
+        self.edit_group_empty_label.grid(row=1, column=0, sticky="nw", pady=(12, 0))
+        self.edit_group_form_holder = ttk.Frame(self.edit_group_tab)
+        self.edit_group_form_holder.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
+        self.edit_group_form_holder.columnconfigure(0, weight=1)
+        self.edit_group_form_holder.grid_remove()
 
-    def create_group_builder(self, parent):
-        form = ttk.LabelFrame(parent, text="Group Builder", padding=14)
+    def create_group_builder(self, parent, builder_key="create", show_cancel=False):
+        form = ttk.LabelFrame(parent, text="Group Builder", padding=8)
         form.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
         form.columnconfigure(1, weight=1)
         form.columnconfigure(3, weight=1)
 
-        ttk.Label(form, text="group").grid(row=0, column=0, sticky="e", padx=(0, 10), pady=(0, 8))
-        ttk.Entry(form, textvariable=self.group_id_var).grid(row=0, column=1, columnspan=3, sticky="ew", pady=(0, 8))
-        ttk.Label(form, text="role").grid(row=1, column=0, sticky="e", padx=(0, 10), pady=(0, 8))
-        ttk.Entry(form, textvariable=self.group_role_var).grid(row=1, column=1, columnspan=3, sticky="ew", pady=(0, 8))
-        ttk.Label(form, text="tags").grid(row=2, column=0, sticky="e", padx=(0, 10), pady=(0, 8))
-        ttk.Entry(form, textvariable=self.group_tags_var).grid(row=2, column=1, columnspan=3, sticky="ew", pady=(0, 8))
+        ttk.Label(form, text="group").grid(row=0, column=0, sticky="e", padx=(0, 10), pady=(0, 4))
+        ttk.Entry(form, textvariable=self.group_id_var).grid(row=0, column=1, columnspan=3, sticky="ew", pady=(0, 4))
+        ttk.Label(form, text="role").grid(row=1, column=0, sticky="e", padx=(0, 10), pady=(0, 4))
+        ttk.Entry(form, textvariable=self.group_role_var).grid(row=1, column=1, columnspan=3, sticky="ew", pady=(0, 4))
+        ttk.Label(form, text="tags").grid(row=2, column=0, sticky="e", padx=(0, 10), pady=(0, 4))
+        ttk.Entry(form, textvariable=self.group_tags_var).grid(row=2, column=1, columnspan=3, sticky="ew", pady=(0, 4))
 
-        ttk.Label(form, text="layer type").grid(row=3, column=0, sticky="e", padx=(0, 10), pady=(12, 8))
+        ttk.Label(form, text="rect").grid(row=3, column=0, sticky="e", padx=(0, 10), pady=(0, 4))
+        self.create_quad_inputs(
+            form,
+            3,
+            (self.group_rect_x_var, self.group_rect_y_var, self.group_rect_w_var, self.group_rect_h_var),
+        )
+
+        ttk.Label(form, text="hit_rect").grid(row=4, column=0, sticky="e", padx=(0, 10), pady=(0, 4))
+        self.create_quad_inputs(
+            form,
+            4,
+            (self.group_hit_x_var, self.group_hit_y_var, self.group_hit_w_var, self.group_hit_h_var),
+        )
+
+        ttk.Label(form, text="scale").grid(row=5, column=0, sticky="e", padx=(0, 10), pady=(0, 4))
+        ttk.Entry(form, textvariable=self.group_scale_var, width=8).grid(row=5, column=1, sticky="w", pady=(0, 4))
+        ttk.Checkbutton(form, text="hide_rect", variable=self.group_hide_rect_var).grid(
+            row=5, column=2, columnspan=2, sticky="w", padx=(12, 0), pady=(0, 4)
+        )
+
+        ttk.Label(form, text="layer type").grid(row=6, column=0, sticky="e", padx=(0, 10), pady=(6, 4))
         type_buttons = ttk.Frame(form)
-        type_buttons.grid(row=3, column=1, columnspan=3, sticky="ew", pady=(12, 8))
+        type_buttons.grid(row=6, column=1, columnspan=3, sticky="ew", pady=(6, 4))
         type_buttons.columnconfigure(0, weight=1)
         type_buttons.columnconfigure(1, weight=1)
         ttk.Button(
@@ -1031,63 +1105,90 @@ class ResourcePickerApp:
             command=lambda: self.select_builder_layer_type("Text"),
         ).grid(row=0, column=1, sticky="ew", padx=(4, 0))
         ttk.Label(form, textvariable=self.layer_type_var).grid(
-            row=4, column=1, columnspan=3, sticky="w", pady=(0, 8)
+            row=7, column=1, columnspan=3, sticky="w", pady=(0, 4)
         )
 
-        ttk.Label(form, text="layer id").grid(row=5, column=0, sticky="e", padx=(0, 10), pady=(0, 8))
-        ttk.Entry(form, textvariable=self.layer_name_var).grid(row=5, column=1, columnspan=3, sticky="ew", pady=(0, 8))
-
-        self.graphic_builder_frame = ttk.LabelFrame(form, text="Graphic Layer Form", padding=14)
-        self.graphic_builder_frame.grid(row=6, column=0, columnspan=4, sticky="ew", pady=(12, 0))
-        self.graphic_builder_frame.columnconfigure(1, weight=1)
-        ttk.Label(self.graphic_builder_frame, text="resource").grid(row=0, column=0, sticky="w", pady=(0, 4))
-        ttk.Entry(self.graphic_builder_frame, textvariable=self.graphic_resource_key_var).grid(
-            row=0, column=1, sticky="ew", pady=(0, 4)
+        graphic_builder_frame = ttk.LabelFrame(form, text="Graphic Layer Form", padding=8)
+        graphic_builder_frame.grid(row=8, column=0, columnspan=4, sticky="ew", pady=(6, 0))
+        graphic_builder_frame.columnconfigure(1, weight=1)
+        ttk.Label(graphic_builder_frame, text="layer:").grid(row=0, column=0, sticky="w", pady=(0, 4))
+        graphic_layer_box = ttk.Combobox(
+            graphic_builder_frame,
+            textvariable=self.graphic_layer_choice_var,
+            state="readonly",
+            values=(),
         )
-        ttk.Button(self.graphic_builder_frame, text="Choose", command=self.show_rm_manifest_workbench).grid(
+        graphic_layer_box.grid(row=0, column=1, sticky="ew", pady=(0, 4))
+        graphic_layer_box.bind("<<ComboboxSelected>>", self.on_graphic_layer_choice)
+        ttk.Button(graphic_builder_frame, text="New layer", command=self.select_new_graphic_layer).grid(
             row=0, column=2, sticky="ew", padx=(8, 0), pady=(0, 4)
         )
-        self.create_xy_percent_inputs(self.graphic_builder_frame, row=1)
 
-        self.text_builder_frame = ttk.LabelFrame(form, text="Text Layer Form", padding=14)
-        self.text_builder_frame.grid(row=7, column=0, columnspan=4, sticky="ew", pady=(12, 0))
-        self.text_builder_frame.columnconfigure(1, weight=1)
-        ttk.Label(self.text_builder_frame, text="text").grid(row=0, column=0, sticky="w", pady=(0, 4))
-        ttk.Entry(self.text_builder_frame, textvariable=self.text_value_var).grid(
+        ttk.Label(graphic_builder_frame, text="resource_key:").grid(row=1, column=0, sticky="w", pady=(0, 4))
+        ttk.Entry(graphic_builder_frame, textvariable=self.graphic_resource_key_var).grid(
+            row=1, column=1, sticky="ew", pady=(0, 4)
+        )
+        ttk.Button(graphic_builder_frame, text="Choose", command=self.show_rm_manifest_workbench).grid(
+            row=1, column=2, sticky="ew", padx=(8, 0), pady=(0, 4)
+        )
+        self.create_xy_percent_inputs(graphic_builder_frame, row=2)
+
+        text_builder_frame = ttk.LabelFrame(form, text="Text Layer Form", padding=8)
+        text_builder_frame.grid(row=9, column=0, columnspan=4, sticky="ew", pady=(6, 0))
+        text_builder_frame.columnconfigure(1, weight=1)
+        ttk.Label(text_builder_frame, text="text").grid(row=0, column=0, sticky="w", pady=(0, 4))
+        ttk.Entry(text_builder_frame, textvariable=self.text_value_var).grid(
             row=0, column=1, columnspan=3, sticky="ew", pady=(0, 4)
         )
-        ttk.Label(self.text_builder_frame, text="font").grid(row=1, column=0, sticky="w", pady=(0, 4))
+        ttk.Label(text_builder_frame, text="font").grid(row=1, column=0, sticky="w", pady=(0, 4))
         font_box = ttk.Combobox(
-            self.text_builder_frame,
+            text_builder_frame,
             textvariable=self.font_path_var,
             values=self.available_fonts,
         )
         font_box.grid(row=1, column=1, columnspan=3, sticky="ew", pady=(0, 4))
         font_box.bind("<<ComboboxSelected>>", self.on_builder_font_selected)
-        ttk.Label(self.text_builder_frame, text="height").grid(row=2, column=0, sticky="w", pady=(0, 4))
-        ttk.Entry(self.text_builder_frame, textvariable=self.text_height_var).grid(
+        ttk.Label(text_builder_frame, text="height").grid(row=2, column=0, sticky="w", pady=(0, 4))
+        ttk.Entry(text_builder_frame, textvariable=self.text_height_var).grid(
             row=2, column=1, sticky="ew", pady=(0, 4)
         )
-        ttk.Label(self.text_builder_frame, text="color").grid(row=2, column=2, sticky="w", padx=(8, 0), pady=(0, 4))
-        ttk.Entry(self.text_builder_frame, textvariable=self.font_color_hex_var).grid(
+        ttk.Label(text_builder_frame, text="color").grid(row=2, column=2, sticky="w", padx=(8, 0), pady=(0, 4))
+        ttk.Entry(text_builder_frame, textvariable=self.font_color_hex_var).grid(
             row=2, column=3, sticky="ew", pady=(0, 4)
         )
-        self.create_xy_percent_inputs(self.text_builder_frame, row=3)
+        self.create_xy_percent_inputs(text_builder_frame, row=3)
 
-        ttk.Button(form, text="Save Group", command=self.save_create_group_builder, style="Primary.TButton").grid(
-            row=8, column=0, columnspan=4, sticky="ew", pady=(14, 0)
+        footer = ttk.Frame(form)
+        footer.grid(row=10, column=0, columnspan=4, sticky="ew", pady=(8, 0))
+        footer.columnconfigure(0, weight=1)
+        if show_cancel:
+            footer.columnconfigure(1, weight=1)
+        ttk.Button(footer, text="Save Group", command=self.save_create_group_builder, style="Primary.TButton").grid(
+            row=0, column=0, sticky="ew", padx=(0, 4 if show_cancel else 0)
         )
+        if show_cancel:
+            ttk.Button(footer, text="Cancel", command=self.cancel_edit_group).grid(
+                row=0, column=1, sticky="ew", padx=(4, 0)
+            )
+        self.group_builder_sections[builder_key] = {
+            "form": form,
+            "graphic": graphic_builder_frame,
+            "text": text_builder_frame,
+            "graphic_layer_box": graphic_layer_box,
+        }
+        self.graphic_builder_frame = graphic_builder_frame
+        self.text_builder_frame = text_builder_frame
         self.on_layer_type_change()
 
     def create_xy_percent_inputs(self, parent, row):
-        ttk.Label(parent, text="x").grid(row=row, column=0, sticky="w", pady=(0, 4))
-        ttk.Entry(parent, textvariable=self.layer_x_var, width=8).grid(row=row, column=1, sticky="ew", pady=(0, 4))
-        ttk.Label(parent, text="y").grid(row=row, column=2, sticky="w", padx=(8, 0), pady=(0, 4))
-        ttk.Entry(parent, textvariable=self.layer_y_var, width=8).grid(row=row, column=3, sticky="ew", pady=(0, 4))
-        ttk.Label(parent, text="scale w%").grid(row=row + 1, column=0, sticky="w", pady=(0, 4))
-        ttk.Entry(parent, textvariable=self.layer_scale_w_var, width=8).grid(row=row + 1, column=1, sticky="ew", pady=(0, 4))
-        ttk.Label(parent, text="scale h%").grid(row=row + 1, column=2, sticky="w", padx=(8, 0), pady=(0, 4))
-        ttk.Entry(parent, textvariable=self.layer_scale_h_var, width=8).grid(row=row + 1, column=3, sticky="ew", pady=(0, 4))
+        ttk.Label(parent, text="x").grid(row=row, column=0, sticky="w", pady=(0, 2))
+        ttk.Entry(parent, textvariable=self.layer_x_var, width=8).grid(row=row, column=1, sticky="ew", pady=(0, 2))
+        ttk.Label(parent, text="y").grid(row=row, column=2, sticky="w", padx=(8, 0), pady=(0, 2))
+        ttk.Entry(parent, textvariable=self.layer_y_var, width=8).grid(row=row, column=3, sticky="ew", pady=(0, 2))
+        ttk.Label(parent, text="scale w%").grid(row=row + 1, column=0, sticky="w", pady=(0, 2))
+        ttk.Entry(parent, textvariable=self.layer_scale_w_var, width=8).grid(row=row + 1, column=1, sticky="ew", pady=(0, 2))
+        ttk.Label(parent, text="scale h%").grid(row=row + 1, column=2, sticky="w", padx=(8, 0), pady=(0, 2))
+        ttk.Entry(parent, textvariable=self.layer_scale_h_var, width=8).grid(row=row + 1, column=3, sticky="ew", pady=(0, 2))
 
     def create_check_rm_controls(self, parent):
         controls = ttk.LabelFrame(parent, text="RM Manifest Actions", padding=14)
@@ -1318,7 +1419,7 @@ class ResourcePickerApp:
     def create_quad_inputs(self, parent, row, variables):
         labels = ("x", "y", "w", "h")
         holder = ttk.Frame(parent)
-        holder.grid(row=row, column=1, columnspan=3, sticky="ew", pady=(0, 4))
+        holder.grid(row=row, column=1, columnspan=3, sticky="ew", pady=(0, 2))
         for index, variable in enumerate(variables):
             holder.columnconfigure(index * 2 + 1, weight=1)
             ttk.Label(holder, text=labels[index]).grid(row=0, column=index * 2, sticky="w", padx=(0 if index == 0 else 8, 3))
@@ -1409,19 +1510,16 @@ class ResourcePickerApp:
 
     def on_layer_type_change(self, _event=None):
         if self.layer_type_var.get() == "Text":
-            if hasattr(self, "graphic_builder_frame"):
-                self.graphic_builder_frame.grid_remove()
-            if hasattr(self, "text_builder_frame"):
-                self.text_builder_frame.grid()
+            for sections in self.group_builder_sections.values():
+                sections["graphic"].grid_remove()
+                sections["text"].grid()
             self.show_text_layer_editor()
-            self.graphic_resource_key_var.set("")
             self.status_var.set("Text layer mode")
             self.update_group_config_preview()
             return
-        if hasattr(self, "graphic_builder_frame"):
-            self.graphic_builder_frame.grid()
-        if hasattr(self, "text_builder_frame"):
-            self.text_builder_frame.grid_remove()
+        for sections in self.group_builder_sections.values():
+            sections["graphic"].grid()
+            sections["text"].grid_remove()
         self.hide_text_layer_editor()
         self.status_var.set("Graphic layer mode")
         self.update_group_config_preview()
@@ -1435,8 +1533,19 @@ class ResourcePickerApp:
             self.group_id_var,
             self.group_role_var,
             self.group_tags_var,
+            self.group_rect_x_var,
+            self.group_rect_y_var,
+            self.group_rect_w_var,
+            self.group_rect_h_var,
+            self.group_hit_x_var,
+            self.group_hit_y_var,
+            self.group_hit_w_var,
+            self.group_hit_h_var,
+            self.group_scale_var,
+            self.group_hide_rect_var,
             self.layer_type_var,
             self.layer_name_var,
+            self.graphic_layer_choice_var,
             self.layer_x_var,
             self.layer_y_var,
             self.layer_scale_w_var,
@@ -1454,6 +1563,8 @@ class ResourcePickerApp:
         if not hasattr(self, "group_config_preview_text"):
             return
         payload = self.build_group_config_draft()
+        if self.edit_group_active and self.edit_group_id:
+            payload = payload.get("groups", {}).get(self.edit_group_id, {})
         text = json.dumps(payload, ensure_ascii=False, indent=2)
         self.group_config_preview_text.configure(state="normal")
         self.group_config_preview_text.delete("1.0", tk.END)
@@ -1479,6 +1590,23 @@ class ResourcePickerApp:
             }
         group_payload["role"] = self.group_role_var.get().strip()
         group_payload["tags"] = self.parse_tags(self.group_tags_var.get())
+        group_payload["rect"] = [
+            self.safe_int(self.group_rect_x_var.get()),
+            self.safe_int(self.group_rect_y_var.get()),
+            self.safe_int(self.group_rect_w_var.get()),
+            self.safe_int(self.group_rect_h_var.get()),
+        ]
+        group_payload["hit_rect"] = [
+            self.safe_int(self.group_hit_x_var.get()),
+            self.safe_int(self.group_hit_y_var.get()),
+            self.safe_int(self.group_hit_w_var.get()),
+            self.safe_int(self.group_hit_h_var.get()),
+        ]
+        try:
+            group_payload["scale_factor"] = float(self.group_scale_var.get().strip() or "1.0")
+        except ValueError:
+            group_payload["scale_factor"] = 1.0
+        group_payload["hide_rect"] = bool(self.group_hide_rect_var.get())
 
         layer = self.build_current_layer_draft()
         if layer:
@@ -1493,15 +1621,15 @@ class ResourcePickerApp:
         return {"groups": {group_id: group_payload}}
 
     def build_current_layer_draft(self):
-        layer_name = self.layer_name_var.get().strip()
-        if not layer_name:
-            return None
         position = [self.safe_int(self.layer_x_var.get()), self.safe_int(self.layer_y_var.get())]
         scale_percent = [
             max(1, self.safe_int(self.layer_scale_w_var.get(), 100)),
             max(1, self.safe_int(self.layer_scale_h_var.get(), 100)),
         ]
         if self.layer_type_var.get() == "Text":
+            layer_name = self.get_builder_layer_name("text")
+            if not layer_name:
+                return None
             style = {
                 "font_path": self.font_path_var.get().strip() or None,
                 "font_size": self.safe_int(self.font_size_var.get(), 24),
@@ -1517,13 +1645,99 @@ class ResourcePickerApp:
                 "position": position,
                 "style": style,
             }
+        layer_name = self.get_builder_layer_name("image")
+        if not layer_name:
+            return None
         return {
             "name": layer_name,
             "type": "image",
-            "resource_key": self.graphic_resource_key_var.get().strip(),
+            "resource_key": self.get_graphic_resource_key(),
             "scale_percent": scale_percent,
             "position": position,
         }
+
+    def get_builder_layer_name(self, layer_type):
+        current_name = self.layer_name_var.get().strip()
+        if current_name:
+            return current_name
+        if layer_type == "text":
+            return self.create_layer_name_from_text_fields()
+        resource_key = self.get_graphic_resource_key()
+        return self.create_layer_name_from_resource_key(resource_key)
+
+    def set_graphic_resource_key(self, resource_key):
+        self.graphic_resource_full_key = str(resource_key or "").strip()
+        self.graphic_resource_key_var.set(self.create_layer_name_from_resource_key(self.graphic_resource_full_key))
+
+    def get_graphic_resource_key(self):
+        if self.graphic_resource_full_key:
+            return self.graphic_resource_full_key
+        return self.graphic_resource_key_var.get().strip()
+
+    def clear_graphic_resource_key(self):
+        self.graphic_resource_full_key = ""
+        self.graphic_resource_key_var.set("")
+
+    def create_layer_name_from_text_fields(self):
+        text_key = self.text_key_var.get().strip()
+        if text_key:
+            return self.create_layer_name_from_resource_key(text_key)
+        if self.text_value_var.get().strip():
+            return "text"
+        return ""
+
+    @staticmethod
+    def create_layer_name_from_resource_key(resource_key):
+        name = str(resource_key or "").strip().replace("\\", "/")
+        if not name:
+            return ""
+        name = name.rsplit("/", 1)[-1].rsplit(".", 1)[-1]
+        name = re.sub(r"[^0-9A-Za-z_]+", "_", name).strip("_").lower()
+        return name
+
+    def refresh_graphic_layer_choices(self, group_payload=None, selected_layer_name=""):
+        group_payload = group_payload or {}
+        image_layer_names = [
+            layer.get("name", "")
+            for layer in group_payload.get("layers", ())
+            if layer.get("type", "image") == "image" and layer.get("name")
+        ]
+        values = tuple(image_layer_names)
+        for sections in self.group_builder_sections.values():
+            layer_box = sections.get("graphic_layer_box")
+            if layer_box is not None:
+                layer_box.configure(values=values)
+        if selected_layer_name in image_layer_names:
+            self.graphic_layer_choice_var.set(selected_layer_name)
+        else:
+            self.graphic_layer_choice_var.set("")
+
+    def on_graphic_layer_choice(self, _event=None):
+        layer_name = self.graphic_layer_choice_var.get().strip()
+        if not layer_name:
+            self.select_new_graphic_layer()
+            return
+        group_id = self.group_id_var.get().strip()
+        if not group_id:
+            return
+        try:
+            group_payload = group_config.get_group_config(group_id)
+            layer_payload = group_config.get_layer_config(group_id, layer_name)
+        except Exception as error:
+            self.status_var.set(str(error))
+            return
+        if layer_payload.get("type", "image") != "image":
+            return
+        self.fill_group_config_form_from_layer_payload(group_id, group_payload, layer_payload)
+        self.status_var.set(f"Editing layer resource_key: {group_id}.{layer_name}")
+
+    def select_new_graphic_layer(self):
+        self.graphic_layer_choice_var.set("")
+        self.layer_name_var.set("")
+        self.clear_graphic_resource_key()
+        self.layer_x_var.set("0")
+        self.layer_y_var.set("0")
+        self.status_var.set("New graphic layer")
 
     def save_create_group_builder(self):
         group_id = self.group_id_var.get().strip()
@@ -1612,14 +1826,12 @@ class ResourcePickerApp:
         self.create_png_workbench(self.workbench_container)
         self.create_rm_manifest_workbench(self.workbench_container)
         self.create_create_group_workbench(self.workbench_container)
+        self.create_gui_manifest_workbench(self.workbench_container)
         self.create_group_config_workbench(self.workbench_container)
 
         ttk.Label(right_panel, textvariable=self.status_var, style="Muted.TLabel").grid(
             row=2, column=0, sticky="w", pady=(12, 0)
         )
-        self.details_heading = ttk.Label(right_panel, text="Details", style="Heading.TLabel")
-        self.details_heading.grid(row=3, column=0, sticky="w", pady=(12, 0))
-
         self.output_text = tk.Text(
             right_panel,
             height=6,
@@ -1634,7 +1846,6 @@ class ResourcePickerApp:
         )
         self.output_text.grid(row=4, column=0, sticky="ew")
         self.output_text.configure(state="disabled")
-        self.details_heading.grid_remove()
         self.output_text.grid_remove()
         self.show_png_workbench()
 
@@ -1674,14 +1885,20 @@ class ResourcePickerApp:
         frame = ttk.Frame(parent)
         frame.grid(row=0, column=0, sticky="nsew")
         frame.columnconfigure(0, weight=1)
-        frame.rowconfigure(1, weight=1)
+        frame.rowconfigure(0, weight=1)
         self.workbench_frames["rm"] = frame
         self.create_manifest_tree(frame)
+        actions = ttk.Frame(frame)
+        actions.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        actions.columnconfigure(0, weight=1)
+        ttk.Button(actions, text="Add to layer", command=self.add_rm_resource_to_graphic_layer).grid(
+            row=0, column=0, sticky="ew"
+        )
         self.create_rm_metadata_view(frame)
 
     def create_rm_metadata_view(self, parent):
         view = ttk.LabelFrame(parent, text="Selected PNG metadata", padding=8)
-        view.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        view.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
         view.columnconfigure(1, weight=1)
         ttk.Label(view, text="resource_key").grid(row=0, column=0, sticky="w", pady=(0, 4))
         ttk.Label(view, textvariable=self.resource_key_var).grid(row=0, column=1, sticky="w", pady=(0, 4))
@@ -1708,6 +1925,46 @@ class ResourcePickerApp:
         )
         ttk.Button(actions, text="DELETE", command=self.delete_selected_group_config, style="Danger.TButton").grid(
             row=0, column=1, sticky="ew", padx=(4, 0)
+        )
+
+    def create_gui_manifest_workbench(self, parent):
+        frame = ttk.Frame(parent)
+        frame.grid(row=0, column=0, sticky="nsew")
+        frame.columnconfigure(0, weight=1)
+        frame.rowconfigure(1, weight=1)
+        self.workbench_frames["gui_manifest"] = frame
+
+        ttk.Button(
+            frame,
+            text="Build/Update GUI Manifest",
+            command=self.build_update_gui_manifest,
+            style="Primary.TButton",
+        ).grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
+
+        self.gui_manifest_tree = ttk.Treeview(
+            frame,
+            columns=("type", "value"),
+            show="tree headings",
+            height=16,
+        )
+        self.gui_manifest_tree.heading("#0", text="GUI object")
+        self.gui_manifest_tree.heading("type", text="Type")
+        self.gui_manifest_tree.heading("value", text="Value")
+        self.gui_manifest_tree.column("#0", width=240)
+        self.gui_manifest_tree.column("type", width=90, anchor="center")
+        self.gui_manifest_tree.column("value", width=320)
+        self.gui_manifest_tree.grid(row=1, column=0, sticky="nsew")
+        self.gui_manifest_tree.bind("<<TreeviewSelect>>", self.on_gui_manifest_select)
+
+        tree_scroll = ttk.Scrollbar(frame, orient="vertical", command=self.gui_manifest_tree.yview)
+        tree_scroll.grid(row=1, column=1, sticky="ns")
+        self.gui_manifest_tree.configure(yscrollcommand=tree_scroll.set)
+
+        actions = ttk.Frame(frame)
+        actions.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        actions.columnconfigure(0, weight=1)
+        ttk.Button(actions, text="EDIT", command=self.edit_selected_gui_manifest_group).grid(
+            row=0, column=0, sticky="ew"
         )
 
     def create_create_group_workbench(self, parent):
@@ -1739,11 +1996,18 @@ class ResourcePickerApp:
         preview_x.grid(row=1, column=0, sticky="ew")
         self.group_config_preview_text.configure(yscrollcommand=preview_y.set, xscrollcommand=preview_x.set)
         self.group_config_preview_text.configure(state="disabled")
+        ttk.Button(
+            frame,
+            text="Build/Update GUI Manifest",
+            command=self.build_update_gui_manifest,
+            style="Primary.TButton",
+        ).grid(row=2, column=0, sticky="ew", pady=(8, 0))
         self.update_group_config_preview()
 
     def show_workbench(self, name, title):
         self.right_title_var.set(title)
         self.workbench_frames[name].tkraise()
+        self.hide_details_output()
 
     def show_png_workbench(self):
         self.show_workbench("png", "PNG Workbench")
@@ -1756,6 +2020,9 @@ class ResourcePickerApp:
     def show_group_config_workbench(self):
         self.show_workbench("group", "Group Config Explorer")
 
+    def show_gui_manifest_workbench(self):
+        self.show_workbench("gui_manifest", "GUI Manifest Explorer")
+
     def on_mode_tab_changed(self, _event=None):
         if not hasattr(self, "workbench_frames"):
             return
@@ -1764,8 +2031,13 @@ class ResourcePickerApp:
             self.show_png_workbench()
         elif selected == str(self.check_rm_tab):
             self.show_rm_manifest_workbench()
-        else:
+        elif selected == str(self.create_group_tab):
             self.show_workbench("create_group", "Create Group")
+        else:
+            if self.edit_group_active:
+                self.show_workbench("create_group", "Group Config Preview")
+            else:
+                self.show_gui_manifest_workbench()
         self.update_result_label()
 
     def reload_index(self):
@@ -1775,6 +2047,7 @@ class ResourcePickerApp:
             self.manifest = self.service.load_manifest_if_exists()
         else:
             self.manifest = {"resources": {}}
+        self.gui_manifest = self.service.load_gui_manifest_if_exists()
         self.png_assets = self.service.load_png_assets()
         self.png_assets_by_key = {asset.resource_key: asset for asset in self.png_assets}
         self.graphics_entries = self.service.load_graphics_entries(assets_by_key=self.png_assets_by_key, manifest=self.manifest)
@@ -1784,6 +2057,8 @@ class ResourcePickerApp:
         self.restore_open_png_folders(open_folders)
         self.populate_group_config_tree(self.graphics_entries)
         self.populate_manifest_tree(self.visible_graphics_entries)
+        if hasattr(self, "gui_manifest_tree"):
+            self.populate_gui_manifest_tree()
         if selected_resource_key:
             self.reselect_asset(selected_resource_key, show=False)
         self.update_result_label()
@@ -1939,6 +2214,70 @@ class ResourcePickerApp:
             )
             self.rm_resource_by_item[item_id] = (resource_key, payload)
 
+    def populate_gui_manifest_tree(self):
+        self.gui_manifest_tree.delete(*self.gui_manifest_tree.get_children())
+        self.gui_manifest_nav_by_item = {}
+        query = self.search_var.get().strip().lower()
+        tokens = query.split()
+        query_is_active = bool(tokens)
+
+        manifest = self.gui_manifest or self.service.empty_gui_manifest()
+        screens_root = self.gui_manifest_tree.insert("", "end", text="screens", values=("section", ""), open=True)
+        frames_root = self.gui_manifest_tree.insert("", "end", text="frames", values=("section", ""), open=query_is_active)
+        groups_root = self.gui_manifest_tree.insert("", "end", text="groups", values=("section", ""), open=True)
+
+        for screen_id, payload in sorted(manifest.get("screens", {}).items()):
+            if not self.gui_manifest_object_matches(screen_id, payload, tokens):
+                continue
+            item_id = self.gui_manifest_tree.insert(
+                screens_root,
+                "end",
+                text=screen_id,
+                values=("screen", payload.get("class", "")),
+                open=query_is_active,
+            )
+            self.gui_manifest_nav_by_item[item_id] = ("screen", screen_id, payload)
+
+        for frame_id, payload in sorted(manifest.get("frames", {}).items()):
+            if not self.gui_manifest_object_matches(frame_id, payload, tokens):
+                continue
+            item_id = self.gui_manifest_tree.insert(
+                frames_root,
+                "end",
+                text=frame_id,
+                values=("frame", ",".join(payload.get("group_ids", ()))),
+                open=query_is_active,
+            )
+            self.gui_manifest_nav_by_item[item_id] = ("frame", frame_id, payload)
+
+        for group_id, payload in sorted(manifest.get("groups", {}).items()):
+            if not self.gui_manifest_object_matches(group_id, payload, tokens):
+                continue
+            group_item = self.gui_manifest_tree.insert(
+                groups_root,
+                "end",
+                text=group_id,
+                values=("group", payload.get("role", "")),
+                open=query_is_active,
+            )
+            self.gui_manifest_nav_by_item[group_item] = ("group", group_id, payload)
+            for layer_name in payload.get("layer_order", payload.get("layers", {})):
+                layer_payload = payload.get("layers", {}).get(layer_name, {})
+                layer_item = self.gui_manifest_tree.insert(
+                    group_item,
+                    "end",
+                    text=layer_name,
+                    values=("layer", layer_payload.get("resource_key") or layer_payload.get("text", "")),
+                )
+                self.gui_manifest_nav_by_item[layer_item] = ("layer", group_id, layer_payload)
+
+    @staticmethod
+    def gui_manifest_object_matches(object_id, payload, tokens):
+        if not tokens:
+            return True
+        searchable = f"{object_id} {json.dumps(payload, ensure_ascii=False)}".lower()
+        return all(token in searchable for token in tokens)
+
     def find_png_asset_for_manifest_resource(self, resource_key, payload):
         asset = self.png_assets_by_key.get(resource_key)
         if asset is not None:
@@ -1976,6 +2315,8 @@ class ResourcePickerApp:
         self.populate_png_tree(self.visible_png_assets)
         self.populate_group_config_tree(self.graphics_entries)
         self.populate_manifest_tree(self.visible_graphics_entries)
+        if hasattr(self, "gui_manifest_tree"):
+            self.populate_gui_manifest_tree()
         self.update_result_label()
 
     def filter_png_assets(self):
@@ -2023,6 +2364,10 @@ class ResourcePickerApp:
             total = len(self.manifest.get("resources", {}))
             visible = len(self.manifest_tree.get_children()) if hasattr(self, "manifest_tree") else total
             noun = "RM resources"
+        elif selected == str(getattr(self, "edit_group_tab", "")):
+            total = len(self.gui_manifest.get("groups", {}))
+            visible = len(self.gui_manifest_nav_by_item) if hasattr(self, "gui_manifest_tree") else total
+            noun = "GUI Manifest objects"
         elif selected == str(getattr(self, "create_group_tab", "")):
             total = len(self.graphics_entries)
             visible = len(self.visible_graphics_entries)
@@ -2044,11 +2389,8 @@ class ResourcePickerApp:
             return
         self.selected_asset = self.png_assets_by_item[item_id]
         self.selected_graphic = None
-        self.graphic_resource_key_var.set(self.selected_asset.resource_key)
         self.group_mode_var.set("Mode: Create")
         self.layer_type_var.set("Graphic")
-        if not self.layer_name_var.get().strip():
-            self.layer_name_var.set(self.service.create_local_name_from_file(self.selected_asset.file_name))
         self.clear_text_layer_editor()
         self.show_asset(self.selected_asset)
 
@@ -2077,6 +2419,18 @@ class ResourcePickerApp:
             self.status_var.set(f"RM resource selected, PNG missing: {resource_key}")
         self.show_output(self.service.format_gui_object_details("rm_resource", resource_key, payload))
 
+    def on_gui_manifest_select(self, _event):
+        selection = self.gui_manifest_tree.selection()
+        if not selection:
+            return
+        item_id = selection[0]
+        if item_id not in self.gui_manifest_nav_by_item:
+            self.status_var.set("Select a GUI Manifest object")
+            return
+        object_type, object_id, payload = self.gui_manifest_nav_by_item[item_id]
+        self.status_var.set(f"GUI Manifest {object_type} selected: {object_id}")
+        self.show_output(self.service.format_gui_object_details(object_type, object_id, payload))
+
     def on_group_config_select(self, _event):
         selection = self.group_config_tree.selection()
         if not selection:
@@ -2104,8 +2458,9 @@ class ResourcePickerApp:
         self.group_role_var.set(group_payload.get("role", ""))
         self.fill_group_geometry_fields(group_payload)
         self.populate_group_editor_layers(group_id, group_payload)
+        self.refresh_graphic_layer_choices(group_payload)
         self.target_id_var.set("")
-        self.graphic_resource_key_var.set("")
+        self.clear_graphic_resource_key()
         self.group_mode_var.set(f"Mode: Edit group {group_id}")
         self.layer_type_var.set("Graphic")
         self.hide_text_layer_editor()
@@ -2129,10 +2484,11 @@ class ResourcePickerApp:
         self.group_role_var.set(group_payload.get("role", ""))
         self.fill_group_geometry_fields(group_payload)
         self.populate_group_editor_layers(group_id, group_payload, selected_layer_name=layer_name)
+        self.refresh_graphic_layer_choices(group_payload, selected_layer_name=layer_name)
         self.target_id_var.set(self.find_target_for_layer(group_payload, layer_name))
         if layer_payload.get("type", "image") == "image":
             self.layer_type_var.set("Graphic")
-            self.graphic_resource_key_var.set(layer_payload.get("resource_key", ""))
+            self.set_graphic_resource_key(layer_payload.get("resource_key", ""))
             self.hide_text_layer_editor()
         else:
             self.layer_type_var.set("Text")
@@ -2287,21 +2643,76 @@ class ResourcePickerApp:
         return {
             "role": self.group_role_var.get().strip(),
             "tags": self.parse_tags(self.group_tags_var.get()),
-            "rect": [
-                int(self.group_rect_x_var.get().strip() or "0"),
-                int(self.group_rect_y_var.get().strip() or "0"),
-                int(self.group_rect_w_var.get().strip() or "0"),
-                int(self.group_rect_h_var.get().strip() or "0"),
-            ],
-            "hit_rect": [
-                int(self.group_hit_x_var.get().strip() or "0"),
-                int(self.group_hit_y_var.get().strip() or "0"),
-                int(self.group_hit_w_var.get().strip() or "0"),
-                int(self.group_hit_h_var.get().strip() or "0"),
-            ],
-            "scale_factor": float(self.group_scale_var.get().strip() or "1.0"),
+            "rect": list(
+                self.read_rect_vars(
+                    (
+                        self.group_rect_x_var,
+                        self.group_rect_y_var,
+                        self.group_rect_w_var,
+                        self.group_rect_h_var,
+                    ),
+                    "Group rect",
+                )
+            ),
+            "hit_rect": list(
+                self.read_rect_vars(
+                    (
+                        self.group_hit_x_var,
+                        self.group_hit_y_var,
+                        self.group_hit_w_var,
+                        self.group_hit_h_var,
+                    ),
+                    "Group hit_rect",
+                )
+            ),
+            "scale_factor": self.read_float_var(self.group_scale_var, "Group scale", default=1.0, min_value=0.01),
             "hide_rect": bool(self.group_hide_rect_var.get()),
         }
+
+    @staticmethod
+    def _read_var_text(variable):
+        return str(variable.get()).strip()
+
+    def read_int_var(self, variable, field_name, default=0, min_value=None):
+        text = self._read_var_text(variable)
+        if not text:
+            value = default
+        else:
+            try:
+                value = int(text)
+            except ValueError as error:
+                raise ValueError(f"{field_name} must be an integer") from error
+        if min_value is not None and value < min_value:
+            raise ValueError(f"{field_name} must be >= {min_value}")
+        return value
+
+    def read_float_var(self, variable, field_name, default=0.0, min_value=None):
+        text = self._read_var_text(variable)
+        if not text:
+            value = default
+        else:
+            try:
+                value = float(text)
+            except ValueError as error:
+                raise ValueError(f"{field_name} must be a number") from error
+        if min_value is not None and value < min_value:
+            raise ValueError(f"{field_name} must be >= {min_value}")
+        return value
+
+    def read_position_vars(self, x_var, y_var, field_name="Position"):
+        return (
+            self.read_int_var(x_var, f"{field_name} X"),
+            self.read_int_var(y_var, f"{field_name} Y"),
+        )
+
+    def read_rect_vars(self, variables, field_name):
+        x_var, y_var, width_var, height_var = variables
+        return (
+            self.read_int_var(x_var, f"{field_name} X"),
+            self.read_int_var(y_var, f"{field_name} Y"),
+            self.read_int_var(width_var, f"{field_name} width", min_value=0),
+            self.read_int_var(height_var, f"{field_name} height", min_value=0),
+        )
 
     def save_current_group_metadata(self):
         group_id = self.group_id_var.get().strip()
@@ -2314,6 +2725,7 @@ class ResourcePickerApp:
         )
 
     def clear_selection(self, clear_output=True):
+        self.cancel_preview_refresh()
         self.selected_asset = None
         self.selected_graphic = None
         self.preview_asset = None
@@ -2355,29 +2767,51 @@ class ResourcePickerApp:
         height = max(1, self.preview_label.winfo_height() - 24)
         if width <= 1 or height <= 1:
             width, height = self.PREVIEW_SIZE
-        with Image.open(asset.path) as image:
-            image = image.convert("RGBA")
-            self.draw_frame_grid(image, asset)
-            image.thumbnail((width, height))
-            self.preview_image = ImageTk.PhotoImage(image)
+        try:
+            with Image.open(asset.path) as image:
+                image = image.convert("RGBA")
+                self.draw_frame_grid(image, asset)
+                image.thumbnail((width, height))
+                self.preview_image = ImageTk.PhotoImage(image)
+        except OSError as error:
+            self.preview_image = None
+            self.preview_label.configure(image="", text="Preview unavailable")
+            self.status_var.set(f"Preview unavailable: {error}")
+            return
         self.preview_label.configure(image=self.preview_image, text="")
 
     def refresh_preview_after_layout_change(self):
         if self.preview_asset is not None:
-            self.root.after_idle(lambda: self.show_preview(self.preview_asset))
+            self.cancel_preview_refresh()
+            asset = self.preview_asset
+            self.preview_after_id = self.root.after_idle(lambda: self.run_preview_refresh(asset))
+
+    def cancel_preview_refresh(self):
+        if self.preview_after_id is None:
+            return
+        try:
+            self.root.after_cancel(self.preview_after_id)
+        except tk.TclError:
+            pass
+        self.preview_after_id = None
+
+    def run_preview_refresh(self, asset):
+        self.preview_after_id = None
+        if asset is self.preview_asset:
+            self.show_preview(asset)
 
     def show_text_layer_preview(self, layer_payload=None):
         layer_payload = layer_payload or {
             "text": self.text_value_var.get(),
             "size": [
-                int(self.text_width_var.get().strip() or "1"),
-                int(self.text_height_var.get().strip() or "1"),
+                max(1, self.safe_int(self.text_width_var.get(), 1)),
+                max(1, self.safe_int(self.text_height_var.get(), 1)),
             ],
             "fit_mode": self.text_fit_mode_var.get(),
             "style": {
                 "font_name": self.font_name_var.get().strip(),
                 "font_path": self.font_path_var.get().strip(),
-                "font_size": int(self.font_size_var.get().strip() or "24"),
+                "font_size": max(1, self.safe_int(self.font_size_var.get(), 24)),
                 "color": list(
                     self.normalize_rgb(
                         (
@@ -2519,8 +2953,41 @@ class ResourcePickerApp:
         if not self.selected_manifest_resource_key:
             self.status_var.set("Select an RM resource first")
             return
-        self.graphic_resource_key_var.set(self.selected_manifest_resource_key)
-        self.status_var.set(f"Graphic layer resource set: {self.selected_manifest_resource_key}")
+        self.set_graphic_resource_key(self.selected_manifest_resource_key)
+        selected_layer_name = self.graphic_layer_choice_var.get().strip()
+        if selected_layer_name:
+            group_id = self.group_id_var.get().strip()
+            if not group_id:
+                self.status_var.set("Select a group before updating a layer")
+                return
+            try:
+                layer_payload = group_config.set_layer_resource(
+                    group_id,
+                    selected_layer_name,
+                    self.selected_manifest_resource_key,
+                )
+                self.rebuild_rm_manifest_after_group_change()
+                group_payload = group_config.get_group_config(group_id)
+                self.fill_group_config_form_from_layer_payload(group_id, group_payload, layer_payload)
+                self.reload_index()
+                self.update_group_config_preview()
+            except Exception as error:
+                self.status_var.set("Layer resource_key was not updated")
+                self.show_output(str(error))
+                messagebox.showerror("Group Config error", str(error))
+                return
+            self.status_var.set(
+                f"resource_key updated for layer {selected_layer_name}: "
+                f"{self.selected_manifest_resource_key}"
+            )
+            return
+
+        if not self.layer_name_var.get().strip():
+            self.layer_name_var.set(self.create_layer_name_from_resource_key(self.selected_manifest_resource_key))
+        self.status_var.set(
+            f"New layer {self.layer_name_var.get().strip()} resource_key set: "
+            f"{self.selected_manifest_resource_key}"
+        )
 
     def edit_manifest_png_metadata(self):
         if self.selected_asset is None:
@@ -2531,11 +2998,12 @@ class ResourcePickerApp:
         self.status_var.set("PNG metadata editor opened")
 
     def clear_graphic_resource(self):
-        self.graphic_resource_key_var.set("")
+        self.clear_graphic_resource_key()
         self.selected_manifest_resource_key = None
 
     def clear_group_config_form(self):
         self.group_edit_source_id = None
+        self.edit_group_id = ""
         self.group_id_var.set("")
         self.group_role_var.set("")
         self.group_tags_var.set("")
@@ -2550,10 +3018,12 @@ class ResourcePickerApp:
         self.group_scale_var.set("1.0")
         self.group_hide_rect_var.set(True)
         self.layer_name_var.set("")
+        self.graphic_layer_choice_var.set("")
         self.layer_x_var.set("0")
         self.layer_y_var.set("0")
         self.target_id_var.set("")
-        self.graphic_resource_key_var.set("")
+        self.clear_graphic_resource_key()
+        self.refresh_graphic_layer_choices()
         self.clear_text_layer_editor()
         self.clear_group_editor_layers()
         self.group_mode_var.set("Mode: Create")
@@ -2587,7 +3057,7 @@ class ResourcePickerApp:
             return
         group_id = self.group_id_var.get().strip()
         layer_name = self.layer_name_var.get().strip()
-        resource_key = self.graphic_resource_key_var.get().strip()
+        resource_key = self.get_graphic_resource_key()
         if not group_id or not layer_name or not resource_key:
             self.status_var.set("Group, layer, and resource are required")
             messagebox.showerror("Group Config error", "Group, layer, and resource are required")
@@ -2595,10 +3065,7 @@ class ResourcePickerApp:
 
         try:
             _group, group_report = self.save_current_group_metadata()
-            position = (
-                int(self.layer_x_var.get().strip() or "0"),
-                int(self.layer_y_var.get().strip() or "0"),
-            )
+            position = self.read_position_vars(self.layer_x_var, self.layer_y_var, "Layer position")
             _layer, report = self.service.upsert_group_config_image_layer(
                 group_id,
                 layer_name,
@@ -2630,10 +3097,7 @@ class ResourcePickerApp:
 
         try:
             _group, group_report = self.save_current_group_metadata()
-            position = (
-                int(self.layer_x_var.get().strip() or "0"),
-                int(self.layer_y_var.get().strip() or "0"),
-            )
+            position = self.read_position_vars(self.layer_x_var, self.layer_y_var, "Layer position")
             _layer, report = self.service.set_group_config_layer_position(
                 group_id,
                 layer_name,
@@ -2699,7 +3163,7 @@ class ResourcePickerApp:
             messagebox.showerror("Group Config error", str(error))
             return
         self.layer_name_var.set("")
-        self.graphic_resource_key_var.set("")
+        self.clear_graphic_resource_key()
         self.clear_text_layer_editor()
         self.reload_index()
         self.refresh_group_editor_layers_from_current_group()
@@ -2726,12 +3190,98 @@ class ResourcePickerApp:
             self.fill_group_config_form_from_layer_payload(group_id, group_payload, layer_payload)
             self.fill_text_layer_editor(layer_payload)
             if layer_payload.get("type", "image") == "image":
-                self.graphic_resource_key_var.set(layer_payload.get("resource_key", ""))
+                self.set_graphic_resource_key(layer_payload.get("resource_key", ""))
                 self.hide_text_layer_editor()
         self.group_mode_var.set(f"Mode: Edit group {group_id}")
         self.show_rm_manifest_workbench()
         self.status_var.set(f"Editing group_config: {group_id}")
         self.show_output(self.service.format_gui_object_details("group_config", group_id, group_payload))
+
+    def edit_selected_gui_manifest_group(self):
+        selection = self.gui_manifest_tree.selection()
+        if not selection:
+            self.status_var.set("Select a group in GUI Manifest first")
+            return
+        item_id = selection[0]
+        if item_id not in self.gui_manifest_nav_by_item:
+            self.status_var.set("Select a GUI Manifest group")
+            return
+
+        object_type, object_id, _payload = self.gui_manifest_nav_by_item[item_id]
+        group_id = object_id
+        if object_type == "layer":
+            group_id = object_id
+        elif object_type != "group":
+            self.status_var.set("Only GUI Manifest groups and layers can be edited")
+            return
+
+        try:
+            group_config.reload_group_config()
+            group_payload = group_config.get_group_config(group_id)
+        except Exception as error:
+            self.status_var.set(f"group_config missing for GUI Manifest group: {group_id}")
+            self.show_output(str(error))
+            messagebox.showerror("Edit Group error", str(error))
+            return
+
+        self.ensure_edit_group_form()
+        self.group_edit_source_id = group_id
+        self.edit_group_id = group_id
+        layers = group_payload.get("layers", ())
+        if layers:
+            first_layer = layers[0]
+            self.fill_group_config_form_from_layer_payload(group_id, group_payload, first_layer)
+            self.fill_text_layer_editor(first_layer)
+            if first_layer.get("type", "image") == "image":
+                self.set_graphic_resource_key(first_layer.get("resource_key", ""))
+                self.hide_text_layer_editor()
+        else:
+            self.fill_group_config_form_from_group(group_id, group_payload)
+            self.clear_text_layer_editor()
+
+        self.edit_group_active = True
+        self.edit_group_empty_label.grid_remove()
+        self.edit_group_form_holder.grid()
+        self.group_builder_sections["edit"]["form"].grid()
+        self.mode_tabs.select(self.edit_group_tab)
+        self.group_mode_var.set(f"Mode: Edit group {group_id}")
+        self.show_workbench("create_group", "Group Config Preview")
+        self.update_group_config_preview()
+        self.status_var.set(f"Editing GUI Manifest group: {group_id}")
+        self.show_output(self.service.format_gui_object_details("group_config", group_id, group_payload))
+
+    def ensure_edit_group_form(self):
+        if "edit" in self.group_builder_sections:
+            return
+        self.create_group_builder(
+            self.edit_group_form_holder,
+            builder_key="edit",
+            show_cancel=True,
+        )
+
+    def cancel_edit_group(self):
+        self.edit_group_active = False
+        self.clear_group_config_form()
+        self.edit_group_form_holder.grid_remove()
+        self.edit_group_empty_label.grid()
+        self.show_gui_manifest_workbench()
+        self.status_var.set("Edit group cancelled")
+
+    def build_update_gui_manifest(self):
+        try:
+            manifest, report = self.service.update_gui_manifest()
+            self.service.save_gui_manifest(manifest)
+            self.gui_manifest = manifest
+        except Exception as error:
+            self.status_var.set("GUI Manifest was not updated")
+            self.show_output(str(error))
+            messagebox.showerror("GUI Manifest error", str(error))
+            return
+
+        if hasattr(self, "gui_manifest_tree"):
+            self.populate_gui_manifest_tree()
+        self.status_var.set("GUI Manifest built/updated")
+        self.show_output(report.to_text())
 
     def delete_selected_group_config(self):
         selection = self.group_config_tree.selection()
@@ -2763,8 +3313,8 @@ class ResourcePickerApp:
         font_name = self.font_name_var.get().strip()
         font_path = self.font_path_var.get().strip()
         size = (
-            int(self.text_width_var.get().strip() or "0"),
-            int(self.text_height_var.get().strip() or "0"),
+            self.read_int_var(self.text_width_var, "Text width", min_value=0),
+            self.read_int_var(self.text_height_var, "Text height", min_value=0),
         )
         color = self.normalize_rgb(
             (
@@ -2774,7 +3324,7 @@ class ResourcePickerApp:
             )
         )
         style = {
-            "font_size": int(self.font_size_var.get().strip() or "24"),
+            "font_size": self.read_int_var(self.font_size_var, "Font size", default=24, min_value=1),
             "color": list(color),
             "antialias": bool(self.font_antialias_var.get()),
         }
@@ -2792,8 +3342,8 @@ class ResourcePickerApp:
             "text_key": text_key or None,
             "size": [max(1, size[0]), max(1, size[1])],
             "position": [
-                int(self.layer_x_var.get().strip() or "0"),
-                int(self.layer_y_var.get().strip() or "0"),
+                self.read_int_var(self.layer_x_var, "Layer position X"),
+                self.read_int_var(self.layer_y_var, "Layer position Y"),
             ],
             "fit_mode": self.text_fit_mode_var.get().strip() or "none",
             "style": style,
@@ -2837,8 +3387,8 @@ class ResourcePickerApp:
             self.status_var.set("Select a PNG first")
             return
         try:
-            frame_width = int(self.frame_width_var.get().strip())
-            frame_height = int(self.frame_height_var.get().strip())
+            frame_width = self.read_int_var(self.frame_width_var, "Frame width", min_value=1)
+            frame_height = self.read_int_var(self.frame_height_var, "Frame height", min_value=1)
             self.service.write_png_metadata(self.selected_asset.path, frame_width, frame_height)
         except Exception as error:
             self.status_var.set("PNG metadata was not saved")
@@ -2891,17 +3441,16 @@ class ResourcePickerApp:
         self.status_var.set("RM Manifest updated from group_config")
 
     def show_output(self, text):
-        if text:
-            self.details_heading.grid()
-            self.output_text.grid()
-        elif hasattr(self, "details_heading"):
-            self.details_heading.grid_remove()
-            self.output_text.grid_remove()
+        self.hide_details_output()
         self.output_text.configure(state="normal")
         self.output_text.delete("1.0", tk.END)
         self.output_text.insert("1.0", text)
         self.output_text.configure(state="disabled")
         self.refresh_preview_after_layout_change()
+
+    def hide_details_output(self):
+        if hasattr(self, "output_text"):
+            self.output_text.grid_remove()
 
     def copy_to_clipboard(self, text):
         self.root.clipboard_clear()

@@ -14,7 +14,8 @@
       ],
       "active_group_ids": [
         "table_group",
-        "left_player"
+        "left_player",
+        "right_player"
       ]
     }
   },
@@ -44,7 +45,8 @@
         "table_group"
       ],
       "child_frame_ids": [
-        "left_player_az"
+        "left_player_frame",
+        "right_player_frame"
       ],
       "group_origins": {
         "table_group": [
@@ -56,8 +58,8 @@
       "padding": 0,
       "spacing": 12
     },
-    "left_player_az": {
-      "id": "left_player_az",
+    "left_player_frame": {
+      "id": "left_player_frame",
       "parent_frame_id": "game_table",
       "local_rect": [
         0,
@@ -88,7 +90,7 @@
     },
     "left_player_portrait": {
       "id": "left_player_portrait",
-      "parent_frame_id": "left_player_az",
+      "parent_frame_id": "left_player_frame",
       "local_rect": [
         20,
         46,
@@ -120,11 +122,96 @@
       "action_count": 0,
       "padding": 0,
       "spacing": 12
+    },
+    "right_player_frame": {
+      "id": "right_player_frame",
+      "parent_frame_id": "game_table",
+      "local_rect": [
+        1020,
+        210,
+        260,
+        300
+      ],
+      "rect": [
+        1020,
+        210,
+        260,
+        300
+      ],
+      "hit_rect": [
+        1020,
+        210,
+        260,
+        300
+      ],
+      "group_ids": [],
+      "child_frame_ids": [
+        "right_player_portrait"
+      ],
+      "group_origins": {},
+      "action_count": 0,
+      "padding": 0,
+      "spacing": 12
+    },
+    "right_player_portrait": {
+      "id": "right_player_portrait",
+      "parent_frame_id": "right_player_frame",
+      "local_rect": [
+        20,
+        46,
+        200,
+        200
+      ],
+      "rect": [
+        1040,
+        256,
+        200,
+        200
+      ],
+      "hit_rect": [
+        1040,
+        256,
+        200,
+        200
+      ],
+      "group_ids": [
+        "right_player"
+      ],
+      "child_frame_ids": [],
+      "group_origins": {
+        "right_player": [
+          1040,
+          256
+        ]
+      },
+      "action_count": 0,
+      "padding": 0,
+      "spacing": 12
     }
   },
   "groups": {
     "left_player": {
       "id": "left_player",
+      "role": "player_panel",
+      "tags": [
+        "configurable",
+        "left_player",
+        "player"
+      ],
+      "manifest_targets": {
+        "player.left.avatar": {
+          "type": "resource",
+          "layer": "portrait",
+          "description": "Left player portrait image.",
+          "group_id": "left_player"
+        },
+        "player.left.name": {
+          "type": "text",
+          "layer": "player_name_text",
+          "description": "Left player display name.",
+          "group_id": "left_player"
+        }
+      },
       "rect": [
         20,
         256,
@@ -138,14 +225,14 @@
         200
       ],
       "scale_factor": 1.0,
-      "hide_rect": false,
+      "hide_rect": true,
       "rect_debug_layer_ids": [
         "p_name_bg",
         "player_name_text"
       ],
       "layer_order": [
         "p_portrait_bg",
-        "portrait_2",
+        "portrait",
         "portrait_frame",
         "p_name_bg",
         "player_name_text"
@@ -159,19 +246,17 @@
             0
           ],
           "current_frame_index": 0,
-          "frame_count": 1,
-          "resource_key": "main_screen.p_portrait_bg"
+          "frame_count": 1
         },
-        "portrait_2": {
-          "id": "portrait_2",
+        "portrait": {
+          "id": "portrait",
           "type": "resource",
           "position": [
             0,
             0
           ],
           "current_frame_index": 0,
-          "frame_count": 1,
-          "resource_key": "main_screen.avatars.portrait_2"
+          "frame_count": 1
         },
         "portrait_frame": {
           "id": "portrait_frame",
@@ -181,8 +266,7 @@
             0
           ],
           "current_frame_index": 0,
-          "frame_count": 1,
-          "resource_key": "main_screen.portrait_frame"
+          "frame_count": 1
         },
         "p_name_bg": {
           "id": "p_name_bg",
@@ -192,8 +276,7 @@
             132
           ],
           "current_frame_index": 0,
-          "frame_count": 1,
-          "resource_key": "main_screen.p_name_bg"
+          "frame_count": 1
         },
         "player_name_text": {
           "id": "player_name_text",
@@ -204,14 +287,21 @@
           ],
           "current_frame_index": 0,
           "frame_count": 1,
-          "text_key": "player.left.name",
           "default_text": "Player 1",
           "size": [
             200,
             68
           ],
+          "rect": [
+            0,
+            132,
+            200,
+            68
+          ],
+          "fit_mode": "contain",
           "style": {
             "font_name": null,
+            "font_path": "assets/fonts/ingrid-darling/IngridDarling-Regular.ttf",
             "font_size": 28,
             "color": [
               255,
@@ -226,8 +316,147 @@
         "left_player_portrait"
       ]
     },
+    "right_player": {
+      "id": "right_player",
+      "role": "player_panel",
+      "tags": [
+        "configurable",
+        "player",
+        "right_player"
+      ],
+      "manifest_targets": {
+        "player.right.avatar": {
+          "type": "resource",
+          "layer": "portrait",
+          "description": "Right player portrait image.",
+          "group_id": "right_player"
+        },
+        "player.right.name": {
+          "type": "text",
+          "layer": "player_name_text",
+          "description": "Right player display name.",
+          "group_id": "right_player"
+        }
+      },
+      "rect": [
+        1040,
+        256,
+        200,
+        200
+      ],
+      "hit_rect": [
+        1040,
+        256,
+        200,
+        200
+      ],
+      "scale_factor": 1.0,
+      "hide_rect": true,
+      "rect_debug_layer_ids": [
+        "p_name_bg",
+        "player_name_text"
+      ],
+      "layer_order": [
+        "p_portrait_bg",
+        "portrait",
+        "portrait_frame",
+        "p_name_bg",
+        "player_name_text"
+      ],
+      "layers": {
+        "p_portrait_bg": {
+          "id": "p_portrait_bg",
+          "type": "resource",
+          "position": [
+            0,
+            0
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1
+        },
+        "portrait": {
+          "id": "portrait",
+          "type": "resource",
+          "position": [
+            0,
+            0
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1
+        },
+        "portrait_frame": {
+          "id": "portrait_frame",
+          "type": "resource",
+          "position": [
+            0,
+            0
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1
+        },
+        "p_name_bg": {
+          "id": "p_name_bg",
+          "type": "resource",
+          "position": [
+            0,
+            132
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1
+        },
+        "player_name_text": {
+          "id": "player_name_text",
+          "type": "text",
+          "position": [
+            0,
+            132
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1,
+          "text_key": "player.right.name",
+          "default_text": "Player 3",
+          "size": [
+            200,
+            68
+          ],
+          "rect": [
+            0,
+            132,
+            200,
+            68
+          ],
+          "fit_mode": "contain",
+          "style": {
+            "font_name": null,
+            "font_path": "assets/fonts/ingrid-darling/IngridDarling-Regular.ttf",
+            "font_size": 28,
+            "color": [
+              255,
+              238,
+              196
+            ],
+            "antialias": true
+          }
+        }
+      },
+      "frame_ids": [
+        "right_player_portrait"
+      ]
+    },
     "table_group": {
       "id": "table_group",
+      "role": "game_table",
+      "tags": [
+        "background",
+        "table"
+      ],
+      "manifest_targets": {
+        "table.surface": {
+          "type": "group",
+          "description": "Main game table visual object.",
+          "group_id": "table_group"
+        }
+      },
       "rect": [
         0,
         0,
@@ -256,8 +485,7 @@
             0
           ],
           "current_frame_index": 0,
-          "frame_count": 1,
-          "resource_key": "main_screen.table"
+          "frame_count": 1
         },
         "tressure_map": {
           "id": "tressure_map",
@@ -267,8 +495,7 @@
             0
           ],
           "current_frame_index": 0,
-          "frame_count": 1,
-          "resource_key": "main_screen.tressure_map"
+          "frame_count": 1
         }
       },
       "frame_ids": [
@@ -283,7 +510,8 @@
       ],
       "active_group_ids": [
         "table_group",
-        "left_player"
+        "left_player",
+        "right_player"
       ]
     }
   }
