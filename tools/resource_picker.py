@@ -710,6 +710,24 @@ class ResourcePickerService:
         return re.sub(r"\W+", "_", name.strip()).strip("_") or "resource"
 
     @staticmethod
+    def create_font_display_map(font_paths):
+        display_map = {}
+        seen = {}
+        for font_path in font_paths:
+            base_name = os.path.splitext(os.path.basename(font_path))[0]
+            display_name = base_name
+            if display_name in seen:
+                previous_path = seen[display_name]
+                previous_parent = os.path.basename(os.path.dirname(previous_path))
+                previous_display = f"{display_name} ({previous_parent})"
+                display_map[previous_display] = display_map.pop(display_name)
+                parent = os.path.basename(os.path.dirname(font_path))
+                display_name = f"{display_name} ({parent})"
+            seen[base_name] = font_path
+            display_map[display_name] = font_path
+        return display_map
+
+    @staticmethod
     def load_available_fonts():
         fonts_dir = os.path.join(PROJECT_DIR, "assets", "fonts")
         fonts = []
@@ -818,6 +836,7 @@ class ResourcePickerApp:
         self.text_fit_mode_var = tk.StringVar(value="none")
         self.font_name_var = tk.StringVar()
         self.font_path_var = tk.StringVar()
+        self.font_display_var = tk.StringVar()
         self.font_size_var = tk.StringVar(value="24")
         self.font_color_hex_var = tk.StringVar(value="#ffffff")
         self.layer_scale_w_var = tk.StringVar(value="100")
@@ -826,7 +845,11 @@ class ResourcePickerApp:
         self.font_color_g_var = tk.StringVar(value="255")
         self.font_color_b_var = tk.StringVar(value="255")
         self.font_antialias_var = tk.BooleanVar(value=True)
+        self.text_color_swatches = []
+        self.text_color_palettes = []
         self.available_fonts = ResourcePickerService.load_available_fonts()
+        self.font_display_to_path = ResourcePickerService.create_font_display_map(self.available_fonts)
+        self.available_font_names = tuple(self.font_display_to_path)
 
         self.configure_window()
         self.create_widgets()
@@ -943,7 +966,7 @@ class ResourcePickerApp:
         )
         style.configure(
             "TButton",
-            padding=(14, 8),
+            padding=(10, 4),
             background=colors["field_bg"],
             foreground=colors["text"],
             bordercolor=colors["border"],
@@ -952,7 +975,7 @@ class ResourcePickerApp:
         )
         style.configure(
             "Primary.TButton",
-            padding=(16, 9),
+            padding=(12, 5),
             background=colors["accent"],
             foreground=colors["heading"],
             bordercolor=colors["accent_active"],
@@ -961,7 +984,7 @@ class ResourcePickerApp:
         )
         style.configure(
             "Danger.TButton",
-            padding=(14, 8),
+            padding=(10, 4),
             background=colors["danger"],
             foreground=colors["heading"],
             bordercolor=colors["danger"],
@@ -975,7 +998,7 @@ class ResourcePickerApp:
         )
         style.configure(
             "TNotebook.Tab",
-            padding=(14, 8),
+            padding=(10, 5),
             background=colors["field_bg"],
             foreground=colors["muted_text"],
             borderwidth=0,
@@ -1040,7 +1063,7 @@ class ResourcePickerApp:
         self.main_pane = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
         self.main_pane.grid(row=0, column=0, sticky="nsew")
 
-        self.left_panel = ttk.Frame(self.main_pane, padding=14, width=528)
+        self.left_panel = ttk.Frame(self.main_pane, padding=(8, 8), width=528)
         self.left_panel.rowconfigure(3, weight=1)
         self.left_panel.columnconfigure(0, weight=1)
         self.main_pane.add(self.left_panel, weight=1)
@@ -1063,7 +1086,7 @@ class ResourcePickerApp:
 
     def create_global_actions(self, parent):
         actions = ttk.Frame(parent)
-        actions.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+        actions.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 6))
         actions.columnconfigure(0, weight=1)
         ttk.Button(
             actions,
@@ -1076,38 +1099,38 @@ class ResourcePickerApp:
             text="Build/Update GUI Manifest",
             command=self.build_update_gui_manifest,
             style="Primary.TButton",
-        ).grid(row=1, column=0, sticky="ew", pady=(8, 0))
+        ).grid(row=1, column=0, sticky="ew", pady=(4, 0))
         ttk.Button(
             actions,
             text="Build Groups",
             command=self.build_groups,
             style="Primary.TButton",
-        ).grid(row=2, column=0, sticky="ew", pady=(8, 0))
+        ).grid(row=2, column=0, sticky="ew", pady=(4, 0))
 
     def create_search(self, parent):
         search_frame = ttk.Frame(parent)
-        search_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 12))
+        search_frame.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 6))
         search_frame.columnconfigure(1, weight=1)
 
         ttk.Label(search_frame, text="Search").grid(row=0, column=0, sticky="w", padx=(0, 10))
         ttk.Entry(search_frame, textvariable=self.search_var, width=24).grid(row=0, column=1, sticky="ew")
         ttk.Button(search_frame, text="Clear", command=self.clear_search).grid(row=0, column=2, sticky="e", padx=(10, 0))
-        ttk.Label(parent, textvariable=self.result_var, style="Muted.TLabel").grid(row=2, column=0, columnspan=2, sticky="w", pady=(0, 10))
+        ttk.Label(parent, textvariable=self.result_var, style="Muted.TLabel").grid(row=2, column=0, columnspan=2, sticky="w", pady=(0, 6))
 
     def create_mode_tabs(self, parent):
         self.mode_tabs = ttk.Notebook(parent)
         self.mode_tabs.grid(row=3, column=0, columnspan=2, sticky="nsew")
         self.mode_tabs.bind("<<NotebookTabChanged>>", self.on_mode_tab_changed)
 
-        self.png_data_tab = ttk.Frame(self.mode_tabs, padding=14)
+        self.png_data_tab = ttk.Frame(self.mode_tabs, padding=(10, 8))
         self.png_data_tab.rowconfigure(1, weight=1)
         self.png_data_tab.columnconfigure(0, weight=1)
-        self.check_rm_tab = ttk.Frame(self.mode_tabs, padding=14)
+        self.check_rm_tab = ttk.Frame(self.mode_tabs, padding=(10, 8))
         self.check_rm_tab.columnconfigure(0, weight=1)
-        self.create_group_tab = ttk.Frame(self.mode_tabs, padding=14)
+        self.create_group_tab = ttk.Frame(self.mode_tabs, padding=(10, 8))
         self.create_group_tab.rowconfigure(1, weight=1)
         self.create_group_tab.columnconfigure(0, weight=1)
-        self.edit_group_tab = ttk.Frame(self.mode_tabs, padding=14)
+        self.edit_group_tab = ttk.Frame(self.mode_tabs, padding=(8, 6))
         self.edit_group_tab.rowconfigure(1, weight=1)
         self.edit_group_tab.columnconfigure(0, weight=1)
 
@@ -1166,15 +1189,18 @@ class ResourcePickerApp:
             wraplength=420,
             style="Muted.TLabel",
         )
-        self.edit_group_empty_label.grid(row=1, column=0, sticky="nw", pady=(12, 0))
+        self.edit_group_empty_label.grid(row=1, column=0, sticky="nw", pady=(6, 0))
         self.edit_group_form_holder = ttk.Frame(self.edit_group_tab)
-        self.edit_group_form_holder.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
+        self.edit_group_form_holder.grid(row=1, column=0, sticky="nsew", pady=(6, 0))
+        self.edit_group_form_holder.rowconfigure(0, weight=1)
         self.edit_group_form_holder.columnconfigure(0, weight=1)
         self.edit_group_form_holder.grid_remove()
 
     def create_group_builder(self, parent, builder_key="create", show_cancel=False):
         form = ttk.LabelFrame(parent, text="Group Builder", padding=8)
-        form.grid(row=1, column=0, sticky="nsew", pady=(12, 0))
+        form_row = 0 if show_cancel else 1
+        parent.rowconfigure(form_row, weight=1)
+        form.grid(row=form_row, column=0, sticky="nsew", pady=((0, 0) if show_cancel else (12, 0)))
         form.columnconfigure(1, weight=1)
         form.columnconfigure(3, weight=1)
 
@@ -1265,27 +1291,43 @@ class ResourcePickerApp:
             row=0, column=2, columnspan=2, sticky="ew", padx=(8, 0), pady=(0, 4)
         )
 
-        ttk.Label(text_builder_frame, text="text").grid(row=1, column=0, sticky="w", pady=(0, 4))
-        ttk.Entry(text_builder_frame, textvariable=self.text_value_var).grid(
+        ttk.Label(text_builder_frame, text="name").grid(row=1, column=0, sticky="w", pady=(0, 4))
+        ttk.Entry(text_builder_frame, textvariable=self.layer_name_var).grid(
             row=1, column=1, columnspan=3, sticky="ew", pady=(0, 4)
         )
-        ttk.Label(text_builder_frame, text="font").grid(row=2, column=0, sticky="w", pady=(0, 4))
+        ttk.Label(text_builder_frame, text="text").grid(row=2, column=0, sticky="w", pady=(0, 4))
+        ttk.Entry(text_builder_frame, textvariable=self.text_value_var).grid(
+            row=2, column=1, columnspan=3, sticky="ew", pady=(0, 4)
+        )
+        ttk.Label(text_builder_frame, text="font").grid(row=3, column=0, sticky="w", pady=(0, 4))
         font_box = ttk.Combobox(
             text_builder_frame,
-            textvariable=self.font_path_var,
-            values=self.available_fonts,
+            textvariable=self.font_display_var,
+            values=self.available_font_names,
+            state="readonly",
         )
-        font_box.grid(row=2, column=1, columnspan=3, sticky="ew", pady=(0, 4))
+        font_box.grid(row=3, column=1, columnspan=3, sticky="ew", pady=(0, 4))
         font_box.bind("<<ComboboxSelected>>", self.on_builder_font_selected)
-        ttk.Label(text_builder_frame, text="height").grid(row=3, column=0, sticky="w", pady=(0, 4))
+        ttk.Label(text_builder_frame, text="height").grid(row=4, column=0, sticky="w", pady=(0, 4))
         ttk.Entry(text_builder_frame, textvariable=self.text_height_var).grid(
-            row=3, column=1, sticky="ew", pady=(0, 4)
+            row=4, column=1, sticky="ew", pady=(0, 4)
         )
-        ttk.Label(text_builder_frame, text="color").grid(row=3, column=2, sticky="w", padx=(8, 0), pady=(0, 4))
-        ttk.Entry(text_builder_frame, textvariable=self.font_color_hex_var).grid(
-            row=3, column=3, sticky="ew", pady=(0, 4)
+        ttk.Label(text_builder_frame, text="color").grid(row=4, column=2, sticky="w", padx=(8, 0), pady=(0, 4))
+        color_swatch = tk.Label(
+            text_builder_frame,
+            bg=self.font_color_hex_var.get(),
+            relief="solid",
+            bd=1,
+            height=1,
+            cursor="hand2",
         )
-        self.create_xy_percent_inputs(text_builder_frame, row=4)
+        color_swatch.grid(row=4, column=3, sticky="ew", pady=(0, 4))
+        color_swatch.bind("<Button-1>", lambda _event: self.toggle_text_color_palette())
+        self.text_color_swatches.append(color_swatch)
+        color_palette = self.create_text_color_palette(text_builder_frame, row=5)
+        self.text_color_palettes.append(color_palette)
+        color_palette.grid_remove()
+        self.create_xy_percent_inputs(text_builder_frame, row=6)
 
         if not show_cancel:
             footer = ttk.Frame(form)
@@ -1321,6 +1363,70 @@ class ResourcePickerApp:
         ttk.Entry(parent, textvariable=self.layer_scale_w_var, width=8).grid(row=row + 1, column=1, sticky="ew", pady=(0, 2))
         ttk.Label(parent, text="scale h%").grid(row=row + 1, column=2, sticky="w", padx=(8, 0), pady=(0, 2))
         ttk.Entry(parent, textvariable=self.layer_scale_h_var, width=8).grid(row=row + 1, column=3, sticky="ew", pady=(0, 2))
+
+    def create_text_color_palette(self, parent, row):
+        palette = ttk.Frame(parent)
+        palette.grid(row=row, column=0, columnspan=4, sticky="ew", pady=(2, 4))
+        colors = (
+            "#ffffff", "#d7d7d7", "#9e9e9e", "#5f6368", "#202124", "#000000",
+            "#ff5252", "#ff9800", "#ffeb3b", "#8bc34a", "#00bcd4", "#448aff",
+            "#b388ff", "#f06292", "#795548", "#ffccbc", "#ffe0b2", "#fff9c4",
+            "#dcedc8", "#b2ebf2", "#bbdefb", "#d1c4e9", "#f8bbd0", "#cfd8dc",
+            "#f7efe3", "#e7d3b1", "#c8a46b", "#8b5e34", "#4a2f1b", "#1d1510",
+            "#ffd7d7", "#ff8a80", "#d50000", "#8b0000", "#5b1b1b", "#2a0d0d",
+            "#ffe7c2", "#ffc166", "#f57c00", "#b85c00", "#6d3b00", "#2f1a00",
+            "#fff4b8", "#ffd54f", "#f9a825", "#806000", "#4e3d00", "#242000",
+            "#e1f5c4", "#aeea00", "#64dd17", "#2e7d32", "#1b5e20", "#0b2b12",
+            "#c8f7dc", "#69f0ae", "#00c853", "#008b4f", "#00543a", "#06251b",
+            "#d1ffff", "#84ffff", "#18ffff", "#00acc1", "#006978", "#08343b",
+            "#d8ecff", "#80d8ff", "#00b0ff", "#1565c0", "#0d47a1", "#071b3a",
+            "#e0ddff", "#8c9eff", "#536dfe", "#3949ab", "#1a237e", "#0d103a",
+            "#f0ddff", "#ea80fc", "#d500f9", "#8e24aa", "#4a148c", "#240642",
+            "#ffd9ec", "#ff80ab", "#f50057", "#ad1457", "#6a0030", "#300014",
+        )
+        for index, color in enumerate(colors):
+            cell = tk.Label(
+                palette,
+                bg=color,
+                width=3,
+                height=1,
+                relief="solid",
+                bd=1,
+                cursor="hand2",
+            )
+            cell.grid(row=index // 12, column=index % 12, sticky="ew", padx=1, pady=1)
+            cell.bind("<Button-1>", lambda _event, value=color: self.apply_text_palette_color(value))
+        return palette
+
+    def apply_text_palette_color(self, color):
+        self.font_color_hex_var.set(color)
+        red, green, blue = self.parse_hex_color(color)
+        self.font_color_r_var.set(str(red))
+        self.font_color_g_var.set(str(green))
+        self.font_color_b_var.set(str(blue))
+        self.update_text_color_swatches()
+        self.hide_text_color_palettes()
+        self.update_group_config_preview()
+        if self.layer_type_var.get() == "Text":
+            self.show_text_layer_preview()
+
+    def toggle_text_color_palette(self):
+        visible_palette = next((palette for palette in self.text_color_palettes if palette.winfo_ismapped()), None)
+        if visible_palette is not None:
+            self.hide_text_color_palettes()
+            return
+        for palette in self.text_color_palettes:
+            if palette.master.winfo_viewable():
+                palette.grid()
+
+    def hide_text_color_palettes(self):
+        for palette in self.text_color_palettes:
+            palette.grid_remove()
+
+    def update_text_color_swatches(self):
+        color = self.font_color_hex_var.get().strip() or "#ffffff"
+        for swatch in self.text_color_swatches:
+            swatch.configure(bg=color)
 
     def create_check_rm_controls(self, parent):
         controls = ttk.LabelFrame(parent, text="RM Manifest Actions", padding=14)
@@ -1778,6 +1884,10 @@ class ResourcePickerApp:
             layer_name = self.get_builder_layer_name("text")
             if not layer_name:
                 return None
+            text_size = [
+                max(1, self.safe_int(self.text_width_var.get(), 1)),
+                max(1, self.safe_int(self.text_height_var.get(), 1)),
+            ]
             style = {
                 "font_path": self.font_path_var.get().strip() or None,
                 "font_size": self.safe_int(self.font_size_var.get(), 24),
@@ -1788,7 +1898,9 @@ class ResourcePickerApp:
                 "name": layer_name,
                 "type": "text",
                 "text": self.text_value_var.get(),
-                "height": max(1, self.safe_int(self.text_height_var.get(), 1)),
+                "height": text_size[1],
+                "size": text_size,
+                "fit_mode": self.text_fit_mode_var.get().strip() or "none",
                 "scale_percent": scale_percent,
                 "position": position,
                 "style": style,
@@ -2027,11 +2139,30 @@ class ResourcePickerApp:
         self.font_color_r_var.set(str(red))
         self.font_color_g_var.set(str(green))
         self.font_color_b_var.set(str(blue))
+        self.font_color_hex_var.set(self.rgb_to_hex((red, green, blue)))
+        self.update_text_color_swatches()
 
     def on_builder_font_selected(self, _event=None):
-        font_path = self.font_path_var.get().strip()
-        self.font_name_var.set(os.path.splitext(os.path.basename(font_path))[0] if font_path else "")
+        display_name = self.font_display_var.get().strip()
+        font_path = self.font_display_to_path.get(display_name, "")
+        self.font_path_var.set(font_path)
+        self.font_name_var.set(os.path.splitext(os.path.basename(font_path))[0] if font_path else display_name)
         self.update_group_config_preview()
+
+    def set_font_display_from_path(self, font_path):
+        font_path = str(font_path or "").strip()
+        self.font_path_var.set(font_path)
+        display_name = self.get_font_display_name(font_path)
+        self.font_display_var.set(display_name)
+        self.font_name_var.set(os.path.splitext(os.path.basename(font_path))[0] if font_path else display_name)
+
+    def get_font_display_name(self, font_path):
+        for display_name, candidate_path in self.font_display_to_path.items():
+            if candidate_path == font_path:
+                return display_name
+        if font_path:
+            return os.path.splitext(os.path.basename(font_path))[0]
+        return ""
 
     def create_right_panel(self, parent):
         right_panel = ttk.Frame(parent, padding=14)
@@ -2772,13 +2903,21 @@ class ResourcePickerApp:
         self.text_width_var.set(str(width))
         self.text_height_var.set(str(height))
         self.text_fit_mode_var.set(layer_payload.get("fit_mode", "none"))
-        self.font_name_var.set(style.get("font_name", "") or "")
-        self.font_path_var.set(style.get("font_path", "") or "")
+        self.set_font_display_from_path(style.get("font_path", "") or "")
+        if not self.font_path_var.get().strip():
+            self.font_name_var.set(style.get("font_name", "") or "")
+            self.font_display_var.set(style.get("font_name", "") or "")
         self.font_size_var.set(str(style.get("font_size", 24)))
         self.font_color_r_var.set(str(red))
         self.font_color_g_var.set(str(green))
         self.font_color_b_var.set(str(blue))
+        self.font_color_hex_var.set(self.rgb_to_hex((red, green, blue)))
+        self.update_text_color_swatches()
         self.font_antialias_var.set(bool(style.get("antialias", True)))
+        scale_percent = layer_payload.get("scale_percent", (100, 100))
+        scale_w, scale_h = self.service.normalize_layer_position(scale_percent)
+        self.layer_scale_w_var.set(str(scale_w or 100))
+        self.layer_scale_h_var.set(str(scale_h or 100))
 
     def populate_group_editor_layers(self, group_id, group_payload, selected_layer_name=""):
         if not hasattr(self, "group_editor_layers_tree"):
@@ -2853,10 +2992,14 @@ class ResourcePickerApp:
         self.text_fit_mode_var.set("none")
         self.font_name_var.set("")
         self.font_path_var.set("")
+        self.font_display_var.set("")
         self.font_size_var.set("24")
         self.font_color_r_var.set("255")
         self.font_color_g_var.set("255")
         self.font_color_b_var.set("255")
+        self.font_color_hex_var.set("#ffffff")
+        self.update_text_color_swatches()
+        self.hide_text_color_palettes()
         self.font_antialias_var.set(True)
         self.hide_text_layer_editor()
 
@@ -2870,6 +3013,11 @@ class ResourcePickerApp:
         while len(values) < 3:
             values.append(255)
         return tuple(max(0, min(255, value)) for value in values)
+
+    @staticmethod
+    def rgb_to_hex(color):
+        red, green, blue = (max(0, min(255, int(value))) for value in color[:3])
+        return f"#{red:02x}{green:02x}{blue:02x}"
 
     @staticmethod
     def find_target_for_layer(group_payload, layer_name):
@@ -3075,6 +3223,10 @@ class ResourcePickerApp:
                 max(1, self.safe_int(self.text_height_var.get(), 1)),
             ],
             "fit_mode": self.text_fit_mode_var.get(),
+            "scale_percent": [
+                max(1, self.safe_int(self.layer_scale_w_var.get(), 100)),
+                max(1, self.safe_int(self.layer_scale_h_var.get(), 100)),
+            ],
             "style": {
                 "font_name": self.font_name_var.get().strip(),
                 "font_path": self.font_path_var.get().strip(),
@@ -3106,11 +3258,25 @@ class ResourcePickerApp:
         text = str(layer_payload.get("text", ""))
         text_image = self.render_text_image(text, font, color)
         fitted_text = self.fit_preview_text_image(text_image, (width, height), layer_payload.get("fit_mode", "none"))
+        fitted_text = self.scale_preview_image_percent(fitted_text, layer_payload.get("scale_percent", (100, 100)))
         image = Image.new("RGBA", (width, height), (32, 34, 38, 255))
         draw = ImageDraw.Draw(image)
         draw.rectangle((0, 0, width - 1, height - 1), outline=(91, 114, 138, 255))
         self.alpha_composite_center(image, fitted_text)
         return image
+
+    def scale_preview_image_percent(self, image, scale_percent):
+        scale_w, scale_h = self.service.normalize_layer_position(scale_percent)
+        scale_w = max(1, scale_w) / 100
+        scale_h = max(1, scale_h) / 100
+        size = (
+            max(1, round(image.width * scale_w)),
+            max(1, round(image.height * scale_h)),
+        )
+        if size == image.size:
+            return image
+        resampling = getattr(getattr(Image, "Resampling", Image), "LANCZOS", Image.BICUBIC)
+        return image.resize(size, resampling)
 
     def load_preview_font(self, style):
         font_size = int(style.get("font_size", 24) or 24)
@@ -3391,10 +3557,21 @@ class ResourcePickerApp:
     def save_group_config_text_layer(self):
         self.layer_type_var.set("Text")
         group_id = self.group_id_var.get().strip()
-        layer_name = self.text_layer_choice_var.get().strip() or self.layer_name_var.get().strip()
+        layer_name = self.layer_name_var.get().strip() or self.text_layer_choice_var.get().strip()
         if not group_id or not layer_name:
             self.status_var.set("Group and layer are required")
             messagebox.showerror("Text Layer error", "Group and layer are required")
+            return
+        try:
+            existing_layer = group_config.get_layer_config(group_id, layer_name)
+        except KeyError:
+            existing_layer = None
+        if existing_layer is not None and existing_layer.get("type", "image") != "text":
+            self.status_var.set("text layer name is already used by an image layer")
+            messagebox.showerror(
+                "Text Layer error",
+                f"Layer '{layer_name}' is an image layer. Choose an existing text layer or press New layer.",
+            )
             return
         self.layer_name_var.set(layer_name)
 
@@ -3643,6 +3820,10 @@ class ResourcePickerApp:
                 self.read_int_var(self.layer_x_var, "Layer position X"),
                 self.read_int_var(self.layer_y_var, "Layer position Y"),
             ],
+            "scale_percent": [
+                max(1, self.read_int_var(self.layer_scale_w_var, "Layer scale width", default=100)),
+                max(1, self.read_int_var(self.layer_scale_h_var, "Layer scale height", default=100)),
+            ],
             "fit_mode": self.text_fit_mode_var.get().strip() or "none",
             "style": style,
         }
@@ -3655,7 +3836,7 @@ class ResourcePickerApp:
         )
         if not file_path:
             return
-        self.font_path_var.set(self.to_project_relative_path(file_path))
+        self.set_font_display_from_path(self.to_project_relative_path(file_path))
 
     def pick_text_color(self):
         color = self.normalize_rgb(
@@ -3672,6 +3853,12 @@ class ResourcePickerApp:
         self.font_color_r_var.set(str(red))
         self.font_color_g_var.set(str(green))
         self.font_color_b_var.set(str(blue))
+        self.font_color_hex_var.set(self.rgb_to_hex((red, green, blue)))
+        self.update_text_color_swatches()
+        self.hide_text_color_palettes()
+        self.update_group_config_preview()
+        if self.layer_type_var.get() == "Text":
+            self.show_text_layer_preview()
 
     @staticmethod
     def to_project_relative_path(file_path):

@@ -366,6 +366,10 @@
             68
           ],
           "fit_mode": "contain",
+          "scale_percent": [
+            100,
+            100
+          ],
           "style": {
             "font_name": null,
             "font_path": "assets/fonts/ingrid-darling/IngridDarling-Regular.ttf",
@@ -493,6 +497,10 @@
             68
           ],
           "fit_mode": "contain",
+          "scale_percent": [
+            100,
+            100
+          ],
           "style": {
             "font_name": null,
             "font_path": "assets/fonts/ingrid-darling/IngridDarling-Regular.ttf",
@@ -724,7 +732,7 @@
           "current_frame_index": 0,
           "frame_count": 1,
           "text_key": "player.right.name",
-          "default_text": "Player 3",
+          "default_text": "Player 2",
           "size": [
             200,
             68
@@ -736,14 +744,18 @@
             68
           ],
           "fit_mode": "contain",
+          "scale_percent": [
+            70,
+            100
+          ],
           "style": {
             "font_name": null,
             "font_path": "assets/fonts/ingrid-darling/IngridDarling-Regular.ttf",
             "font_size": 28,
             "color": [
               255,
-              238,
-              196
+              255,
+              255
             ],
             "antialias": true
           }

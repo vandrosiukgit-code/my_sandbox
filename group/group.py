@@ -33,6 +33,7 @@ class Layer:
     text_key: str | None = None
     default_text: str | None = None
     size: tuple[int, int] | None = None
+    scale_percent: tuple[int, int] | None = None
     fit_mode: str | None = None
     style: object | None = None
 
@@ -74,6 +75,8 @@ class Layer:
             ]
         if self.fit_mode is not None:
             payload["fit_mode"] = self.fit_mode
+        if self.scale_percent is not None:
+            payload["scale_percent"] = list(self.scale_percent)
         if self.style is not None and hasattr(self.style, "to_manifest_entry"):
             payload["style"] = self.style.to_manifest_entry()
         return payload
@@ -108,35 +111,40 @@ def create_text_layer(
     position=(0, 0),
     text_key=None,
     fit_mode="none",
+    scale_percent=(100, 100),
 ):
     """Create a normal Layer whose frame is a rendered text surface."""
     style = style or TextStyle()
+    scale_percent = normalize_scale_percent(scale_percent)
     return Layer(
         name=layer_name,
-        frames=[render_text_surface(text, style, size, fit_mode)],
+        frames=[render_text_surface(text, style, size, fit_mode, scale_percent)],
         position=position,
         layer_type="text",
         text_key=text_key,
         default_text=str(text),
         size=size,
+        scale_percent=scale_percent,
         fit_mode=fit_mode,
         style=style,
     )
 
 
-def render_text_surface(text, style, size=None, fit_mode="none"):
+def render_text_surface(text, style, size=None, fit_mode="none", scale_percent=(100, 100)):
     """Render text into a pygame.Surface, optionally fitted into a fixed rect."""
     if not pygame.font.get_init():
         pygame.font.init()
 
     font = get_text_font(style)
     text_surface = font.render(str(text), style.antialias, style.color)
+    scale_percent = normalize_scale_percent(scale_percent)
     if size is None:
-        return text_surface
+        return scale_surface_percent(text_surface, scale_percent)
 
     size = normalize_text_rect_size(size)
     surface = pygame.Surface(size, pygame.SRCALPHA)
     fitted_surface = fit_text_surface(text_surface, size, fit_mode)
+    fitted_surface = scale_surface_percent(fitted_surface, scale_percent)
     surface.blit(fitted_surface, fitted_surface.get_rect(center=surface.get_rect().center))
     return surface
 
@@ -161,7 +169,55 @@ def resolve_project_path(path):
 def normalize_text_rect_size(size):
     """Return a safe pygame size tuple for a text layer rect."""
     width, height = size
-    return max(1, int(width)), max(1, int(height))
+    return normalize_positive_int(width, 1), normalize_positive_int(height, 1)
+
+
+def normalize_scale_percent(scale_percent):
+    """Return safe separate width/height scale percentages."""
+    if scale_percent is None:
+        return 100, 100
+    if isinstance(scale_percent, dict):
+        width = scale_percent.get("w", scale_percent.get("x", 100))
+        height = scale_percent.get("h", scale_percent.get("y", 100))
+        return normalize_positive_int(width, 100), normalize_positive_int(height, 100)
+    if isinstance(scale_percent, (int, float)):
+        value = normalize_positive_int(scale_percent, 100)
+        return value, value
+    if isinstance(scale_percent, str):
+        values = [part.strip() for part in scale_percent.split(",")]
+    else:
+        try:
+            values = list(scale_percent)
+        except TypeError:
+            return 100, 100
+    while len(values) < 2:
+        values.append(100)
+    return normalize_positive_int(values[0], 100), normalize_positive_int(values[1], 100)
+
+
+def normalize_positive_int(value, default):
+    """Return a positive int from UI/config values such as 70, 70.0, or '70%'."""
+    try:
+        if isinstance(value, str):
+            value = value.strip().rstrip("%")
+            if not value:
+                return int(default)
+        return max(1, int(float(value)))
+    except (TypeError, ValueError):
+        return int(default)
+
+
+def scale_surface_percent(surface, scale_percent):
+    """Scale surface separately by width and height percentages."""
+    scale_w, scale_h = normalize_scale_percent(scale_percent)
+    width, height = surface.get_size()
+    size = (
+        max(1, round(width * scale_w / 100)),
+        max(1, round(height * scale_h / 100)),
+    )
+    if size == surface.get_size():
+        return surface
+    return pygame.transform.smoothscale(surface, size)
 
 
 def fit_text_surface(surface, target_size, fit_mode="none"):
@@ -323,6 +379,7 @@ class Group(BaseGroup):
                 position=cls.normalize_layer_position(layer_config.get("position", (0, 0))),
                 text_key=layer_config.get("text_key"),
                 fit_mode=layer_config.get("fit_mode", "none"),
+                scale_percent=layer_config.get("scale_percent", (100, 100)),
             )
 
         resource_key = layer_config["resource_key"]
