@@ -103,7 +103,15 @@ VisualCommand(
 
 ## Current Caution
 
-Manifest target IDs must be unique. `group_config.json` currently has duplicated
-`player.right.*` targets on right/top/bottom player groups. This should be
-normalized to side-specific IDs before target-based settings are treated as
-stable API.
+Manifest target IDs must be unique. Current player targets are side-specific:
+
+```text
+player.left.avatar
+player.left.name
+player.right.avatar
+player.right.name
+player.top.avatar
+player.top.name
+player.bottom.avatar
+player.bottom.name
+```

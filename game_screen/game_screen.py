@@ -3,6 +3,7 @@
 import pygame
 
 from base import BaseGameScreen
+from actions import MoveGroupAction
 from game_screen.frame import Frame
 from game_screen.events import ScreenInputEvent, VisualCommand, FrameHit
 from core.gui_manifest import DEFAULT_GUI_ACTIVITIES, GuiManifest
@@ -228,10 +229,46 @@ class GameScreen(BaseGameScreen):
             self.group_store.apply_target_value(target, value)
         elif command_type == "start_activity" and activity_id:
             self.dispatch_manifest_activity(activity_id, command)
+        elif command_type == "move_group" and group_id:
+            self.dispatch_move_group_command(command, group_id)
         elif command_type == "activate_group" and group_id:
             self.activate_group(group_id)
         elif command_type == "deactivate_group" and group_id:
             self.deactivate_group(group_id)
+
+    def dispatch_move_group_command(self, command, group_id):
+        """Create a frame-owned action that moves one active group."""
+        payload = self.get_command_value(command, "payload", {}) or {}
+        to_position = self.resolve_move_target_position(command, payload)
+        duration = payload.get("duration", self.get_command_value(command, "duration", 0.25))
+        frame_id = payload.get("frame_id", self.get_command_value(command, "frame_id"))
+        frame = self.get_screen_frame(frame_id) if frame_id else self.find_frame_for_group(group_id)
+        group = self.get_group(group_id)
+        return frame.add_action(MoveGroupAction(group, to_position, duration=duration))
+
+    def resolve_move_target_position(self, command, payload):
+        """Resolve a move target to absolute screen coordinates."""
+        for key in ("to", "to_position", "screen_pos"):
+            if key in payload:
+                return self.normalize_position(payload[key])
+
+        frame_id = payload.get("frame_id", self.get_command_value(command, "frame_id"))
+        local_pos = payload.get("local_pos")
+        if frame_id and local_pos is not None:
+            return self.get_screen_frame(frame_id).to_screen(self.normalize_position(local_pos))
+
+        raise ValueError("move_group command requires payload.to or payload.frame_id + payload.local_pos")
+
+    def find_frame_for_group(self, group_id):
+        """Return the first frame that currently owns group_id."""
+        for frame in self.screen_frames.values():
+            if group_id in frame.group_ids:
+                return frame
+        raise KeyError(f"Group is not placed in any frame: {group_id}")
+
+    @staticmethod
+    def normalize_position(position):
+        return int(position[0]), int(position[1])
 
     def dispatch_manifest_activity(self, activity_id, command):
         """Dispatch a public manifest activity term.

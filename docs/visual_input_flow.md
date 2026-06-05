@@ -65,6 +65,7 @@ set_text
 start_activity
 activate_group
 deactivate_group
+move_group
 ```
 
 ## Example Resource Update
@@ -109,6 +110,11 @@ player.left.name
 
 ## Activity Terms
 
+`Activity` is a long-lived visual behavior mode/process. It can live for one
+frame, for a phase, or for the whole game session. For example, a player hand
+activity can lay out cards, react to hover, accept visual commands, and start
+short actions.
+
 ```python
 VisualCommand(
     type="start_activity",
@@ -118,5 +124,45 @@ VisualCommand(
 ```
 
 The base screen supports `group.activate` and `group.deactivate`. Future terms
-such as `card.move`, `card.flip`, or `player.highlight` should remain public
-manifest terms and be mapped by concrete screens to real visual processes.
+such as `player.hand`, `table.zone`, or `drag.card` should remain public
+manifest terms and be mapped by concrete screens to real activity objects.
+
+## Action Terms
+
+`Action` is a short finite visual step. It starts, updates over time, and
+completes. Examples include moving a card from A to B, flipping a card, playing
+a flash, or scaling a group. An action can be owned by a screen, a frame, or a
+long-lived activity.
+
+## Move Group Action
+
+`move_group` creates a frame-owned `MoveGroupAction` and moves one runtime
+`Group` in screen coordinates:
+
+```python
+VisualCommand(
+    type="move_group",
+    group_id="left_player",
+    payload={
+        "to": (80, 260),
+        "duration": 0.25,
+    },
+)
+```
+
+The target can also be expressed as a frame-local position:
+
+```python
+VisualCommand(
+    type="move_group",
+    group_id="left_player",
+    payload={
+        "frame_id": "left_player_portrait",
+        "local_pos": (0, 0),
+        "duration": 0.25,
+    },
+)
+```
+
+The action lives in the frame that currently owns `group_id`, and the lower
+level `MoveGroupAnimation` changes only `group.set_position(...)`.

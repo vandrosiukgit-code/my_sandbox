@@ -5,7 +5,8 @@ cards. They compose lower-level animations and do not decide game rules.
 """
 
 from actions.base_action import Action
+from actions.move_group_action import MoveGroupAction
 
-__all__ = ["Action"]
+__all__ = ["Action", "MoveGroupAction"]
 
 

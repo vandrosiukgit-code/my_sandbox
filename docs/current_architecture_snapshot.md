@@ -46,27 +46,15 @@ main.py
 
 ## Current Architecture Risks
 
-- `group_config.json` contains duplicate/legacy table entries: active
-  `table_group` and apparently stale `table`.
-- `top_player` and `bottom_player` reuse `player.right.*` manifest target IDs.
-  Public target IDs should be unique before settings/controller code relies on
-  them.
-- Some tags/descriptions in `group_config.json` still say `right_player` for
-  non-right players.
-- `assets/gui_manifest.json` is a snapshot/export and can drift from the live
-  `TableScreen` unless regenerated.
-- No dependency file is present in the project root. Runtime needs at least
-  `pygame` and `Pillow`.
+- `assets/gui_manifest.json` is a generated snapshot/export and can drift from
+  the live `TableScreen` unless regenerated with
+  `python scripts/update_gui_manifest.py`.
 - The local `.venv` can be machine-specific and should be recreated before
   verification.
 
 ## Recommended Next Steps
 
-1. Normalize `group_config.json` public targets:
-   `player.top.*`, `player.bottom.*`, `player.right.*`, `player.left.*`.
-2. Remove or migrate duplicate `table` config after confirming no tool uses it.
-3. Add a dependency file and a documented environment setup path.
-4. Add a small manifest validation script for duplicate target IDs, missing
+1. Recreate the virtual environment from `requirements.txt`.
+2. Add a small manifest validation script for duplicate target IDs, missing
    resources, and stale group/frame references.
-5. Decide whether `assets/gui_manifest.json` is generated output and document
-   the generator command.
+3. Start implementing real `GameController` rules and card group placement.

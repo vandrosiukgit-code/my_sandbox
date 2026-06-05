@@ -21,7 +21,8 @@ main.py
 - `GameController` владеет правилами, состоянием игры и логическими зонами.
 - `GroupStore` владеет созданными графическими объектами.
 - `GameScreen` владеет экранными зонами, активными group ID и визуальной оркестрацией.
-- `Activity` владеет временным визуальным процессом.
+- `Activity` владеет долгоживущим визуальным режимом/процессом.
+- `Action` владеет коротким конечным визуальным действием.
 - `Group` остается пассивным визуальным объектом.
 
 ## P0. Стабилизация текущей базы
@@ -255,7 +256,7 @@ main.py
 - экран является текущей сценой, а не владельцем всех акторов;
 - взаимодействие идет через ID.
 
-## P4. Activity
+## P4. Activity и Action
 
 ### 10. Создать базовую систему `Activity` [done]
 
@@ -276,28 +277,44 @@ main.py
 Критерий готовности:
 
 - `GameScreen` может хранить и обновлять список активностей;
-- завершенные активности удаляются экраном.
+- завершенные активности удаляются экраном;
+- активность может быть долгоживущим режимом и не обязана завершаться быстро.
 
-### 11. Реализовать первые активности
+### 11. Реализовать первые `Action`
 
 Файлы:
 
-- `activities/move_group_activity.py`
-- `activities/show_group_activity.py`
-- `activities/hide_group_activity.py`
-- возможно `activities/frame_animation_activity.py`
+- `actions/move_group_action.py`
+- возможно `actions/scale_group_action.py`
+- возможно `actions/frame_animation_action.py`
 
 Задачи:
 
-- `MoveGroupActivity`: плавно перемещает group между позициями;
-- `ScaleGroupActivity`: меняет масштаб group-а во времени;
-- `ActivateGroupActivity`: добавляет group ID в активный набор экрана;
-- `DeactivateGroupActivity`: убирает group ID из активного набора экрана;
-- `FrameAnimationActivity`: меняет текущий кадр слоя по времени.
+- `MoveGroupAction`: плавно перемещает group между позициями;
+- `ScaleGroupAction`: меняет масштаб group-а во времени;
+- `FrameAnimationAction`: меняет текущий кадр слоя по времени.
 
 Критерий готовности:
 
-- появление, перемещение и удаление карты можно сделать без логики внутри `Group`.
+- короткое перемещение, масштабирование и смену кадра можно сделать без логики внутри `Group`.
+
+### 11.1. Реализовать первые долгоживущие `Activity`
+
+Файлы:
+
+- `activities/player_hand_activity.py`
+- возможно `activities/table_zone_activity.py`
+
+Задачи:
+
+- `PlayerHandActivity`: раскладывает карты руки, реагирует на hover, принимает визуальные команды;
+- `TableZoneActivity`: управляет поведением зоны стола и может запускать короткие `Action`;
+- активности могут запускать `Action`, но не принимают решений по правилам игры.
+
+Критерий готовности:
+
+- поведение руки или зоны можно развивать без разрастания `GameScreen`;
+- `Activity` может жить весь игровой сеанс.
 
 ## P5. ResourceManager и ресурсы
 
@@ -423,7 +440,8 @@ main.py
 GameController -> logical state
 GroupStore  -> all Group instances
 GameScreen     -> screen frames + active group IDs
-Activity       -> temporary visual process
+Activity       -> long-lived visual behavior mode/process
+Action         -> short finite visual step
 Group       -> passive drawable state
 ```
 
@@ -459,5 +477,4 @@ Group       -> passive drawable state
 6. P5: подчистить ресурсный контур и `resource_picker`.
 7. P6: собрать все через `main.py`.
 8. P7: обновить документацию и smoke-проверки.
-
 
