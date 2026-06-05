@@ -1,38 +1,57 @@
 # GUI Manifest
 
-`GUI Manifest` is the public language between controller, settings, and the
-visual layer.
+`GuiManifest` is the public language between controller/settings code and the
+visual layer. It intentionally exposes stable GUI concepts instead of every
+internal drawing layer.
 
-It does not describe every internal drawing layer. It names the GUI concepts
-that outside code may talk to.
+## Source Of Truth
 
-## Targets
+Public targets are declared in `group_config.json` under each group's
+`manifest_targets` block.
 
-Targets map human-readable names to `group_config.json` entries:
-
-```text
-player.left.avatar -> group_id left_player, layer portrait
-player.left.name   -> group_id left_player, layer player_name_text
-table.surface      -> group_id table_group
-```
-
-These mappings are declared in `group_config.json` under each group's
-`manifest_targets`.
-
-Example:
-
-```python
-"manifest_targets": {
+```json
+{
+  "manifest_targets": {
     "player.left.avatar": {
-        "type": "resource",
-        "layer": "portrait",
+      "type": "resource",
+      "layer": "portrait",
+      "description": "Left player portrait image."
     },
+    "player.left.name": {
+      "type": "text",
+      "layer": "player_name_text",
+      "description": "Left player display name."
+    }
+  }
 }
 ```
 
+At runtime:
+
+```text
+group_config.json
+    -> Group.from_config()
+    -> Group.manifest_targets
+    -> GroupStore.get_manifest_targets()
+    -> GameScreen.get_gui_manifest()
+```
+
+## Target Types
+
+Current target types:
+
+```text
+resource  updates one configured image layer resource_key
+text      updates one configured text layer text value
+group     names a group-level visual object
+```
+
+`GroupStore.apply_target_value()` currently supports value updates for
+`resource` and `text` targets.
+
 ## Commands
 
-Controller/settings code can use target names:
+Controller/settings code should use target names, not group/layer internals:
 
 ```python
 VisualCommand(
@@ -42,19 +61,37 @@ VisualCommand(
 )
 ```
 
-`GameScreen` resolves the target and calls:
+`GameScreen` resolves the target and delegates to `GroupStore`:
+
+```text
+player.left.avatar
+    -> group_id left_player
+    -> layer portrait
+    -> set_group_layer_resource(...)
+```
+
+Text updates follow the same path:
 
 ```python
-group_store.set_group_layer_resource(
-    "left_player",
-    "portrait",
-    "main_screen.avatars.portrait_4",
+VisualCommand(
+    type="set_text",
+    target="player.left.name",
+    value="Captain",
 )
 ```
 
 ## Activities
 
-Activities are also public terms:
+`core.gui_manifest.DEFAULT_GUI_ACTIVITIES` currently defines:
+
+```text
+group.activate
+group.deactivate
+```
+
+These are public activity terms. The base `GameScreen` maps them to active
+group ID changes. Later screens can map richer terms to concrete `Activity` or
+`Action` classes.
 
 ```python
 VisualCommand(
@@ -64,19 +101,9 @@ VisualCommand(
 )
 ```
 
-Concrete screens can map these terms to real `Activity` or `Action` classes.
+## Current Caution
 
-## Relationship To group_config
-
-`group_config.json` is the source of truth.
-`group_config.py` is the load/save/update API.
-
-`GuiManifest` is the public address book derived from that config.
-
-```text
-group_config.json manifest_targets
-    -> group_config.py
-    -> Group.manifest_targets
-        -> GroupStore.get_manifest_targets()
-            -> GuiManifest
-```
+Manifest target IDs must be unique. `group_config.json` currently has duplicated
+`player.right.*` targets on right/top/bottom player groups. This should be
+normalized to side-specific IDs before target-based settings are treated as
+stable API.

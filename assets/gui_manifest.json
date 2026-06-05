@@ -16,11 +16,77 @@
         "table_group",
         "left_player",
         "right_player",
-        "top_player"
+        "top_player",
+        "bottom_player"
       ]
     }
   },
   "frames": {
+    "bottom_player_frame": {
+      "id": "bottom_player_frame",
+      "parent_frame_id": "game_table",
+      "local_rect": [
+        475,
+        518,
+        300,
+        260
+      ],
+      "rect": [
+        475,
+        518,
+        300,
+        260
+      ],
+      "hit_rect": [
+        475,
+        518,
+        300,
+        260
+      ],
+      "group_ids": [],
+      "child_frame_ids": [
+        "bottom_player_portrait"
+      ],
+      "group_origins": {},
+      "action_count": 0,
+      "padding": 0,
+      "spacing": 12
+    },
+    "bottom_player_portrait": {
+      "id": "bottom_player_portrait",
+      "parent_frame_id": "bottom_player_frame",
+      "local_rect": [
+        65,
+        0,
+        200,
+        200
+      ],
+      "rect": [
+        540,
+        518,
+        200,
+        200
+      ],
+      "hit_rect": [
+        540,
+        518,
+        200,
+        200
+      ],
+      "group_ids": [
+        "bottom_player"
+      ],
+      "child_frame_ids": [],
+      "group_origins": {
+        "bottom_player": [
+          540,
+          518
+        ]
+      },
+      "action_count": 0,
+      "padding": 0,
+      "spacing": 12
+    },
     "game_table": {
       "id": "game_table",
       "parent_frame_id": null,
@@ -48,7 +114,8 @@
       "child_frame_ids": [
         "left_player_frame",
         "right_player_frame",
-        "top_player_frame"
+        "top_player_frame",
+        "bottom_player_frame"
       ],
       "group_origins": {
         "table_group": [
@@ -257,6 +324,137 @@
     }
   },
   "groups": {
+    "bottom_player": {
+      "id": "bottom_player",
+      "role": "player_panel",
+      "tags": [
+        "configurable",
+        "player",
+        "right_player"
+      ],
+      "manifest_targets": {
+        "player.right.avatar": {
+          "type": "resource",
+          "layer": "portrait",
+          "description": "Right player portrait image.",
+          "group_id": "bottom_player"
+        },
+        "player.right.name": {
+          "type": "text",
+          "layer": "player_name_text",
+          "description": "Right player display name.",
+          "group_id": "bottom_player"
+        }
+      },
+      "rect": [
+        540,
+        518,
+        200,
+        200
+      ],
+      "hit_rect": [
+        540,
+        518,
+        200,
+        200
+      ],
+      "scale_factor": 1.0,
+      "hide_rect": true,
+      "rect_debug_layer_ids": [
+        "p_name_bg",
+        "player_name_text"
+      ],
+      "layer_order": [
+        "p_portrait_bg",
+        "portrait",
+        "portrait_frame",
+        "p_name_bg",
+        "player_name_text"
+      ],
+      "layers": {
+        "p_portrait_bg": {
+          "id": "p_portrait_bg",
+          "type": "resource",
+          "position": [
+            0,
+            0
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1
+        },
+        "portrait": {
+          "id": "portrait",
+          "type": "resource",
+          "position": [
+            0,
+            0
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1
+        },
+        "portrait_frame": {
+          "id": "portrait_frame",
+          "type": "resource",
+          "position": [
+            0,
+            0
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1
+        },
+        "p_name_bg": {
+          "id": "p_name_bg",
+          "type": "resource",
+          "position": [
+            0,
+            132
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1
+        },
+        "player_name_text": {
+          "id": "player_name_text",
+          "type": "text",
+          "position": [
+            0,
+            132
+          ],
+          "current_frame_index": 0,
+          "frame_count": 1,
+          "text_key": "player.right.name",
+          "default_text": "You",
+          "size": [
+            200,
+            56
+          ],
+          "rect": [
+            0,
+            132,
+            200,
+            56
+          ],
+          "fit_mode": "contain",
+          "scale_percent": [
+            75,
+            100
+          ],
+          "style": {
+            "font_name": "Lobster-Regular",
+            "font_path": "assets/fonts/Lobster/Lobster-Regular.ttf",
+            "font_size": 28,
+            "color": [
+              32,
+              33,
+              36
+            ],
+            "antialias": true
+          }
+        }
+      },
+      "frame_ids": [
+        "bottom_player_portrait"
+      ]
+    },
     "left_player": {
       "id": "left_player",
       "role": "player_panel",
@@ -357,27 +555,27 @@
           "default_text": "Player 1",
           "size": [
             200,
-            68
+            56
           ],
           "rect": [
             0,
             132,
             200,
-            68
+            56
           ],
           "fit_mode": "contain",
           "scale_percent": [
-            100,
+            80,
             100
           ],
           "style": {
-            "font_name": null,
-            "font_path": "assets/fonts/ingrid-darling/IngridDarling-Regular.ttf",
+            "font_name": "Lobster-Regular",
+            "font_path": "assets/fonts/Lobster/Lobster-Regular.ttf",
             "font_size": 28,
             "color": [
-              255,
-              238,
-              196
+              32,
+              33,
+              36
             ],
             "antialias": true
           }
@@ -488,27 +686,27 @@
           "default_text": "Player 3",
           "size": [
             200,
-            68
+            56
           ],
           "rect": [
             0,
             132,
             200,
-            68
+            56
           ],
           "fit_mode": "contain",
           "scale_percent": [
-            100,
+            75,
             100
           ],
           "style": {
-            "font_name": null,
-            "font_path": "assets/fonts/ingrid-darling/IngridDarling-Regular.ttf",
+            "font_name": "Lobster-Regular",
+            "font_path": "assets/fonts/Lobster/Lobster-Regular.ttf",
             "font_size": 28,
             "color": [
-              255,
-              238,
-              196
+              32,
+              33,
+              36
             ],
             "antialias": true
           }
@@ -735,27 +933,27 @@
           "default_text": "Player 2",
           "size": [
             200,
-            68
+            56
           ],
           "rect": [
             0,
             132,
             200,
-            68
+            56
           ],
           "fit_mode": "contain",
           "scale_percent": [
-            70,
+            75,
             100
           ],
           "style": {
-            "font_name": null,
-            "font_path": "assets/fonts/ingrid-darling/IngridDarling-Regular.ttf",
+            "font_name": "Lobster-Regular",
+            "font_path": "assets/fonts/Lobster/Lobster-Regular.ttf",
             "font_size": 28,
             "color": [
-              255,
-              255,
-              255
+              32,
+              33,
+              36
             ],
             "antialias": true
           }
@@ -775,7 +973,8 @@
         "table_group",
         "left_player",
         "right_player",
-        "top_player"
+        "top_player",
+        "bottom_player"
       ]
     }
   }

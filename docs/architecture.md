@@ -1,150 +1,175 @@
 # Architecture
 
-`The Fool's Reef` uses a data-first GUI model.
+`The Fool's Reef` currently uses a data-first GUI architecture on top of
+Pygame. Runtime objects are still lightweight Python objects, but the
+authoritative description of long-lived GUI groups lives in JSON.
+
+## Current Status
+
+The project has a working runtime composition path:
+
+```text
+main.py
+    -> RenderEngine
+        -> ResourceManager.build_runtime_cache(assets/)
+        -> GroupStore.build()
+            -> group_config.iter_group_ids()
+            -> Group.from_config(group_id, ResourceManager)
+        -> TableScreen
+            -> Frame tree
+            -> active group IDs
+```
+
+Game rules are still draft-level. `GameController` stores a fixture
+`GameState`, records input events, and returns no real game commands yet.
 
 ## Main Idea
 
 `group_config.json` is the source of truth for GUI groups.
 
-It contains group metadata, public manifest targets, and graphical/text layers.
-External modules may read and edit it through `group_config.py`. `Group` no
-longer owns PNG-resource decisions; it reads the current config and draws the
-resulting runtime layers.
+It contains:
+
+- group metadata: `role`, `tags`, `rect`, `hit_rect`, `scale_factor`;
+- debug display settings: `hide_rect`, `rect_debug_layer_ids`;
+- public `manifest_targets`;
+- image and text layer definitions.
+
+The runtime path is:
 
 ```text
 group_config.json
     -> group_config.py API
     -> Group.from_config(group_id, ResourceManager)
-        -> runtime Group
+        -> runtime Group with pygame surfaces/text layers
             -> GameScreen.draw()
 ```
 
-## Runtime Flow
+`Group` does not own the durable PNG/text decisions. It reads config, builds
+runtime layers, and can refresh a changed configured layer through
+`GroupStore`.
+
+## Runtime Ownership
 
 ```text
 main.py
-    -> ResourceManager.build_runtime_cache()
-    -> GroupStore.build()
-        -> group_config.iter_group_ids()
-        -> Group.from_config(group_id, ResourceManager)
-    -> TableScreen
-    -> RenderEngine
+    Composition root. Creates GameController and GroupStore, then starts
+    RenderEngine.
+
+RenderEngine
+    Owns pygame init, display, event loop, dt clock, and display flip.
+
+ResourceManager
+    Low-level asset cache. Reads assets/resource_manifest.json, builds a
+    metadata index, and loads pygame Surface frames after display creation.
+
+group_config.json
+    Authoritative GUI group/layer metadata.
+
+group_config.py
+    Load/save/update API for group_config.json.
+
+Group
+    Passive drawable runtime object. Holds rect/hit_rect, scale, role/tags,
+    manifest target metadata, and rendered layers.
+
+GroupStore
+    Built group registry. Builds groups from group_config.json, returns groups
+    by ID, exposes role/tag lookup, and applies manifest target updates.
+
+Frame
+    Screen-space container. Owns frame geometry, parent/child frame hierarchy,
+    group IDs placed in the frame, hit-testing, and local-to-screen conversion.
+
+GameScreen
+    Pygame-facing visual scene. Owns frames, active group IDs, input
+    normalization, GUI manifest creation, and visual command dispatch.
+
+TableScreen
+    Current concrete screen. Creates the table frame tree and places
+    table/left/right/top/bottom player groups.
+
+GameController
+    Draft rule boundary. Owns game state and receives normalized input, but
+    currently only records clicks/input events.
 ```
 
-## group_config.json
+## Current Screen Layout
 
-The config contains one entry per group:
-
-```json
-{
-  "groups": {
-    "left_player": {
-        "role": "player_panel",
-        "rect": [0, 0, 200, 200],
-        "manifest_targets": {
-            "player.left.avatar": {
-                "type": "resource",
-                "layer": "portrait",
-            }
-        },
-        "layers": [
-            {
-                "name": "portrait",
-                "type": "image",
-                "resource_key": "main_screen.avatars.portrait_2"
-            }
-        ]
-    }
-  }
-}
-```
-
-If a settings module wants another portrait, it changes:
-
-```python
-group_config.set_layer_resource(
-    "left_player",
-    "portrait",
-    "main_screen.avatars.portrait_4",
-)
-```
-
-Then the running group can refresh that layer through `GroupStore`.
-
-## Group
-
-`Group` is a runtime drawing script:
+`screens/table_screen.py` creates one root frame and four player frame pairs:
 
 ```text
-read group_config
-load frames through ResourceManager
-render layers
-refresh changed layers when config changes
+game_table
+    table_group
+    left_player_frame
+        left_player_portrait -> left_player
+    right_player_frame
+        right_player_portrait -> right_player
+    top_player_frame
+        top_player_portrait -> top_player
+    bottom_player_frame
+        bottom_player_portrait -> bottom_player
 ```
 
-It stores runtime surfaces and geometry, not the authoritative PNG metadata.
-
-Important methods:
-
-```text
-Group.from_config(group_id, resource_manager)
-group.reload_layers_from_config(resource_manager)
-group.set_layer_resource_from_config(layer_name, resource_key, resource_manager)
-group.set_layer_text_from_config(layer_name, text)
-```
-
-## GroupStore
-
-`GroupStore` stores built `Group` objects and gives external modules a safe API
-for refreshing config-driven groups:
-
-```text
-set_group_layer_resource(group_id, layer_name, resource_key)
-set_group_layer_text(group_id, layer_name, text)
-get_manifest_targets()
-apply_target_value(target, value)
-```
-
-## groups_store/
-
-`GroupStore` no longer needs a builder module for each configured group. It
-builds groups directly from `group_config.json`.
-
-Existing `groups_store/*` modules are thin compatibility adapters only.
+`TableScreen.put_configured_group()` is defensive: if a configured group is not
+present in `GroupStore`, the screen simply skips it.
 
 ## GUI Manifest
 
-The manifest is the public language for controller/settings commands. It does
-not expose all internal layers. It maps readable targets to group-config layers:
+The public GUI language is built at runtime rather than hand-authored in a
+single Python module:
 
 ```text
-player.left.avatar -> group left_player, layer portrait
-player.left.name   -> group left_player, layer player_name_text
+group_config.json manifest_targets
+    -> Group.manifest_targets
+        -> GroupStore.get_manifest_targets()
+            -> GameScreen.get_gui_manifest()
+                -> GuiManifest
 ```
 
-Example command:
-
-```python
-VisualCommand(
-    type="set_resource",
-    target="player.left.avatar",
-    value="main_screen.avatars.portrait_4",
-)
-```
-
-`GameScreen` resolves the target through `GuiManifest` and delegates the change
-to `GroupStore`.
-
-## Ownership
+`GuiManifest` exposes public targets such as:
 
 ```text
-group_config.json -> source of truth for GUI group metadata and layers
-group_config.py   -> load/save/update API for group_config.json
-Group             -> runtime drawing script built from group_config
-GroupStore       -> built groups and refresh/apply API
-groups_store/*   -> thin group_id builders
-GuiManifest      -> public target/activity language
-GameController   -> rules and public VisualCommand terms
-GameScreen       -> pygame adapter and command dispatch
-ResourceManager  -> low-level PNG frame cache
+player.left.avatar -> left_player.portrait
+player.left.name   -> left_player.player_name_text
+table.surface      -> table_group
 ```
+
+`GameScreen.dispatch_visual_command()` supports these command families:
+
+```text
+set_resource target=<manifest target> value=<resource key>
+set_text     target=<manifest target> value=<text>
+start_activity activity=group.activate|group.deactivate target=<manifest target>
+activate_group group_id=<group id>
+deactivate_group group_id=<group id>
+```
+
+## Assets
+
+`assets/resource_manifest.json` describes raw PNG resources and frame sizes.
+`ResourceManager` loads this manifest and can repair missing dimensions.
+
+`assets/gui_manifest.json` is a generated/snapshot artifact of the current GUI
+screen, frames, groups, and hierarchy. It should be treated as a diagnostic or
+tooling export, not the primary source of truth. The durable source remains
+`group_config.json`.
+
+## Compatibility Layer
+
+`groups_store/*_group.py` modules still exist, but they are thin adapters around
+`Group.from_config(GROUP_ID, resource_manager)`. `GroupStore` no longer needs
+to discover these modules by default; it builds directly from `group_config`.
+
+## Known Architecture Debt
+
+- `group_config.json` contains both `table_group` and `table`; the active
+  screen uses `table_group`, while `table` appears to be duplicate legacy data.
+- `top_player` and `bottom_player` currently reuse `player.right.*` manifest
+  target IDs/tags. Public target IDs must be unique and side-specific before
+  controller/settings code relies on them.
+- `assets/gui_manifest.json` can drift from runtime state unless regenerated by
+  tooling after layout/config changes.
+- There is no dependency file in the repository root. Runtime requires at least
+  `pygame` and `Pillow`.
+- The local `.venv` may be machine-specific and can point to a missing base
+  Python installation; verification should use a recreated environment.

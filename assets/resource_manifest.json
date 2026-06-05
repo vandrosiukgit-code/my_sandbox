@@ -15,6 +15,11 @@
       "frame_width": 200,
       "frame_height": 200
     },
+    "main_screen.avatars.portrait_4": {
+      "path": "main_screen/avatars/portrait_4.png",
+      "frame_width": 200,
+      "frame_height": 200
+    },
     "main_screen.p_name_bg": {
       "path": "main_screen/p_name_bg.png",
       "frame_width": 200,

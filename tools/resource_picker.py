@@ -8,6 +8,7 @@ import json
 import os
 import re
 import sys
+import traceback
 import tkinter as tk
 from tkinter import colorchooser, filedialog, messagebox, ttk
 from tkinter import font as tkfont
@@ -506,21 +507,44 @@ class ResourcePickerService:
                 file.write(content)
             written.append(file_path)
 
-        PlaceholderResourceManager.build_index(self.assets_dir)
-        group_store = GroupStore(resource_manager=PlaceholderResourceManager)
-        group_store.build()
-
         report = OperationReport("Build Groups")
         report.add(f"Groups in group_config.json: {len(groups)}")
-        report.add(f"Groups built by GroupStore: {len(group_store)}")
         report.add(f"Builder files written: {len(written)}")
         report.add(f"Builder files unchanged: {len(unchanged)}")
+        report.add("Runtime build skipped in Resource Picker to avoid closing the Tk window from pygame/resource errors.")
         report.add("group_store.py source: group_config.iter_group_ids()")
+        warnings = self.validate_group_config_for_build(groups)
+        if warnings:
+            report.add("")
+            report.add("Warnings:")
+            report.extend(warnings)
         if module_paths:
             report.add("")
             report.add("Builder modules:")
             report.extend(module_paths)
-        return group_store, report
+        return None, report
+
+    @staticmethod
+    def validate_group_config_for_build(groups):
+        warnings = []
+        for group_id, group_payload in sorted(groups.items()):
+            layer_names = set()
+            for layer in group_payload.get("layers", ()):
+                layer_name = layer.get("name", "")
+                layer_type = layer.get("type", "image")
+                if not layer_name:
+                    warnings.append(f"{group_id}: layer without name")
+                    continue
+                if layer_name in layer_names:
+                    warnings.append(f"{group_id}.{layer_name}: duplicate layer name")
+                layer_names.add(layer_name)
+                if layer_type == "image" and not layer.get("resource_key"):
+                    warnings.append(f"{group_id}.{layer_name}: image layer without resource_key")
+                if layer_type == "text" and layer.get("resource_key"):
+                    warnings.append(f"{group_id}.{layer_name}: text layer still has resource_key")
+                if layer_type not in ("image", "text"):
+                    warnings.append(f"{group_id}.{layer_name}: unsupported layer type {layer_type!r}")
+        return warnings
 
     def get_gui_manifest_path(self):
         return os.path.join(self.assets_dir, GUI_MANIFEST_FILE_NAME)
@@ -2086,6 +2110,7 @@ class ResourcePickerApp:
             layer = self.build_current_layer_draft()
             if layer:
                 if layer["type"] == "text":
+                    self.ensure_text_layer_can_be_saved(group_id, layer["name"])
                     self.sync_hex_color_to_rgb()
                     if self.safe_int(self.text_width_var.get()) <= 0:
                         self.text_width_var.set(str(max(1, self.safe_int(self.group_rect_w_var.get(), 1))))
@@ -3563,15 +3588,10 @@ class ResourcePickerApp:
             messagebox.showerror("Text Layer error", "Group and layer are required")
             return
         try:
-            existing_layer = group_config.get_layer_config(group_id, layer_name)
-        except KeyError:
-            existing_layer = None
-        if existing_layer is not None and existing_layer.get("type", "image") != "text":
+            self.ensure_text_layer_can_be_saved(group_id, layer_name)
+        except ValueError as error:
             self.status_var.set("text layer name is already used by an image layer")
-            messagebox.showerror(
-                "Text Layer error",
-                f"Layer '{layer_name}' is an image layer. Choose an existing text layer or press New layer.",
-            )
+            messagebox.showerror("Text Layer error", str(error))
             return
         self.layer_name_var.set(layer_name)
 
@@ -3595,6 +3615,16 @@ class ResourcePickerApp:
         self.show_text_layer_preview()
         self.status_var.set("text layer saved")
         self.show_output(f"{group_report.to_text()}\n\n{report.to_text()}")
+
+    def ensure_text_layer_can_be_saved(self, group_id, layer_name):
+        try:
+            existing_layer = group_config.get_layer_config(group_id, layer_name)
+        except KeyError:
+            return
+        if existing_layer.get("type", "image") != "text":
+            raise ValueError(
+                f"Layer '{layer_name}' is an image layer. Choose an existing text layer or press New layer."
+            )
 
     def delete_group_config_layer(self):
         group_id = self.group_id_var.get().strip()
@@ -3746,9 +3776,10 @@ class ResourcePickerApp:
     def build_groups(self):
         try:
             _group_store, report = self.service.build_groups_from_config()
-        except Exception as error:
+        except BaseException as error:
+            details = "".join(traceback.format_exception(type(error), error, error.__traceback__))
             self.status_var.set("Groups were not built")
-            self.show_output(str(error))
+            self.show_output(details)
             messagebox.showerror("Build Groups error", str(error))
             return
 
