@@ -19,9 +19,10 @@ main.py
 Главная граница:
 
 - `GameController` владеет правилами, состоянием игры и логическими зонами.
-- `GroupStore` владеет созданными графическими объектами.
+- `GroupStore` владеет долгоживущими созданными графическими объектами.
 - `GameScreen` владеет экранными зонами, активными group ID и визуальной оркестрацией.
 - `Activity` владеет долгоживущим визуальным режимом/процессом.
+- `Activity` может владеть созданными ею visual-only `Group`.
 - `Action` владеет коротким конечным визуальным действием.
 - `Group` остается пассивным визуальным объектом.
 
@@ -308,13 +309,15 @@ main.py
 Задачи:
 
 - `PlayerHandActivity`: раскладывает карты руки, реагирует на hover, принимает визуальные команды;
+- `BotHandActivity`: получает `resource_key` рубашки карты и `card_count`, создает visual-only `Group` под количество карт и расставляет их веером;
 - `TableZoneActivity`: управляет поведением зоны стола и может запускать короткие `Action`;
 - активности могут запускать `Action`, но не принимают решений по правилам игры.
 
 Критерий готовности:
 
 - поведение руки или зоны можно развивать без разрастания `GameScreen`;
-- `Activity` может жить весь игровой сеанс.
+- `Activity` может жить весь игровой сеанс;
+- visual-only группы, созданные активностью, удаляются при изменении count или завершении активности.
 
 ## P5. ResourceManager и ресурсы
 
@@ -438,9 +441,10 @@ main.py
 
 ```text
 GameController -> logical state
-GroupStore  -> all Group instances
+GroupStore  -> long-lived configured Group instances
 GameScreen     -> screen frames + active group IDs
 Activity       -> long-lived visual behavior mode/process
+Activity       -> generated visual-only Group instances for its mode
 Action         -> short finite visual step
 Group       -> passive drawable state
 ```
@@ -477,4 +481,3 @@ Group       -> passive drawable state
 6. P5: подчистить ресурсный контур и `resource_picker`.
 7. P6: собрать все через `main.py`.
 8. P7: обновить документацию и smoke-проверки.
-

@@ -287,11 +287,12 @@ class ResourcePickerService:
         except (TypeError, ValueError):
             return None
 
-    def build_manifest_from_graphics(self):
+    def build_manifest_from_graphics(self, base_manifest=None):
         assets = self.load_png_assets()
         assets_by_key = {asset.resource_key: asset for asset in assets}
         entries = self.load_graphics_entries(assets_by_key=assets_by_key, manifest={"resources": {}})
-        resources = {}
+        base_resources = (base_manifest or {}).get("resources", {})
+        resources = copy.deepcopy(base_resources)
         report = OperationReport("Build RM Manifest")
         missing_png = []
         metadata_warnings = []
@@ -316,6 +317,7 @@ class ResourcePickerService:
 
         manifest = ResourceManager.normalize_manifest({"resources": resources})
         report.add(f"Resources written: {len(resources)}")
+        report.add(f"Preserved existing: {len(base_resources)}")
         report.add(f"Missing PNG: {len(missing_png)}")
         report.add(f"Metadata warnings: {len(metadata_warnings)}")
         if missing_png:
@@ -431,7 +433,7 @@ class ResourcePickerService:
     def update_manifest_from_graphics(self):
         old_manifest = self.load_manifest_if_exists()
         old_resources = old_manifest.get("resources", {})
-        new_manifest, report = self.build_manifest_from_graphics()
+        new_manifest, report = self.build_manifest_from_graphics(base_manifest=old_manifest)
         new_resources = new_manifest.get("resources", {})
 
         old_keys = set(old_resources)
@@ -1149,8 +1151,6 @@ class ResourcePickerApp:
         self.png_data_tab = ttk.Frame(self.mode_tabs, padding=(10, 8))
         self.png_data_tab.rowconfigure(1, weight=1)
         self.png_data_tab.columnconfigure(0, weight=1)
-        self.check_rm_tab = ttk.Frame(self.mode_tabs, padding=(10, 8))
-        self.check_rm_tab.columnconfigure(0, weight=1)
         self.create_group_tab = ttk.Frame(self.mode_tabs, padding=(10, 8))
         self.create_group_tab.rowconfigure(1, weight=1)
         self.create_group_tab.columnconfigure(0, weight=1)
@@ -1159,7 +1159,6 @@ class ResourcePickerApp:
         self.edit_group_tab.columnconfigure(0, weight=1)
 
         self.mode_tabs.add(self.png_data_tab, text="PNG DATA")
-        self.mode_tabs.add(self.check_rm_tab, text="CHECK RM MANIFEST")
         self.mode_tabs.add(self.create_group_tab, text="CREATE GROUP")
         self.mode_tabs.add(self.edit_group_tab, text="EDIT GROUP")
 
@@ -1170,12 +1169,6 @@ class ResourcePickerApp:
             style="Heading.TLabel",
         ).grid(row=0, column=0, sticky="nw")
         self.create_png_explorer(self.png_data_tab, row=1, column=0, columnspan=1, sticky="nsew")
-        ttk.Label(
-            self.check_rm_tab,
-            text="RM Manifest inspection. Use the right panel to check metadata stored in the PNG files referenced by RM Manifest.",
-            wraplength=360,
-        ).grid(row=0, column=0, sticky="nw")
-        self.create_check_rm_controls(self.check_rm_tab)
         ttk.Label(
             self.create_group_tab,
             text="CREATE GROUP",
@@ -1451,23 +1444,6 @@ class ResourcePickerApp:
         color = self.font_color_hex_var.get().strip() or "#ffffff"
         for swatch in self.text_color_swatches:
             swatch.configure(bg=color)
-
-    def create_check_rm_controls(self, parent):
-        controls = ttk.LabelFrame(parent, text="RM Manifest Actions", padding=14)
-        controls.grid(row=1, column=0, sticky="ew", pady=(14, 0))
-        controls.columnconfigure(0, weight=1)
-        ttk.Button(controls, text="EDIT PNG Metadata", command=self.edit_manifest_png_metadata).grid(
-            row=0, column=0, sticky="ew"
-        )
-        self.rm_metadata_editor_holder = ttk.Frame(controls)
-        self.rm_metadata_editor_holder.grid(row=1, column=0, sticky="ew")
-        self.create_metadata_editor(
-            self.rm_metadata_editor_holder,
-            row=0,
-            title="PNG Metadata Editor",
-            button_text="APPLY",
-        )
-        self.rm_metadata_editor_holder.grid_remove()
 
     def create_png_explorer(self, parent, row=0, column=0, columnspan=2, sticky="nsew"):
         explorer = ttk.LabelFrame(parent, text="PNG Explorer", padding=14)
@@ -2414,8 +2390,6 @@ class ResourcePickerApp:
         selected = self.mode_tabs.select()
         if selected == str(self.png_data_tab):
             self.show_png_workbench()
-        elif selected == str(self.check_rm_tab):
-            self.show_rm_manifest_workbench()
         elif selected == str(self.create_group_tab):
             self.show_workbench("create_group", "Create Group")
         else:
@@ -2750,11 +2724,7 @@ class ResourcePickerApp:
             selected = self.mode_tabs.select()
         else:
             selected = ""
-        if selected == str(getattr(self, "check_rm_tab", "")):
-            total = len(self.manifest.get("resources", {}))
-            visible = len(self.manifest_tree.get_children()) if hasattr(self, "manifest_tree") else total
-            noun = "RM resources"
-        elif selected == str(getattr(self, "edit_group_tab", "")):
+        if selected == str(getattr(self, "edit_group_tab", "")):
             total = len(self.gui_manifest.get("groups", {}))
             visible = len(self.gui_manifest_nav_by_item) if hasattr(self, "gui_manifest_tree") else total
             noun = "GUI Manifest objects"
@@ -2798,7 +2768,6 @@ class ResourcePickerApp:
         if asset is not None:
             self.selected_asset = asset
             self.show_asset(asset)
-            self.rm_metadata_editor_holder.grid_remove()
             self.status_var.set(f"RM resource selected: {resource_key}")
         else:
             self.selected_asset = None
@@ -3451,14 +3420,6 @@ class ResourcePickerApp:
             f"{self.selected_manifest_resource_key}"
         )
 
-    def edit_manifest_png_metadata(self):
-        if self.selected_asset is None:
-            self.status_var.set("Select an RM resource with an existing PNG first")
-            return
-        self.rm_metadata_editor_holder.grid()
-        self.show_asset(self.selected_asset)
-        self.status_var.set("PNG metadata editor opened")
-
     def clear_graphic_resource(self):
         self.clear_graphic_resource_key()
         self.selected_manifest_resource_key = None
@@ -3496,7 +3457,8 @@ class ResourcePickerApp:
         self.status_var.set("New group config")
 
     def rebuild_rm_manifest_after_group_change(self):
-        manifest, _report = self.service.build_manifest_from_graphics()
+        base_manifest = self.service.load_manifest_if_exists()
+        manifest, _report = self.service.build_manifest_from_graphics(base_manifest=base_manifest)
         self.manifest = ResourceManager.save_manifest(self.assets_dir, manifest)
         self.rm_manifest_loaded = True
 
@@ -3934,7 +3896,8 @@ class ResourcePickerApp:
 
     def build_manifest(self):
         selected_key = self.selected_asset.resource_key if self.selected_asset is not None else ""
-        manifest, report = self.service.build_manifest_from_graphics()
+        base_manifest = self.service.load_manifest_if_exists()
+        manifest, report = self.service.build_manifest_from_graphics(base_manifest=base_manifest)
         ResourceManager.save_manifest(self.assets_dir, manifest)
         self.rm_manifest_loaded = True
         self.reload_index()

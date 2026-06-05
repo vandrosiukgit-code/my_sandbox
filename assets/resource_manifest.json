@@ -1,5 +1,10 @@
 {
   "resources": {
+    "cards.card_back": {
+      "path": "cards/card_back.png",
+      "frame_width": 103,
+      "frame_height": 160
+    },
     "main_screen.avatars.portrait_1": {
       "path": "main_screen/avatars/portrait_1.png",
       "frame_width": 200,

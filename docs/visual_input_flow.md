@@ -115,6 +115,12 @@ frame, for a phase, or for the whole game session. For example, a player hand
 activity can lay out cards, react to hover, accept visual commands, and start
 short actions.
 
+An activity may also own generated visual-only groups. For example,
+`BotHandActivity` can receive a card-back `resource_key` and `card_count`,
+create that many card-back groups, place them in its frame as a fan, and remove
+extra groups when the count decreases. These groups are screen representations
+of controller data. They do not create, delete, or mutate game entities.
+
 ```python
 VisualCommand(
     type="start_activity",
@@ -126,6 +132,20 @@ VisualCommand(
 The base screen supports `group.activate` and `group.deactivate`. Future terms
 such as `player.hand`, `table.zone`, or `drag.card` should remain public
 manifest terms and be mapped by concrete screens to real activity objects.
+
+Example payload for a bot hand activity:
+
+```python
+VisualCommand(
+    type="start_activity",
+    activity="bot.hand",
+    payload={
+        "frame_id": "left_player_hand",
+        "resource_key": "cards.card_back",
+        "card_count": 8,
+    },
+)
+```
 
 ## Action Terms
 

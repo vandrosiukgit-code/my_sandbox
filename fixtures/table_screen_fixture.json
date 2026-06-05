@@ -1,0 +1,8 @@
+{
+  "activities": {
+    "left_player_hand": {
+      "resource_key": "cards.card_back",
+      "card_count": 8
+    }
+  }
+}

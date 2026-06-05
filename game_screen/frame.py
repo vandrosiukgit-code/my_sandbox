@@ -190,6 +190,8 @@ class Frame(BaseFrame):
                 return hit
 
         for group_id in reversed(self.group_ids):
+            if hasattr(group_store, "has") and not group_store.has(group_id):
+                continue
             group = group_store.get(group_id)
             if group.hit_rect.collidepoint(screen_pos):
                 return FrameHit(
@@ -263,4 +265,3 @@ class Frame(BaseFrame):
         """Convert a rect from parent-frame coordinates to screen coordinates."""
         screen_pos = self.to_screen((rect.x - self._rect.x, rect.y - self._rect.y))
         return pygame.Rect(screen_pos, rect.size)
-

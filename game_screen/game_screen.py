@@ -348,6 +348,9 @@ class GameScreen(BaseGameScreen):
 
     def draw(self, screen):
         screen.fill(self.background_color)
+        for activity in self.active_activities:
+            if hasattr(activity, "draw"):
+                activity.draw(screen)
         for group in self.iter_active_groups():
             group.draw(screen)
         for frame in self.iter_root_frames():

@@ -1,8 +1,9 @@
 """Базовая реализация Activity.
 
-Activity - это временный визуальный процесс, которым владеет GameScreen.
-Она получает нужные Group снаружи и меняет только их визуальное состояние:
-позицию, видимость, прозрачность, текущий кадр и т.д.
+Activity - это визуально-поведенческий режим или процесс, которым владеет
+GameScreen, Frame или другой экранный владелец. Она получает нужный контекст
+снаружи и меняет только визуальное состояние: позицию group-а, hit_rect,
+scale_factor, текущий кадр слоя или собственные generated visual-only Group.
 
 Важно: Activity не должна менять GameController и не должна знать правила
 игры. Если после визуального процесса нужно продолжить сценарий, это решает
@@ -13,15 +14,16 @@ from base import BaseActivity
 
 
 class Activity(BaseActivity):
-    """Базовый класс для визуальных процессов."""
+    """Базовый класс для визуальных режимов/процессов."""
 
     def __init__(self, group_ids=None, duration=0.0):
         """Создать Activity.
 
         Args:
             group_ids: ID group-ов, к которым относится активность.
-            duration: Желаемая длительность в секундах. Значение 0 означает,
-                что базовая Activity завершится сразу после первого update().
+            duration: Желаемая длительность в секундах для конечных Activity.
+                Долгоживущие наследники могут переопределить update() и
+                is_finished().
         """
         self.group_ids = tuple(group_ids or ())
         self.duration = max(0.0, float(duration))
@@ -30,7 +32,7 @@ class Activity(BaseActivity):
         self._finished = False
 
     def start(self):
-        """Запустить визуальный процесс.
+        """Запустить визуальный режим/процесс.
 
         GameScreen вызывает start() при добавлении Activity. Наследники могут
         переопределять метод, но обычно должны вызывать super().start().
@@ -83,5 +85,4 @@ class Activity(BaseActivity):
         if self.duration <= 0:
             return 1.0
         return max(0.0, min(1.0, self.elapsed / self.duration))
-
 
