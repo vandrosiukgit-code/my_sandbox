@@ -44,10 +44,17 @@ main.py
 - Each GUI hierarchy level owns a `pygame.Rect`.
 - `rect.topleft` is stored relative to the parent rect.
 - `rect.size` belongs to the object itself.
+- `Frame.scale_factor` is inherited by descendants until a child frame, group,
+  or activity defines its own scale.
+- A child `scale_factor` replaces the inherited parent scale; scales are not
+  multiplied together.
 - Screen-space rects are derived runtime projections used for draw, hit-test,
   and movement interpolation.
 - Movement animations may run in absolute screen coordinates, but their final
   position should be resolved back into the object's local rect.
+- Fractional scale and interpolation are allowed only during calculation. Values
+  that enter `pygame.Rect`, fixture positions, layer positions, blit positions,
+  or scaled surface sizes are rounded to integer pixels.
 
 ## What Is Still Draft
 

@@ -89,6 +89,10 @@
                                                            "name":  "p_portrait_bg",
                                                            "type":  "image",
                                                            "resource_key":  "main_screen.p_portrait_bg",
+                                                           "scale_percent":  [
+                                                                                 100,
+                                                                                 100
+                                                                             ],
                                                            "position":  [
                                                                             0,
                                                                             0
@@ -120,6 +124,10 @@
                                                            "name":  "p_name_bg",
                                                            "type":  "image",
                                                            "resource_key":  "main_screen.p_name_bg",
+                                                           "scale_percent":  [
+                                                                                 100,
+                                                                                 100
+                                                                             ],
                                                            "position":  [
                                                                             0,
                                                                             132
@@ -200,6 +208,10 @@
                                                           "name":  "p_portrait_bg",
                                                           "type":  "image",
                                                           "resource_key":  "main_screen.p_portrait_bg",
+                                                          "scale_percent":  [
+                                                                                100,
+                                                                                100
+                                                                            ],
                                                           "position":  [
                                                                            0,
                                                                            0
@@ -209,6 +221,10 @@
                                                           "name":  "portrait",
                                                           "type":  "image",
                                                           "resource_key":  "main_screen.avatars.portrait_2",
+                                                          "scale_percent":  [
+                                                                                100,
+                                                                                100
+                                                                            ],
                                                           "position":  [
                                                                            0,
                                                                            0
@@ -227,6 +243,10 @@
                                                           "name":  "p_name_bg",
                                                           "type":  "image",
                                                           "resource_key":  "main_screen.p_name_bg",
+                                                          "scale_percent":  [
+                                                                                100,
+                                                                                100
+                                                                            ],
                                                           "position":  [
                                                                            0,
                                                                            132
@@ -257,7 +277,7 @@
                                                                         "font_name":  "Lobster-Regular"
                                                                     },
                                                           "scale_percent":  [
-                                                                                80,
+                                                                                75,
                                                                                 100
                                                                             ],
                                                           "height":  56,

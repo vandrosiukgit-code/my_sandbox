@@ -1,25 +1,130 @@
 {
-  "activities": {
-    "left_player_hand": {
-      "resource_key": "cards.card_back",
-      "card_count": 20,
-      "scale_factor": 0.5,
-      "radius": 90,
-      "center_offset": [-10, -4]
-    },
-    "right_player_hand": {
-      "resource_key": "cards.card_back",
-      "card_count": 1,
-      "scale_factor": 0.5,
-      "radius": 90,
-      "center_offset": [-10, -4]
-    },
-    "top_player_hand": {
-      "resource_key": "cards.card_back",
-      "card_count": 12,
-      "scale_factor": 0.5,
-      "radius": 80,
-      "center_offset": [0, 0]
+  "gui": {
+    "game_table": {
+      "position": [0, 0],
+      "scale_factor": 1.0,
+      "groups": {
+        "table_group": {
+          "position": [0, 0],
+          "scale_factor": null
+        }
+      },
+      "children": {
+        "left_player_frame": {
+          "position": [0, 240],
+          "scale_factor": 0.8,
+          "children": {
+            "left_player_hand": {
+              "position": [0, 0],
+              "scale_factor": null,
+              "activity": {
+                "resource_key": "cards.card_back",
+                "card_count": 1,
+                "scale_factor": 0.7,
+                "radius": 80,
+                "center_offset": [-32, 0]
+              }
+            },
+            "left_player_portrait": {
+              "position": [25, 50],
+              "scale_factor": null,
+              "groups": {
+                "left_player": {
+                  "position": [0, 0],
+                  "scale_factor": null
+                }
+              }
+            }
+          }
+        },
+        "right_player_frame": {
+          "position": [1080, 240],
+          "scale_factor": 0.8,
+          "children": {
+            "right_player_hand": {
+              "position": [0, 0],
+              "scale_factor": null,
+              "activity": {
+                "resource_key": "cards.card_back",
+                "card_count": 1,
+                "scale_factor": 0.7,
+                "radius": 80,
+                "center_offset": [-32, 0]
+              }
+            },
+            "right_player_portrait": {
+              "position": [25, 50],
+              "scale_factor": null,
+              "groups": {
+                "right_player": {
+                  "position": [0, 0],
+                  "scale_factor": null
+                }
+              }
+            }
+          }
+        },
+        "top_player_frame": {
+          "position": [520, 0],
+          "scale_factor": 0.8,
+          "children": {
+            "top_player_hand": {
+              "position": [0, 0],
+              "scale_factor": null,
+              "activity": {
+                "resource_key": "cards.card_back",
+                "card_count": 12,
+                "scale_factor": 0.7,
+                "radius": 80,
+                "center_offset": [0, -20]
+              }
+            },
+            "top_player_portrait": {
+              "position": [50, 25],
+              "scale_factor": null,
+              "groups": {
+                "top_player": {
+                  "position": [0, 0],
+                  "scale_factor": null
+                }
+              }
+            }
+          }
+        },
+        "bottom_player_frame": {
+          "position": [520, 520],
+          "scale_factor": 0.8,
+          "children": {
+            "bottom_player_hand": {
+              "position": [0, 0],
+              "scale_factor": null,
+              "activity": {
+                "cards": [
+                  "cards.6_of_clubs",
+                  "cards.7_of_clubs",
+                  "cards.8_of_clubs",
+                  "cards.9_of_clubs",
+                  "cards.10_of_clubs",
+                  "cards.j_of_clubs"
+                ],
+                "scale_factor": 0.7,
+                "radius": 80,
+                "center_offset": [0, -20]
+              }
+            },
+            "bottom_player_portrait": {
+              "position": [50, 25],
+              "scale_factor": null,
+              "groups": {
+                "bottom_player": {
+                  "position": [0, 0],
+                  "scale_factor": null
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

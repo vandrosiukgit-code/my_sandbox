@@ -202,9 +202,31 @@ def normalize_positive_int(value, default):
             value = value.strip().rstrip("%")
             if not value:
                 return int(default)
-        return max(1, int(float(value)))
+        return max(1, round_coord(value))
     except (TypeError, ValueError):
         return int(default)
+
+
+def round_coord(value):
+    """Round one coordinate/size value to a real screen pixel."""
+    return int(round(float(value)))
+
+
+def round_pair(values):
+    return round_coord(values[0]), round_coord(values[1])
+
+
+def round_rect(rect):
+    if isinstance(rect, pygame.Rect):
+        values = rect.x, rect.y, rect.width, rect.height
+    else:
+        values = tuple(rect)
+    return pygame.Rect(
+        round_coord(values[0]),
+        round_coord(values[1]),
+        round_coord(values[2]),
+        round_coord(values[3]),
+    )
 
 
 def scale_surface_percent(surface, scale_percent):
@@ -212,8 +234,8 @@ def scale_surface_percent(surface, scale_percent):
     scale_w, scale_h = normalize_scale_percent(scale_percent)
     width, height = surface.get_size()
     size = (
-        max(1, round(width * scale_w / 100)),
-        max(1, round(height * scale_h / 100)),
+        max(1, round_coord(width * scale_w / 100)),
+        max(1, round_coord(height * scale_h / 100)),
     )
     if size == surface.get_size():
         return surface
@@ -233,15 +255,15 @@ def fit_text_surface(surface, target_size, fit_mode="none"):
     target_width, target_height = target_size
     if fit_mode == "width":
         scale = target_width / source_width
-        size = (target_width, max(1, round(source_height * scale)))
+        size = (target_width, max(1, round_coord(source_height * scale)))
     elif fit_mode == "height":
         scale = target_height / source_height
-        size = (max(1, round(source_width * scale)), target_height)
+        size = (max(1, round_coord(source_width * scale)), target_height)
     elif fit_mode == "contain":
         scale = min(target_width / source_width, target_height / source_height)
         size = (
-            max(1, round(source_width * scale)),
-            max(1, round(source_height * scale)),
+            max(1, round_coord(source_width * scale)),
+            max(1, round_coord(source_height * scale)),
         )
     elif fit_mode == "stretch":
         size = (target_width, target_height)
@@ -287,7 +309,7 @@ class Group(BaseGroup):
         rect=(0, 0, 0, 0),
         hit_rect=None,
         layers=None,
-        scale_factor=1.0,
+        scale_factor=None,
         role=None,
         tags=None,
         manifest_targets=None,
@@ -305,12 +327,12 @@ class Group(BaseGroup):
             raise ValueError("Group требует непустой group_id")
 
         self.group_id = group_id
-        self._base_rect = pygame.Rect(rect)
+        self._base_rect = round_rect(rect)
         self.parent_frame = None
         self._rect = self._base_rect.copy()
-        self._base_hit_rect = pygame.Rect(hit_rect) if hit_rect is not None else self._base_rect.copy()
+        self._base_hit_rect = round_rect(hit_rect) if hit_rect is not None else self._base_rect.copy()
         self._hit_rect = self._base_hit_rect.copy()
-        self.scale_factor = float(scale_factor)
+        self.scale_factor = None if scale_factor is None else float(scale_factor)
         self.hide_rect = True
         self.rect_debug_layer_ids = None
         self.role = role
@@ -333,7 +355,7 @@ class Group(BaseGroup):
             group_id=group_id,
             rect=config.get("rect", (0, 0, 0, 0)),
             hit_rect=config.get("hit_rect"),
-            scale_factor=config.get("scale_factor", 1.0),
+            scale_factor=cls.normalize_config_scale_factor(config.get("scale_factor")),
             role=config.get("role"),
             tags=config.get("tags", ()),
             manifest_targets=cls.resolve_manifest_targets(group_id, config),
@@ -476,9 +498,9 @@ class Group(BaseGroup):
         if position is None:
             return (0, 0)
         if isinstance(position, dict):
-            return (int(position.get("x", 0)), int(position.get("y", 0)))
+            return round_pair((position.get("x", 0), position.get("y", 0)))
         if isinstance(position, (tuple, list)) and len(position) >= 2:
-            return (int(position[0]), int(position[1]))
+            return round_pair(position)
         raise TypeError(f"Позиция слоя должна быть (x, y): {position!r}")
 
     @property
@@ -489,12 +511,12 @@ class Group(BaseGroup):
     @property
     def rect(self):
         """Текущий прямоугольник group-а в координатах экрана."""
-        return self.local_rect_to_screen_rect(self.get_scaled_local_rect())
+        return self.local_rect_to_screen_rect(self._base_rect)
 
     @property
     def hit_rect(self):
         """Обязательная область взаимодействия group-а в координатах экрана."""
-        return self.local_rect_to_screen_rect(self.get_scaled_local_hit_rect())
+        return self.local_rect_to_screen_rect(self._base_hit_rect)
 
     @property
     def local_rect(self):
@@ -551,7 +573,7 @@ class Group(BaseGroup):
     def set_local_position(self, x, y):
         """Переместить group в локальных координатах parent Frame."""
         old_position = self._base_rect.topleft
-        self._base_rect.topleft = (int(x), int(y))
+        self._base_rect.topleft = round_pair((x, y))
         self._base_hit_rect.move_ip(
             self._base_rect.x - old_position[0],
             self._base_rect.y - old_position[1],
@@ -567,13 +589,13 @@ class Group(BaseGroup):
 
     def set_local_rect(self, rect):
         """Задать rect group-а в координатах parent Frame."""
-        self._base_rect = pygame.Rect(rect)
+        self._base_rect = round_rect(rect)
         self._base_hit_rect = self._base_rect.copy()
         self.apply_scale()
 
     def set_rect(self, rect):
         """Совместимость: задать rect group-а в координатах экрана."""
-        screen_rect = pygame.Rect(rect)
+        screen_rect = round_rect(rect)
         if self.parent_frame is None:
             self.set_local_rect(screen_rect)
             return
@@ -586,12 +608,12 @@ class Group(BaseGroup):
         hit_rect может отличаться от rect, но остается геометрией всего group-а,
         а не отдельного слоя.
         """
-        self._base_hit_rect = pygame.Rect(rect)
+        self._base_hit_rect = round_rect(rect)
         self.apply_scale()
 
     def set_scale_factor(self, scale_factor):
         """Задать масштаб всего group-а от исходного базового rect."""
-        self.scale_factor = float(scale_factor)
+        self.scale_factor = None if scale_factor is None else float(scale_factor)
         self.apply_scale()
 
     def add_layer(self, layer):
@@ -657,34 +679,41 @@ class Group(BaseGroup):
 
     def get_scaled_local_rect(self):
         """Return local rect with size scaled from its base top-left."""
-        return self.scale_rect(self._base_rect, self.scale_factor)
+        return self.scale_rect(self._base_rect, self.get_local_scale_factor())
 
     def get_scaled_local_hit_rect(self):
         """Return local hit rect with size scaled from its base top-left."""
-        return self.scale_rect(self._base_hit_rect, self.scale_factor)
+        return self.scale_rect(self._base_hit_rect, self.get_local_scale_factor())
 
     def local_rect_to_screen_rect(self, rect):
         """Convert a local group rect to screen coordinates."""
         if self.parent_frame is None:
             return rect.copy()
-        return pygame.Rect(self.parent_frame.to_screen(rect.topleft), rect.size)
+        scale = self.get_effective_screen_scale()
+        size = (
+            max(0, round_coord(rect.width * scale)),
+            max(0, round_coord(rect.height * scale)),
+        )
+        return pygame.Rect(self.parent_frame.to_screen(rect.topleft), size)
 
     def get_scaled_surface(self, surface):
         """Вернуть surface, масштабированный текущим scale_factor."""
-        if self.scale_factor == 1.0:
+        scale = self.get_effective_screen_scale()
+        if scale == 1.0:
             return surface
         width, height = surface.get_size()
         scaled_size = (
-            max(1, round(width * self.scale_factor)),
-            max(1, round(height * self.scale_factor)),
+            max(1, round_coord(width * scale)),
+            max(1, round_coord(height * scale)),
         )
         return pygame.transform.smoothscale(surface, scaled_size)
 
     def get_layer_screen_position(self, layer):
         rect = self.rect
+        scale = self.get_effective_screen_scale()
         return (
-            rect.x + round(layer.position[0] * self.scale_factor),
-            rect.y + round(layer.position[1] * self.scale_factor),
+            rect.x + round_coord(layer.position[0] * scale),
+            rect.y + round_coord(layer.position[1] * scale),
         )
 
     def get_layer_rect(self, layer):
@@ -720,6 +749,7 @@ class Group(BaseGroup):
             "rect": list(self.rect),
             "hit_rect": list(self.hit_rect),
             "scale_factor": self.scale_factor,
+            "effective_screen_scale": self.get_effective_screen_scale(),
             "hide_rect": self.hide_rect,
             "rect_debug_layer_ids": (
                 sorted(self.rect_debug_layer_ids)
@@ -737,8 +767,32 @@ class Group(BaseGroup):
     def scale_rect(rect, scale_factor):
         """Масштабировать прямоугольник от его базовой левой верхней точки."""
         return pygame.Rect(
-            rect.x,
-            rect.y,
-            max(0, round(rect.width * scale_factor)),
-            max(0, round(rect.height * scale_factor)),
+            round_coord(rect.x),
+            round_coord(rect.y),
+            max(0, round_coord(rect.width * scale_factor)),
+            max(0, round_coord(rect.height * scale_factor)),
         )
+
+    def get_parent_screen_scale(self):
+        if self.parent_frame is None:
+            return 1.0
+        return self.parent_frame.get_content_screen_scale()
+
+    def get_effective_screen_scale(self):
+        if self.scale_factor is not None:
+            return self.scale_factor
+        return self.get_parent_screen_scale()
+
+    def get_local_scale_factor(self):
+        if self.scale_factor is not None:
+            return self.scale_factor
+        return 1.0
+
+    @staticmethod
+    def normalize_config_scale_factor(scale_factor):
+        if scale_factor is None:
+            return None
+        scale = float(scale_factor)
+        if scale == 1.0:
+            return None
+        return scale

@@ -25,6 +25,7 @@ class Frame(BaseFrame):
         padding=0,
         spacing=12,
         parent_frame=None,
+        scale_factor=None,
     ):
         """Создать активную экранную зону.
 
@@ -38,13 +39,14 @@ class Frame(BaseFrame):
             spacing: Расстояние между group-ами в базовой раскладке.
         """
         self.frame_id = frame_id
-        self._rect = pygame.Rect(rect)
-        self._hit_rect = pygame.Rect(hit_rect) if hit_rect is not None else self._rect.copy()
+        self._rect = self.round_rect(rect)
+        self._hit_rect = self.round_rect(hit_rect) if hit_rect is not None else self._rect.copy()
         self.parent_frame = parent_frame
         self.child_frames = {}
         self.group_ids = list(group_ids or [])
         self.padding = padding
         self.spacing = spacing
+        self.scale_factor = None if scale_factor is None else float(scale_factor)
         self.group_origins = {}
         self.actions = []
         self.hide_rect = True
@@ -79,6 +81,18 @@ class Frame(BaseFrame):
         """Child coordinate space of this frame, rooted at (0, 0)."""
         return pygame.Rect(0, 0, self._rect.width, self._rect.height)
 
+    def get_parent_screen_scale(self):
+        """Return screen scale inherited from the parent frame."""
+        if self.parent_frame is None:
+            return 1.0
+        return self.parent_frame.get_content_screen_scale()
+
+    def get_content_screen_scale(self):
+        """Return screen scale for this frame's children."""
+        if self.scale_factor is not None:
+            return self.scale_factor
+        return self.get_parent_screen_scale()
+
     def add_child_frame(self, frame):
         """Attach a child frame to this frame."""
         if frame.id in self.child_frames:
@@ -94,11 +108,15 @@ class Frame(BaseFrame):
     def set_local_position(self, x, y):
         """Move this frame inside its parent coordinate system."""
         old_position = self._rect.topleft
-        self._rect.topleft = (int(x), int(y))
+        self._rect.topleft = self.round_pair((x, y))
         self._hit_rect.move_ip(
             self._rect.x - old_position[0],
             self._rect.y - old_position[1],
         )
+
+    def set_scale_factor(self, scale_factor):
+        """Set local content scale for this frame and its descendants."""
+        self.scale_factor = None if scale_factor is None else float(scale_factor)
 
     def set_group_ids(self, group_ids):
         """Задать полный список group ID в зоне.
@@ -180,19 +198,29 @@ class Frame(BaseFrame):
 
     def to_local(self, screen_pos):
         """Convert screen coordinates to this frame local coordinates."""
-        rect = self.rect
-        return (int(screen_pos[0] - rect.x), int(screen_pos[1] - rect.y))
+        origin = self.get_screen_origin()
+        scale = self.get_content_screen_scale()
+        if scale == 0:
+            return (0, 0)
+        return (
+            self.round_coord((screen_pos[0] - origin[0]) / scale),
+            self.round_coord((screen_pos[1] - origin[1]) / scale),
+        )
 
     def to_screen(self, local_pos):
         """Convert local frame coordinates to screen coordinates."""
-        if self.parent_frame is None:
-            return (int(self._rect.x + local_pos[0]), int(self._rect.y + local_pos[1]))
-
-        parent_local_pos = (
-            self._rect.x + local_pos[0],
-            self._rect.y + local_pos[1],
+        origin = self.get_screen_origin()
+        scale = self.get_content_screen_scale()
+        return (
+            self.round_coord(origin[0] + local_pos[0] * scale),
+            self.round_coord(origin[1] + local_pos[1] * scale),
         )
-        return self.parent_frame.to_screen(parent_local_pos)
+
+    def get_screen_origin(self):
+        """Return this frame content origin in screen coordinates."""
+        if self.parent_frame is None:
+            return self.round_pair(self._rect.topleft)
+        return self.parent_frame.to_screen(self._rect.topleft)
 
     def hit_test(self, screen_pos, group_store):
         """Return FrameHit for the topmost group under screen_pos inside this frame."""
@@ -241,7 +269,9 @@ class Frame(BaseFrame):
         """
         if group is None:
             return self.spacing
-        return group.rect.width + self.spacing
+        if hasattr(group, "get_scaled_local_rect"):
+            return group.get_scaled_local_rect().width + self.spacing
+        return group.local_rect.width + self.spacing
 
     def to_payload(self):
         """Вернуть словарь с параметрами зоны для отладки и документации."""
@@ -257,6 +287,8 @@ class Frame(BaseFrame):
             "action_count": len(self.actions),
             "padding": self.padding,
             "spacing": self.spacing,
+            "scale_factor": self.scale_factor,
+            "content_screen_scale": self.get_content_screen_scale(),
         }
 
     def draw_debug_rects(self, screen, depth=0):
@@ -279,5 +311,37 @@ class Frame(BaseFrame):
 
     def _to_screen_rect(self, rect):
         """Convert a rect from parent-frame coordinates to screen coordinates."""
-        screen_pos = self.to_screen((rect.x - self._rect.x, rect.y - self._rect.y))
-        return pygame.Rect(screen_pos, rect.size)
+        parent_scale = self.get_parent_screen_scale()
+        content_scale = self.get_content_screen_scale()
+        origin = self.get_screen_origin()
+        screen_pos = (
+            self.round_coord(origin[0] + (rect.x - self._rect.x) * parent_scale),
+            self.round_coord(origin[1] + (rect.y - self._rect.y) * parent_scale),
+        )
+        screen_size = (
+            max(0, self.round_coord(rect.width * content_scale)),
+            max(0, self.round_coord(rect.height * content_scale)),
+        )
+        return pygame.Rect(screen_pos, screen_size)
+
+    @staticmethod
+    def round_coord(value):
+        """Round one coordinate/size value to a real screen pixel."""
+        return int(round(float(value)))
+
+    @classmethod
+    def round_pair(cls, values):
+        return cls.round_coord(values[0]), cls.round_coord(values[1])
+
+    @classmethod
+    def round_rect(cls, rect):
+        if isinstance(rect, pygame.Rect):
+            values = rect.x, rect.y, rect.width, rect.height
+        else:
+            values = tuple(rect)
+        return pygame.Rect(
+            cls.round_coord(values[0]),
+            cls.round_coord(values[1]),
+            cls.round_coord(values[2]),
+            cls.round_coord(values[3]),
+        )

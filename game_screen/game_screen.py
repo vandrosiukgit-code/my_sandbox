@@ -37,7 +37,16 @@ class GameScreen(BaseGameScreen):
     def set_game_controller(self, game_controller):
         self.game_controller = game_controller
 
-    def create_frame(self, frame_id, rect, hit_rect=None, padding=0, spacing=12, parent_frame_id=None):
+    def create_frame(
+        self,
+        frame_id,
+        rect,
+        hit_rect=None,
+        padding=0,
+        spacing=12,
+        parent_frame_id=None,
+        scale_factor=None,
+    ):
         """Create an Frame and register it on this screen."""
         parent_frame = self.get_screen_frame(parent_frame_id) if parent_frame_id else None
         frame = Frame(
@@ -47,6 +56,7 @@ class GameScreen(BaseGameScreen):
             padding=padding,
             spacing=spacing,
             parent_frame=parent_frame,
+            scale_factor=scale_factor,
         )
         self.add_screen_frame(frame_id, frame)
         if parent_frame is not None:
@@ -272,7 +282,7 @@ class GameScreen(BaseGameScreen):
 
     @staticmethod
     def normalize_position(position):
-        return int(position[0]), int(position[1])
+        return int(round(float(position[0]))), int(round(float(position[1])))
 
     def dispatch_manifest_activity(self, activity_id, command):
         """Dispatch a public manifest activity term.
@@ -306,6 +316,8 @@ class GameScreen(BaseGameScreen):
                 "id": frame_id,
                 "parent_frame_id": frame.parent_frame.id if frame.parent_frame else None,
                 "group_ids": tuple(frame.group_ids),
+                "scale_factor": frame.scale_factor,
+                "content_screen_scale": frame.get_content_screen_scale(),
             }
             for frame_id, frame in self.screen_frames.items()
         }

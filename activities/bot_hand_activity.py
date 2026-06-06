@@ -29,6 +29,8 @@ class BotHandActivity(Activity):
         radius=0,
         orientation_degrees=90,
         center_offset=(50, 0),
+        card_resource_provider=None,
+        card_layer_name="card_back",
     ):
         super().__init__(duration=0.0)
         self.frame = frame
@@ -36,12 +38,14 @@ class BotHandActivity(Activity):
         self.resource_key = resource_key
         self.card_count = max(0, int(card_count))
         self.group_id_prefix = group_id_prefix or f"{self.frame.id}.bot_hand"
-        self.scale_factor = float(scale_factor)
+        self.scale_factor = self.normalize_scale_factor(scale_factor)
         self.max_total_angle = float(max_total_angle)
         self.reference_card_count = max(2, int(reference_card_count))
         self.radius = float(radius)
         self.orientation_degrees = float(orientation_degrees)
         self.center_offset = self.normalize_pair(center_offset)
+        self.card_resource_provider = card_resource_provider
+        self.card_layer_name = card_layer_name
         self.generated_groups = []
 
     def start(self):
@@ -95,7 +99,10 @@ class BotHandActivity(Activity):
             self.clear_generated_groups()
             self.resource_key = resource_key
 
-        self.scale_factor = float(fixture.get("scale_factor", self.scale_factor))
+        if "scale_factor" in fixture:
+            self.scale_factor = self.normalize_scale_factor(fixture["scale_factor"])
+        elif "scale" in fixture:
+            self.scale_factor = self.normalize_scale_factor(fixture["scale"])
         self.radius = float(fixture.get("radius", self.radius))
         self.center_offset = self.normalize_pair(fixture.get("center_offset", self.center_offset))
         self.set_card_count(fixture.get("card_count", self.card_count))
@@ -166,51 +173,66 @@ class BotHandActivity(Activity):
 
     def get_fan_center(self, frame_rect):
         """Вернуть точку схода веера в локальных координатах frame."""
+        local_scale = self.get_activity_local_scale()
         return (
-            frame_rect.centerx + int(self.center_offset[0]),
-            frame_rect.centery + int(self.center_offset[1]),
+            frame_rect.centerx + int(round(self.center_offset[0] * local_scale)),
+            frame_rect.centery + int(round(self.center_offset[1] * local_scale)),
         )
 
     def calculate_pivot_position(self, center_x, center_y, angle_degrees):
         """Перевести угол карты в локальную координату pivot по радиусу веера."""
         radians = math.radians(angle_degrees)
+        radius = self.radius * self.get_activity_local_scale()
         return (
-            center_x + self.radius * math.sin(radians),
-            center_y - self.radius * math.cos(radians),
+            int(round(center_x + radius * math.sin(radians))),
+            int(round(center_y - radius * math.cos(radians))),
         )
 
     def apply_card_transform(self, group, angle_degrees, pivot_position):
         """Повернуть карту вокруг нижнего центра и поставить в pivot."""
         base_surface = group._bot_hand_base_frames[0]
-        scaled_surface = self.scale_surface(base_surface)
-        rotated_surface = pygame.transform.rotate(scaled_surface, -angle_degrees)
+        rotated_surface = pygame.transform.rotate(base_surface, -angle_degrees)
 
         group.layers[0].frames = [rotated_surface]
         group.layers[0].position = (0, 0)
-        group.set_scale_factor(1.0)
+        group.set_scale_factor(self.scale_factor)
 
         pivot_offset = self.calculate_rotated_pivot_offset(
-            scaled_surface.get_size(),
+            base_surface.get_size(),
             rotated_surface.get_size(),
             angle_degrees,
         )
+        offset_scale = self.get_activity_local_scale()
         group.set_local_rect((
-            round(pivot_position[0] - pivot_offset[0]),
-            round(pivot_position[1] - pivot_offset[1]),
+            int(round(pivot_position[0] - pivot_offset[0] * offset_scale)),
+            int(round(pivot_position[1] - pivot_offset[1] * offset_scale)),
             rotated_surface.get_width(),
             rotated_surface.get_height(),
         ))
 
+    def get_frame_screen_scale(self):
+        if hasattr(self.frame, "get_content_screen_scale"):
+            return self.frame.get_content_screen_scale() or 1.0
+        return 1.0
+
+    def get_activity_screen_scale(self):
+        if self.scale_factor is None:
+            return self.get_frame_screen_scale()
+        return self.scale_factor
+
+    def get_activity_local_scale(self):
+        return self.get_activity_screen_scale() / self.get_frame_screen_scale()
+
     def scale_surface(self, surface):
         """Вернуть surface с внутренним масштабом веера."""
-        if self.scale_factor == 1.0:
+        if self.scale_factor is None or self.scale_factor == 1.0:
             return surface
         width, height = surface.get_size()
         return pygame.transform.smoothscale(
             surface,
             (
-                max(1, round(width * self.scale_factor)),
-                max(1, round(height * self.scale_factor)),
+                max(1, int(round(width * self.scale_factor))),
+                max(1, int(round(height * self.scale_factor))),
             ),
         )
 
@@ -222,7 +244,7 @@ class BotHandActivity(Activity):
         bottom_center_from_source_center = pygame.Vector2(0, scaled_height / 2)
         rotated_vector = bottom_center_from_source_center.rotate(angle_degrees)
         pivot = center + rotated_vector
-        return pivot.x, pivot.y
+        return int(round(pivot.x)), int(round(pivot.y))
 
     @staticmethod
     def normalize_pair(value):
@@ -233,17 +255,24 @@ class BotHandActivity(Activity):
             return (float(value[0]), float(value[1]))
         return (0.0, 0.0)
 
+    @staticmethod
+    def normalize_scale_factor(value):
+        if value is None:
+            return None
+        return float(value)
+
     def add_generated_group(self, index):
         """Создать одну visual-only Group рубашки карты."""
         if self.resource_manager is None:
             raise RuntimeError("BotHandActivity requires resource_manager")
-        if not self.resource_key:
+        resource_key = self.get_card_resource_key(index)
+        if not resource_key:
             raise RuntimeError("BotHandActivity requires resource_key")
 
         group_id = f"{self.group_id_prefix}.{index}"
         group = Group.create_group(
             group_id,
-            (("card_back", self.resource_key),),
+            ((self.card_layer_name, resource_key),),
             resource_manager=self.resource_manager,
         )
         group._bot_hand_base_frames = tuple(frame.copy() for frame in group.layers[0].frames)
@@ -251,6 +280,12 @@ class BotHandActivity(Activity):
         self.generated_groups.append(group)
         self.frame.add_group_id(group.id)
         return group
+
+    def get_card_resource_key(self, index):
+        """Return the resource key for a generated card slot."""
+        if self.card_resource_provider is not None:
+            return self.card_resource_provider(index)
+        return self.resource_key
 
     def draw(self, screen):
         """Отрисовать generated visual-only Group, которыми владеет Activity."""

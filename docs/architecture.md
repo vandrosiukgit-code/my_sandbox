@@ -126,6 +126,11 @@ Rules:
 - Every GUI hierarchy level owns a `pygame.Rect`.
 - `rect.topleft` is always stored in the coordinate system of the parent rect.
 - `rect.size` is the object's own size.
+- Each `Frame` may define a `scale_factor`. If it is absent, the frame inherits
+  the nearest parent scale. If it is present, it replaces the inherited scale
+  for this frame's descendants.
+- A `Group` or `Activity` may also define its own `scale_factor`. A child scale
+  replaces the inherited parent scale; scales are not multiplied together.
 - User-facing layout is expressed by positioning an object's base point
   (`rect.topleft`) relative to its parent.
 - A `Frame` stores its local rect in parent coordinates. Its screen-space rect
@@ -136,8 +141,16 @@ Rules:
 - An `Activity` works in coordinates of its assigned `Frame`.
 - An `Action` receives coordinates resolved by its owner; it should not guess
   screen coordinates for neighboring objects.
+- Scale factors and animation interpolation may use fractional math internally,
+  but every coordinate or size written into a `pygame.Rect`, fixture position,
+  layer position, blit position, or scaled surface size is rounded to `int`.
+  The rendered GUI has no half-pixel coordinates.
 
 Screen-space geometry is a runtime projection, not a second source of truth.
+Local positions and sizes stay unscaled; the current inherited-or-overridden
+scale is applied only during the local-to-screen projection. This lets one
+parent frame resize an entire game object subtree until a child explicitly
+chooses its own scale.
 Movement scripts may interpolate GUI objects in absolute screen coordinates
 because that is the simplest way to animate travel between unrelated parents.
 When the movement ends, the final screen position must be resolved back into
