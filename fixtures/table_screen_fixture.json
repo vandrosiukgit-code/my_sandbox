@@ -10,6 +10,10 @@
         }
       },
       "children": {
+        "play_area_frame": {
+          "position": [20, 20],
+          "scale_factor": null
+        },
         "left_player_frame": {
           "position": [0, 240],
           "scale_factor": 0.8,
@@ -19,10 +23,10 @@
               "scale_factor": null,
               "activity": {
                 "resource_key": "cards.card_back",
-                "card_count": 1,
+                "card_count": 9,
                 "scale_factor": 0.7,
                 "radius": 80,
-                "center_offset": [-32, 0]
+                "center_offset": [-30, 0]
               }
             },
             "left_player_portrait": {
@@ -46,10 +50,10 @@
               "scale_factor": null,
               "activity": {
                 "resource_key": "cards.card_back",
-                "card_count": 1,
+                "card_count": 9,
                 "scale_factor": 0.7,
                 "radius": 80,
-                "center_offset": [-32, 0]
+                "center_offset": [18, 0]
               }
             },
             "right_player_portrait": {
@@ -73,10 +77,10 @@
               "scale_factor": null,
               "activity": {
                 "resource_key": "cards.card_back",
-                "card_count": 12,
+                "card_count": 9,
                 "scale_factor": 0.7,
                 "radius": 80,
-                "center_offset": [0, -20]
+                "center_offset": [0, -30]
               }
             },
             "top_player_portrait": {
@@ -99,17 +103,11 @@
               "position": [0, 0],
               "scale_factor": null,
               "activity": {
-                "cards": [
-                  "cards.6_of_clubs",
-                  "cards.7_of_clubs",
-                  "cards.8_of_clubs",
-                  "cards.9_of_clubs",
-                  "cards.10_of_clubs",
-                  "cards.j_of_clubs"
-                ],
+                "cards_from_manifest": true,
+                "card_count": 12,
                 "scale_factor": 0.7,
                 "radius": 80,
-                "center_offset": [0, -20]
+                "center_offset": [0, 30]
               }
             },
             "bottom_player_portrait": {

@@ -24,6 +24,7 @@ class TableScreen(GameScreen):
         )
 
         self.create_frame("game_table", rect=(0, 0, 1280, 720))
+        self.create_frame("play_area_frame", rect=(0, 0, 1240, 680)).set_rect_visibility(False)
 
         self.create_frame("left_player_frame", rect=(0, 0, 260, 300))
         self.create_frame("left_player_portrait", rect=(0, 0, 200, 200))
@@ -40,6 +41,8 @@ class TableScreen(GameScreen):
         self.create_frame("bottom_player_frame", rect=(0, 0, 300, 260))
         self.create_frame("bottom_player_portrait", rect=(0, 0, 200, 200))
         self.create_frame("bottom_player_hand", rect=(0, 0, 300, 260))
+
+        self.put_frame_in_frame("play_area_frame", "game_table", position=(20, 20))
 
         self.put_frame_in_frame("left_player_frame", "game_table", position=(0, 210))
         self.put_frame_in_frame("left_player_hand", "left_player_frame", position=(0, 0))
@@ -98,6 +101,7 @@ class TableScreen(GameScreen):
                     center_offset=(0, 0),
                 ),
                 cards=(),
+                resource_manager=ResourceManager,
             ),
         }
         for activity in self.hand_activities.values():

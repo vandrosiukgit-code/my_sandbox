@@ -11,9 +11,10 @@ class VisibleCardsHandDecorator(Activity):
     key per generated card slot.
     """
 
-    def __init__(self, hand_activity, cards=None):
+    def __init__(self, hand_activity, cards=None, resource_manager=None):
         super().__init__(duration=0.0)
         self.hand_activity = hand_activity
+        self.resource_manager = resource_manager
         self.card_resource_keys = self.normalize_cards(cards or ())
         self.hand_activity.card_resource_provider = self.get_card_resource_key
         self.hand_activity.card_layer_name = "card"
@@ -66,12 +67,26 @@ class VisibleCardsHandDecorator(Activity):
         self.hand_activity.finish()
         super().finish()
 
-    @staticmethod
-    def get_fixture_cards(fixture):
+    def get_fixture_cards(self, fixture):
         for key in ("cards", "card_resource_keys", "resource_keys"):
             if key in fixture:
                 return fixture[key]
+        if fixture.get("cards_from_manifest"):
+            return self.get_manifest_card_keys(fixture)
         return None
+
+    def get_manifest_card_keys(self, fixture):
+        """Temporary GUI debug source; Controller must provide real hand cards."""
+        if self.resource_manager is None:
+            return ()
+
+        resource_keys = tuple(
+            key
+            for key in self.resource_manager.get_runtime_cache()
+            if key.startswith("cards.") and key != "cards.card_back"
+        )
+        start, stop = self.get_fixture_slice_bounds(fixture)
+        return resource_keys[start:stop]
 
     @staticmethod
     def normalize_cards(cards):
@@ -84,3 +99,29 @@ class VisibleCardsHandDecorator(Activity):
                 if resource_key:
                     normalized.append(str(resource_key))
         return tuple(normalized)
+
+    @staticmethod
+    def normalize_slice(card_slice):
+        if isinstance(card_slice, dict):
+            start = card_slice.get("start", 0)
+            stop = card_slice.get("stop", card_slice.get("end"))
+        else:
+            values = tuple(card_slice)
+            start = values[0] if len(values) >= 1 else 0
+            stop = values[1] if len(values) >= 2 else None
+        start = 0 if start is None else int(start)
+        stop = None if stop is None else int(stop)
+        return start, stop
+
+    @classmethod
+    def get_fixture_slice_bounds(cls, fixture):
+        card_slice = fixture.get("card_slice", fixture.get("cards_slice"))
+        if card_slice is None:
+            start, stop = 0, None
+        else:
+            start, stop = cls.normalize_slice(card_slice)
+
+        if "card_count" in fixture:
+            count = max(0, int(fixture["card_count"]))
+            stop = start + count
+        return start, stop
