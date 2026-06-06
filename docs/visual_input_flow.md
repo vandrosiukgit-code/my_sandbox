@@ -185,4 +185,7 @@ VisualCommand(
 ```
 
 The action lives in the frame that currently owns `group_id`, and the lower
-level `MoveGroupAnimation` changes only `group.set_position(...)`.
+level `MoveGroupAnimation` interpolates in absolute screen coordinates. This is
+an animation convenience only: the durable GUI geometry remains the object's
+local `pygame.Rect` relative to its parent. At the end of the move, the final
+screen position should resolve back through the current or new parent frame.

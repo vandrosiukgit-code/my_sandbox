@@ -30,8 +30,9 @@ class Frame(BaseFrame):
 
         Args:
             frame_id: Стабильный ID зоны, например "bottom_hand".
-            rect: Позиция и размер зоны в координатах экрана.
-            hit_rect: Область клика/взаимодействия. Если не задана, равна rect.
+            rect: Позиция и размер зоны в координатах parent Frame.
+            hit_rect: Область клика/взаимодействия в координатах parent Frame.
+                Если не задана, равна rect.
             group_ids: Начальный список group ID внутри зоны.
             padding: Внутренний отступ для базовой раскладки.
             spacing: Расстояние между group-ами в базовой раскладке.
@@ -66,7 +67,17 @@ class Frame(BaseFrame):
     @property
     def local_rect(self):
         """Rectangle in the parent frame coordinate system."""
-        return self._rect
+        return self._rect.copy()
+
+    @property
+    def local_hit_rect(self):
+        """Interaction rectangle in the parent frame coordinate system."""
+        return self._hit_rect.copy()
+
+    @property
+    def content_rect(self):
+        """Child coordinate space of this frame, rooted at (0, 0)."""
+        return pygame.Rect(0, 0, self._rect.width, self._rect.height)
 
     def add_child_frame(self, frame):
         """Attach a child frame to this frame."""
@@ -108,7 +119,7 @@ class Frame(BaseFrame):
             self.group_ids.remove(group_id)
 
     def calculate_group_position(self, index, group_count, group=None):
-        """Рассчитать позицию group-а внутри зоны.
+        """Рассчитать screen-позицию group-а внутри зоны.
 
         Сейчас это простая горизонтальная раскладка слева направо. Она нужна
         как безопасная заготовка. Позже здесь можно заменить алгоритм на веер,
@@ -132,9 +143,14 @@ class Frame(BaseFrame):
         group_count = len(self.group_ids)
         for index, group_id in enumerate(self.group_ids):
             group = group_store.get(group_id)
-            position = self.calculate_group_position(index, group_count, group)
-            group.set_position(*position)
-            self.group_origins[group_id] = position
+            local_position = self.calculate_group_local_position(index, group_count, group)
+            if hasattr(group, "set_parent_frame"):
+                group.set_parent_frame(self)
+            if hasattr(group, "set_local_position"):
+                group.set_local_position(*local_position)
+            else:
+                group.set_position(*self.to_screen(local_position))
+            self.group_origins[group_id] = local_position
 
     def add_action(self, action):
         """Add a visual Action owned by this frame."""
@@ -209,8 +225,8 @@ class Frame(BaseFrame):
         )
 
     def get_group_origin(self, group_id):
-        """Вернуть последнюю рассчитанную экранную точку group-а."""
-        return self.group_origins.get(group_id, self.rect.topleft)
+        """Вернуть последнюю рассчитанную локальную точку group-а."""
+        return self.group_origins.get(group_id, self.content_rect.topleft)
 
     def contains_point(self, point):
         """Проверить попадание точки в hit_rect зоны."""

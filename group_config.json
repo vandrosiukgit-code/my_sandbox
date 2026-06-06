@@ -308,8 +308,8 @@
                                                          "type":  "image",
                                                          "resource_key":  "main_screen.p_portrait_bg",
                                                          "scale_percent":  [
-                                                                               90,
-                                                                               50
+                                                                               100,
+                                                                               100
                                                                            ],
                                                          "position":  [
                                                                           0,
@@ -321,7 +321,7 @@
                                                          "type":  "image",
                                                          "resource_key":  "main_screen.avatars.portrait_1",
                                                          "scale_percent":  [
-                                                                               95,
+                                                                               100,
                                                                                100
                                                                            ],
                                                          "position":  [
@@ -342,6 +342,10 @@
                                                          "name":  "p_name_bg",
                                                          "type":  "image",
                                                          "resource_key":  "main_screen.p_name_bg",
+                                                         "scale_percent":  [
+                                                                               100,
+                                                                               100
+                                                                           ],
                                                          "position":  [
                                                                           0,
                                                                           132
@@ -423,7 +427,7 @@
                                                             "type":  "image",
                                                             "resource_key":  "main_screen.p_portrait_bg",
                                                             "scale_percent":  [
-                                                                                  75,
+                                                                                  100,
                                                                                   100
                                                                               ],
                                                             "position":  [

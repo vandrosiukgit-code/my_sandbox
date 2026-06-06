@@ -77,9 +77,13 @@ class GameScreen(BaseGameScreen):
         frame = self.get_screen_frame(frame_id)
         frame.add_group_id(group_id)
 
-        screen_position = frame.to_screen(position)
-        group.set_position(*screen_position)
-        frame.group_origins[group_id] = screen_position
+        if hasattr(group, "set_parent_frame"):
+            group.set_parent_frame(frame)
+        if hasattr(group, "set_local_position"):
+            group.set_local_position(*position)
+        else:
+            group.set_position(*frame.to_screen(position))
+        frame.group_origins[group_id] = tuple(position)
         return group
 
     def apply_frame_layout(self, frame_id):

@@ -69,8 +69,9 @@ group_config.py
     Load/save/update API for group_config.json.
 
 Group
-    Passive drawable runtime object. Holds rect/hit_rect, scale, role/tags,
-    manifest target metadata, and rendered layers.
+    Passive drawable runtime object. Holds local_rect/local_hit_rect in its
+    parent Frame, exposes screen rect/hit_rect for draw/hit-test, and owns
+    group-local rendered layers.
 
 GroupStore
     Built group registry. Builds groups from group_config.json, returns groups
@@ -81,6 +82,8 @@ GroupStore
 Frame
     Screen-space container. Owns frame geometry, parent/child frame hierarchy,
     group IDs placed in the frame, hit-testing, and local-to-screen conversion.
+    Stores rect/hit_rect in parent-local coordinates and exposes screen rects
+    as derived views.
 
 GameScreen
     Pygame-facing visual scene. Owns frames, active group IDs, input
@@ -105,6 +108,44 @@ GameController
     Draft rule boundary. Owns game state and receives normalized input, but
     currently only records clicks/input events.
 ```
+
+## Coordinate Contract
+
+Every container owns a local coordinate system for its children:
+
+```text
+Screen coordinates
+    Frame local coordinates
+        nested Frame local coordinates
+            Group local coordinates
+                Layer local coordinates
+```
+
+Rules:
+
+- Every GUI hierarchy level owns a `pygame.Rect`.
+- `rect.topleft` is always stored in the coordinate system of the parent rect.
+- `rect.size` is the object's own size.
+- User-facing layout is expressed by positioning an object's base point
+  (`rect.topleft`) relative to its parent.
+- A `Frame` stores its local rect in parent coordinates. Its screen-space rect
+  is derived from the parent chain.
+- A `Group` stores its local rect in parent-frame coordinates. Its screen-space
+  rect is derived and used for drawing and hit-testing.
+- A `Layer.position` is group-local.
+- An `Activity` works in coordinates of its assigned `Frame`.
+- An `Action` receives coordinates resolved by its owner; it should not guess
+  screen coordinates for neighboring objects.
+
+Screen-space geometry is a runtime projection, not a second source of truth.
+Movement scripts may interpolate GUI objects in absolute screen coordinates
+because that is the simplest way to animate travel between unrelated parents.
+When the movement ends, the final screen position must be resolved back into
+the object's local rect relative to its current or new parent.
+
+This keeps player areas, hands, portraits, table zones, and future animations
+composable: moving a parent frame moves the whole nested structure without
+rewriting child coordinates.
 
 ## Current Screen Layout
 

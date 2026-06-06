@@ -1,9 +1,269 @@
 {
   "resources": {
+    "cards.10_of_clubs": {
+      "path": "cards/10_of_clubs.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.10_of_diamonds": {
+      "path": "cards/10_of_diamonds.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.10_of_hearts": {
+      "path": "cards/10_of_hearts.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.10_of_spades": {
+      "path": "cards/10_of_spades.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.2_of_clubs": {
+      "path": "cards/2_of_clubs.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.2_of_diamonds": {
+      "path": "cards/2_of_diamonds.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.2_of_hearts": {
+      "path": "cards/2_of_hearts.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.2_of_spades": {
+      "path": "cards/2_of_spades.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.3_of_clubs": {
+      "path": "cards/3_of_clubs.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.3_of_diamonds": {
+      "path": "cards/3_of_diamonds.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.3_of_hearts": {
+      "path": "cards/3_of_hearts.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.3_of_spades": {
+      "path": "cards/3_of_spades.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.4_of_clubs": {
+      "path": "cards/4_of_clubs.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.4_of_diamonds": {
+      "path": "cards/4_of_diamonds.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.4_of_hearts": {
+      "path": "cards/4_of_hearts.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.4_of_spades": {
+      "path": "cards/4_of_spades.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.5_of_clubs": {
+      "path": "cards/5_of_clubs.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.5_of_diamonds": {
+      "path": "cards/5_of_diamonds.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.5_of_hearts": {
+      "path": "cards/5_of_hearts.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.5_of_spades": {
+      "path": "cards/5_of_spades.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.6_of_clubs": {
+      "path": "cards/6_of_clubs.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.6_of_diamonds": {
+      "path": "cards/6_of_diamonds.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.6_of_hearts": {
+      "path": "cards/6_of_hearts.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.6_of_spades": {
+      "path": "cards/6_of_spades.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.7_of_clubs": {
+      "path": "cards/7_of_clubs.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.7_of_diamonds": {
+      "path": "cards/7_of_diamonds.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.7_of_hearts": {
+      "path": "cards/7_of_hearts.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.7_of_spades": {
+      "path": "cards/7_of_spades.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.8_of_clubs": {
+      "path": "cards/8_of_clubs.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.8_of_diamonds": {
+      "path": "cards/8_of_diamonds.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.8_of_hearts": {
+      "path": "cards/8_of_hearts.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.8_of_spades": {
+      "path": "cards/8_of_spades.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.9_of_clubs": {
+      "path": "cards/9_of_clubs.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.9_of_diamonds": {
+      "path": "cards/9_of_diamonds.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.9_of_hearts": {
+      "path": "cards/9_of_hearts.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.9_of_spades": {
+      "path": "cards/9_of_spades.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.a_of_clubs": {
+      "path": "cards/a_of_clubs.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.a_of_diamonds": {
+      "path": "cards/a_of_diamonds.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.a_of_hearts": {
+      "path": "cards/a_of_hearts.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.a_of_spades": {
+      "path": "cards/a_of_spades.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
     "cards.card_back": {
       "path": "cards/card_back.png",
       "frame_width": 103,
       "frame_height": 160
+    },
+    "cards.j_of_clubs": {
+      "path": "cards/j_of_clubs.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.j_of_diamonds": {
+      "path": "cards/j_of_diamonds.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.j_of_hearts": {
+      "path": "cards/j_of_hearts.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.j_of_spades": {
+      "path": "cards/j_of_spades.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.k_of_clubs": {
+      "path": "cards/k_of_clubs.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.k_of_diamonds": {
+      "path": "cards/k_of_diamonds.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.k_of_hearts": {
+      "path": "cards/k_of_hearts.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.k_of_spades": {
+      "path": "cards/k_of_spades.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.q_of_clubs": {
+      "path": "cards/q_of_clubs.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.q_of_diamonds": {
+      "path": "cards/q_of_diamonds.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.q_of_hearts": {
+      "path": "cards/q_of_hearts.png",
+      "frame_width": 126,
+      "frame_height": 189
+    },
+    "cards.q_of_spades": {
+      "path": "cards/q_of_spades.png",
+      "frame_width": 126,
+      "frame_height": 189
     },
     "main_screen.avatars.portrait_1": {
       "path": "main_screen/avatars/portrait_1.png",

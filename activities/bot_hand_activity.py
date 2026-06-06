@@ -23,11 +23,12 @@ class BotHandActivity(Activity):
         resource_key=None,
         card_count=0,
         group_id_prefix=None,
-        max_total_angle=180,
+        scale_factor=0.8,
+        max_total_angle=160,
         reference_card_count=9,
         radius=0,
         orientation_degrees=90,
-        center_offset=(30, 0),
+        center_offset=(50, 0),
     ):
         super().__init__(duration=0.0)
         self.frame = frame
@@ -35,11 +36,12 @@ class BotHandActivity(Activity):
         self.resource_key = resource_key
         self.card_count = max(0, int(card_count))
         self.group_id_prefix = group_id_prefix or f"{self.frame.id}.bot_hand"
+        self.scale_factor = float(scale_factor)
         self.max_total_angle = float(max_total_angle)
         self.reference_card_count = max(2, int(reference_card_count))
         self.radius = float(radius)
         self.orientation_degrees = float(orientation_degrees)
-        self.center_offset = tuple(center_offset)
+        self.center_offset = self.normalize_pair(center_offset)
         self.generated_groups = []
 
     def start(self):
@@ -78,6 +80,9 @@ class BotHandActivity(Activity):
         Поддерживаемые поля:
         - resource_key;
         - card_count;
+        - scale_factor;
+        - radius;
+        - center_offset;
 
         Остальная геометрия веера является внутренней кухней Activity и не
         входит в публичную команду контроллера.
@@ -90,6 +95,9 @@ class BotHandActivity(Activity):
             self.clear_generated_groups()
             self.resource_key = resource_key
 
+        self.scale_factor = float(fixture.get("scale_factor", self.scale_factor))
+        self.radius = float(fixture.get("radius", self.radius))
+        self.center_offset = self.normalize_pair(fixture.get("center_offset", self.center_offset))
         self.set_card_count(fixture.get("card_count", self.card_count))
 
     def sync_visual_groups(self):
@@ -119,42 +127,52 @@ class BotHandActivity(Activity):
         if count <= 0:
             return
 
-        frame_rect = self.frame.rect
+        frame_rect = self.frame.content_rect
         center_x, center_y = self.get_fan_center(frame_rect)
         occupied_angle, angle_step = self.calculate_fan_angles(count)
 
         for index, group in enumerate(self.generated_groups):
-            local_angle = -occupied_angle / 2 + index * angle_step
+            local_angle = self.calculate_card_angle(index, occupied_angle, angle_step)
             angle = self.orientation_degrees + local_angle
             pivot_x, pivot_y = self.calculate_pivot_position(center_x, center_y, angle)
             self.apply_card_transform(group, angle, (pivot_x, pivot_y))
-            self.frame.group_origins[group.id] = group.rect.topleft
+            self.frame.group_origins[group.id] = group.local_rect.topleft
+
+    @staticmethod
+    def calculate_card_angle(index, occupied_angle, angle_step):
+        """Return card angle inside a sector using card-slot centers."""
+        if angle_step == 0.0:
+            return 0.0
+        return -occupied_angle / 2 + angle_step / 2 + index * angle_step
 
     def calculate_fan_angles(self, count):
         """Return total occupied angle and step for count cards.
 
-        Nine cards occupy half a circle. Larger hands are compressed into the
-        same half-circle span.
+        The reference hand defines card density: 9 cards occupy max_total_angle,
+        so the reference step is max_total_angle / 9. Smaller hands keep that
+        step and shrink the occupied sector. Larger hands keep max_total_angle
+        and compress the step.
         """
         if count <= 1:
-            return 0.0, 0.0
+            return self.max_total_angle / self.reference_card_count, 0.0
 
-        reference_step = self.max_total_angle / (self.reference_card_count - 1)
+        reference_step = self.max_total_angle / self.reference_card_count
         if count <= self.reference_card_count:
-            return reference_step * (count - 1), reference_step
+            occupied_angle = reference_step * count
+            return occupied_angle, reference_step
 
-        compressed_step = self.max_total_angle / (count - 1)
+        compressed_step = self.max_total_angle / count
         return self.max_total_angle, compressed_step
 
     def get_fan_center(self, frame_rect):
-        """Вернуть точку схода веера в координатах экрана."""
+        """Вернуть точку схода веера в локальных координатах frame."""
         return (
             frame_rect.centerx + int(self.center_offset[0]),
             frame_rect.centery + int(self.center_offset[1]),
         )
 
     def calculate_pivot_position(self, center_x, center_y, angle_degrees):
-        """Перевести угол карты в координату pivot по радиусу веера."""
+        """Перевести угол карты в локальную координату pivot по радиусу веера."""
         radians = math.radians(angle_degrees)
         return (
             center_x + self.radius * math.sin(radians),
@@ -164,23 +182,37 @@ class BotHandActivity(Activity):
     def apply_card_transform(self, group, angle_degrees, pivot_position):
         """Повернуть карту вокруг нижнего центра и поставить в pivot."""
         base_surface = group._bot_hand_base_frames[0]
-        rotated_surface = pygame.transform.rotate(base_surface, -angle_degrees)
+        scaled_surface = self.scale_surface(base_surface)
+        rotated_surface = pygame.transform.rotate(scaled_surface, -angle_degrees)
 
         group.layers[0].frames = [rotated_surface]
         group.layers[0].position = (0, 0)
         group.set_scale_factor(1.0)
 
         pivot_offset = self.calculate_rotated_pivot_offset(
-            base_surface.get_size(),
+            scaled_surface.get_size(),
             rotated_surface.get_size(),
             angle_degrees,
         )
-        group.set_rect((
+        group.set_local_rect((
             round(pivot_position[0] - pivot_offset[0]),
             round(pivot_position[1] - pivot_offset[1]),
             rotated_surface.get_width(),
             rotated_surface.get_height(),
         ))
+
+    def scale_surface(self, surface):
+        """Вернуть surface с внутренним масштабом веера."""
+        if self.scale_factor == 1.0:
+            return surface
+        width, height = surface.get_size()
+        return pygame.transform.smoothscale(
+            surface,
+            (
+                max(1, round(width * self.scale_factor)),
+                max(1, round(height * self.scale_factor)),
+            ),
+        )
 
     @staticmethod
     def calculate_rotated_pivot_offset(scaled_size, rotated_size, angle_degrees):
@@ -191,6 +223,15 @@ class BotHandActivity(Activity):
         rotated_vector = bottom_center_from_source_center.rotate(angle_degrees)
         pivot = center + rotated_vector
         return pivot.x, pivot.y
+
+    @staticmethod
+    def normalize_pair(value):
+        """Return a two-number tuple from fixture/list/tuple input."""
+        if isinstance(value, dict):
+            return (float(value.get("x", 0)), float(value.get("y", 0)))
+        if isinstance(value, (tuple, list)) and len(value) >= 2:
+            return (float(value[0]), float(value[1]))
+        return (0.0, 0.0)
 
     def add_generated_group(self, index):
         """Создать одну visual-only Group рубашки карты."""
@@ -206,6 +247,7 @@ class BotHandActivity(Activity):
             resource_manager=self.resource_manager,
         )
         group._bot_hand_base_frames = tuple(frame.copy() for frame in group.layers[0].frames)
+        group.set_parent_frame(self.frame)
         self.generated_groups.append(group)
         self.frame.add_group_id(group.id)
         return group

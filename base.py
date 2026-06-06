@@ -150,11 +150,12 @@ class BaseFrame(ABC):
 class BaseGroup(ABC):
     """Базовый контракт GUI/game-group-а.
 
-    Group является пассивным визуальным объектом. Он хранит rect,
-    обязательный hit_rect, scale_factor и набор слоев-кадров, но не должен
-    принимать игровые решения. У слоя нет offset, visible и alpha. Если часть
-    интерфейса должна иметь отдельное положение или поведение, она оформляется
-    отдельным Group.
+    Group является пассивным визуальным объектом. Он хранит local_rect и
+    local_hit_rect в координатах parent Frame, предоставляет screen-space rect
+    и hit_rect для отрисовки/hit-test, хранит scale_factor и набор
+    слоев-кадров, но не должен принимать игровые решения. У слоя нет offset,
+    visible и alpha. Если часть интерфейса должна иметь отдельное положение
+    или поведение, она оформляется отдельным Group.
     """
 
     @property
@@ -166,13 +167,13 @@ class BaseGroup(ABC):
     @property
     @abstractmethod
     def rect(self):
-        """Локальный rect холста group-а."""
+        """Screen-space rect холста group-а."""
         pass
 
     @property
     @abstractmethod
     def hit_rect(self):
-        """Локальная область взаимодействия group-а."""
+        """Screen-space область взаимодействия group-а."""
         pass
 
     @abstractmethod
@@ -191,7 +192,7 @@ class BaseGroup(ABC):
 
     @abstractmethod
     def set_position(self, x, y):
-        """Переместить group в координатах экрана."""
+        """Совместимость: переместить group в координатах экрана."""
         pass
 
     @abstractmethod
@@ -213,4 +214,3 @@ class BaseGroup(ABC):
     def set_layer_frames(self, layer_name, frames):
         """Заменить список кадров слоя."""
         pass
-

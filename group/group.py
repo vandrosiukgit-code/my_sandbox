@@ -306,6 +306,7 @@ class Group(BaseGroup):
 
         self.group_id = group_id
         self._base_rect = pygame.Rect(rect)
+        self.parent_frame = None
         self._rect = self._base_rect.copy()
         self._base_hit_rect = pygame.Rect(hit_rect) if hit_rect is not None else self._base_rect.copy()
         self._hit_rect = self._base_hit_rect.copy()
@@ -487,13 +488,23 @@ class Group(BaseGroup):
 
     @property
     def rect(self):
-        """Текущий прямоугольник group-а на экране с учетом scale_factor."""
-        return self._rect
+        """Текущий прямоугольник group-а в координатах экрана."""
+        return self.local_rect_to_screen_rect(self.get_scaled_local_rect())
 
     @property
     def hit_rect(self):
-        """Обязательная область взаимодействия group-а с учетом scale_factor."""
-        return self._hit_rect
+        """Обязательная область взаимодействия group-а в координатах экрана."""
+        return self.local_rect_to_screen_rect(self.get_scaled_local_hit_rect())
+
+    @property
+    def local_rect(self):
+        """Прямоугольник group-а в координатах parent Frame."""
+        return self._base_rect.copy()
+
+    @property
+    def local_hit_rect(self):
+        """Область взаимодействия group-а в координатах parent Frame."""
+        return self._base_hit_rect.copy()
 
     def update(self, dt):
         """Обновить group.
@@ -531,8 +542,14 @@ class Group(BaseGroup):
             return frozenset((layer_ids,))
         return frozenset(layer_ids)
 
-    def set_position(self, x, y):
-        """Переместить group на экране без изменения его базового размера."""
+    def set_parent_frame(self, frame):
+        """Назначить parent Frame для local -> screen преобразования."""
+        self.parent_frame = frame
+        self.apply_scale()
+        return self
+
+    def set_local_position(self, x, y):
+        """Переместить group в локальных координатах parent Frame."""
         old_position = self._base_rect.topleft
         self._base_rect.topleft = (int(x), int(y))
         self._base_hit_rect.move_ip(
@@ -541,14 +558,30 @@ class Group(BaseGroup):
         )
         self.apply_scale()
 
-    def set_rect(self, rect):
-        """Задать базовый rect group-а и синхронизировать hit_rect."""
+    def set_position(self, x, y):
+        """Совместимость: задать позицию в координатах экрана."""
+        if self.parent_frame is None:
+            self.set_local_position(x, y)
+            return
+        self.set_local_position(*self.parent_frame.to_local((x, y)))
+
+    def set_local_rect(self, rect):
+        """Задать rect group-а в координатах parent Frame."""
         self._base_rect = pygame.Rect(rect)
         self._base_hit_rect = self._base_rect.copy()
         self.apply_scale()
 
+    def set_rect(self, rect):
+        """Совместимость: задать rect group-а в координатах экрана."""
+        screen_rect = pygame.Rect(rect)
+        if self.parent_frame is None:
+            self.set_local_rect(screen_rect)
+            return
+        local_pos = self.parent_frame.to_local(screen_rect.topleft)
+        self.set_local_rect((*local_pos, screen_rect.width, screen_rect.height))
+
     def set_hit_rect(self, rect):
-        """Задать базовую область клика group-а.
+        """Задать область клика group-а в локальных координатах parent Frame.
 
         hit_rect может отличаться от rect, но остается геометрией всего group-а,
         а не отдельного слоя.
@@ -618,9 +651,23 @@ class Group(BaseGroup):
 
 
     def apply_scale(self):
-        """Пересчитать rect и hit_rect от базовой геометрии и scale_factor."""
-        self._rect = self.scale_rect(self._base_rect, self.scale_factor)
-        self._hit_rect = self.scale_rect(self._base_hit_rect, self.scale_factor)
+        """Пересчитать screen rect/hit_rect от локальной геометрии и scale_factor."""
+        self._rect = self.rect
+        self._hit_rect = self.hit_rect
+
+    def get_scaled_local_rect(self):
+        """Return local rect with size scaled from its base top-left."""
+        return self.scale_rect(self._base_rect, self.scale_factor)
+
+    def get_scaled_local_hit_rect(self):
+        """Return local hit rect with size scaled from its base top-left."""
+        return self.scale_rect(self._base_hit_rect, self.scale_factor)
+
+    def local_rect_to_screen_rect(self, rect):
+        """Convert a local group rect to screen coordinates."""
+        if self.parent_frame is None:
+            return rect.copy()
+        return pygame.Rect(self.parent_frame.to_screen(rect.topleft), rect.size)
 
     def get_scaled_surface(self, surface):
         """Вернуть surface, масштабированный текущим scale_factor."""
@@ -634,9 +681,10 @@ class Group(BaseGroup):
         return pygame.transform.smoothscale(surface, scaled_size)
 
     def get_layer_screen_position(self, layer):
+        rect = self.rect
         return (
-            self._rect.x + round(layer.position[0] * self.scale_factor),
-            self._rect.y + round(layer.position[1] * self.scale_factor),
+            rect.x + round(layer.position[0] * self.scale_factor),
+            rect.y + round(layer.position[1] * self.scale_factor),
         )
 
     def get_layer_rect(self, layer):
@@ -667,6 +715,8 @@ class Group(BaseGroup):
             "role": self.role,
             "tags": sorted(self.tags),
             "manifest_targets": self.manifest_targets,
+            "local_rect": list(self.local_rect),
+            "local_hit_rect": list(self.local_hit_rect),
             "rect": list(self.rect),
             "hit_rect": list(self.hit_rect),
             "scale_factor": self.scale_factor,

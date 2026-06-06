@@ -2,7 +2,24 @@
   "activities": {
     "left_player_hand": {
       "resource_key": "cards.card_back",
-      "card_count": 8
+      "card_count": 20,
+      "scale_factor": 0.5,
+      "radius": 90,
+      "center_offset": [-10, -4]
+    },
+    "right_player_hand": {
+      "resource_key": "cards.card_back",
+      "card_count": 1,
+      "scale_factor": 0.5,
+      "radius": 90,
+      "center_offset": [-10, -4]
+    },
+    "top_player_hand": {
+      "resource_key": "cards.card_back",
+      "card_count": 12,
+      "scale_factor": 0.5,
+      "radius": 80,
+      "center_offset": [0, 0]
     }
   }
 }

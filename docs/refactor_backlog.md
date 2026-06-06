@@ -447,6 +447,8 @@ Activity       -> long-lived visual behavior mode/process
 Activity       -> generated visual-only Group instances for its mode
 Action         -> short finite visual step
 Group       -> passive drawable state
+Coordinate contract:
+Screen -> Frame local -> nested Frame local -> Group local -> Layer local
 ```
 
 Критерий готовности:

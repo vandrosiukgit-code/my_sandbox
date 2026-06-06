@@ -31,9 +31,11 @@ class TableScreen(GameScreen):
 
         self.create_frame("right_player_frame", rect=(0, 0, 260, 300))
         self.create_frame("right_player_portrait", rect=(0, 0, 200, 200))
+        self.create_frame("right_player_hand", rect=(0, 0, 260, 300))
 
         self.create_frame("top_player_frame", rect=(0, 0, 300, 260))
         self.create_frame("top_player_portrait",  rect=(0, 0, 200, 200))
+        self.create_frame("top_player_hand", rect=(0, 0, 300, 260))
 
         self.create_frame("bottom_player_frame", rect=(0, 0, 300, 260))
         self.create_frame("bottom_player_portrait", rect=(0, 0, 200, 200))
@@ -43,13 +45,15 @@ class TableScreen(GameScreen):
         self.put_frame_in_frame("left_player_portrait", "left_player_frame", position=(20, 46))
 
         self.put_frame_in_frame("right_player_frame", "game_table", position=(1020, 210))
+        self.put_frame_in_frame("right_player_hand", "right_player_frame", position=(0, 0))
         self.put_frame_in_frame("right_player_portrait", "right_player_frame", position=(20, 46))
 
-        self.put_frame_in_frame("top_player_frame", "game_table", position=(482, 0))
-        self.put_frame_in_frame("top_player_portrait", "top_player_frame", position=(58, 20))
+        self.put_frame_in_frame("top_player_frame", "game_table", position=(490, -10))
+        self.put_frame_in_frame("top_player_hand", "top_player_frame", position=(0, 0))
+        self.put_frame_in_frame("top_player_portrait", "top_player_frame", position=(50, 30))
 
-        self.put_frame_in_frame("bottom_player_frame", "game_table", position=(475, 518))
-        self.put_frame_in_frame("bottom_player_portrait", "bottom_player_frame", position=(65, 0))
+        self.put_frame_in_frame("bottom_player_frame", "game_table", position=(490, 488))
+        self.put_frame_in_frame("bottom_player_portrait", "bottom_player_frame", position=(50, 30))
 
 
         self.put_configured_group("table_group", "game_table", position=(0, 0))
@@ -58,13 +62,34 @@ class TableScreen(GameScreen):
         self.put_configured_group("top_player", "top_player_portrait", position=(0, 0))
         self.put_configured_group("bottom_player", "bottom_player_portrait", position=(0, 0))
 
-        self.left_player_hand_activity = BotHandActivity(
-            frame=self.get_screen_frame("left_player_hand"),
-            resource_manager=ResourceManager,
-            resource_key="cards.card_back",
-            card_count=8,
-        )
-        self.add_activity(self.left_player_hand_activity)
+        self.hand_activities = {
+            "left_player_hand": BotHandActivity(
+                frame=self.get_screen_frame("left_player_hand"),
+                resource_manager=ResourceManager,
+                resource_key="cards.card_back",
+                card_count=8,
+                orientation_degrees=90,
+                center_offset=(20, 0),
+            ),
+            "right_player_hand": BotHandActivity(
+                frame=self.get_screen_frame("right_player_hand"),
+                resource_manager=ResourceManager,
+                resource_key="cards.card_back",
+                card_count=8,
+                orientation_degrees=-90,
+                center_offset=(-20, 0),
+            ),
+            "top_player_hand": BotHandActivity(
+                frame=self.get_screen_frame("top_player_hand"),
+                resource_manager=ResourceManager,
+                resource_key="cards.card_back",
+                card_count=8,
+                orientation_degrees=180,
+                center_offset=(0, 0),
+            ),
+        }
+        for activity in self.hand_activities.values():
+            self.add_activity(activity)
         self.fixture_path = FIXTURE_PATH
         self._fixture_mtime = None
         self._fixture_check_elapsed = 0.0
@@ -137,5 +162,5 @@ class TableScreen(GameScreen):
     def apply_fixture(self, fixture):
         """Apply dev fixture values that imitate controller visual commands."""
         activities = fixture.get("activities", {})
-        hand_fixture = activities.get("left_player_hand", {})
-        self.left_player_hand_activity.apply_fixture(hand_fixture)
+        for activity_id, activity in self.hand_activities.items():
+            activity.apply_fixture(activities.get(activity_id, {}))

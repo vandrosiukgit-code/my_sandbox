@@ -364,7 +364,7 @@ class ResourcePickerService:
         report.add(f"group: {group_id}")
         report.add(f"layer: {layer_name}")
         report.add(f"resource_key: {resource_key}")
-        report.add(f"position: {tuple(position)}")
+        report.add(f"layer_position_group_local: {tuple(position)}")
         if role:
             report.add(f"role: {role}")
         if target_id:
@@ -378,7 +378,7 @@ class ResourcePickerService:
         report = OperationReport("Group Config Layer Position")
         report.add(f"group: {group_id}")
         report.add(f"layer: {layer_name}")
-        report.add(f"position: {tuple(position)}")
+        report.add(f"layer_position_group_local: {tuple(position)}")
         report.add("")
         report.add(f"Saved: {group_config.GROUP_CONFIG_FILE}")
         return layer, report
@@ -401,8 +401,8 @@ class ResourcePickerService:
         report = OperationReport("Group Config Metadata")
         report.add(f"group: {group_id}")
         report.add(f"source_group: {source_group_id or group_id}")
-        report.add(f"rect: {group.get('rect')}")
-        report.add(f"hit_rect: {group.get('hit_rect')}")
+        report.add(f"rect_parent_local: {group.get('rect')}")
+        report.add(f"hit_rect_parent_local: {group.get('hit_rect')}")
         report.add(f"scale_factor: {group.get('scale_factor')}")
         report.add(f"layers: {len(group.get('layers', ())) }")
         report.add("")
@@ -428,6 +428,53 @@ class ResourcePickerService:
         report.add(f"resource_key: {asset.resource_key}")
         report.add(f"path: {asset.relative_path}")
         report.add(f"resources: {len(saved_manifest.get('resources', {}))}")
+        return saved_manifest, report
+
+    def add_png_folder_to_manifest(self, folder_path):
+        folder_path = os.path.abspath(folder_path)
+        try:
+            common_path = os.path.commonpath([self.assets_dir, folder_path])
+        except ValueError as error:
+            raise ValueError("Selected folder must be inside assets/") from error
+        if os.path.normcase(common_path) != os.path.normcase(self.assets_dir):
+            raise ValueError("Selected folder must be inside assets/")
+
+        png_files = ResourceManager.get_png_files(folder_path)
+        manifest = self.load_manifest_if_exists()
+        resources = manifest.setdefault("resources", {})
+        added = []
+        updated = []
+        unchanged = []
+
+        for file_path in png_files:
+            entry = ResourceManager.create_default_manifest_entry(file_path, self.assets_dir)
+            resource_key = ResourceManager.build_resource_key(entry["path"])
+            previous_entry = resources.get(resource_key)
+            resources[resource_key] = entry
+            if previous_entry is None:
+                added.append(resource_key)
+            elif previous_entry != entry:
+                updated.append(resource_key)
+            else:
+                unchanged.append(resource_key)
+
+        saved_manifest = ResourceManager.save_manifest(self.assets_dir, manifest)
+        relative_folder = os.path.relpath(folder_path, self.assets_dir).replace("\\", "/")
+        report = OperationReport("Add Folder to RM Manifest")
+        report.add(f"folder: {relative_folder}")
+        report.add(f"PNG found: {len(png_files)}")
+        report.add(f"Added: {len(added)}")
+        report.add(f"Updated: {len(updated)}")
+        report.add(f"Unchanged: {len(unchanged)}")
+        report.add(f"resources: {len(saved_manifest.get('resources', {}))}")
+        if added:
+            report.add("")
+            report.add("Added:")
+            report.extend(added)
+        if updated:
+            report.add("")
+            report.add("Updated:")
+            report.extend(updated)
         return saved_manifest, report
 
     def update_manifest_from_graphics(self):
@@ -1228,14 +1275,14 @@ class ResourcePickerApp:
         ttk.Label(form, text="tags").grid(row=2, column=0, sticky="e", padx=(0, 10), pady=(0, 4))
         ttk.Entry(form, textvariable=self.group_tags_var).grid(row=2, column=1, columnspan=3, sticky="ew", pady=(0, 4))
 
-        ttk.Label(form, text="rect").grid(row=3, column=0, sticky="e", padx=(0, 10), pady=(0, 4))
+        ttk.Label(form, text="rect (parent-local)").grid(row=3, column=0, sticky="e", padx=(0, 10), pady=(0, 4))
         self.create_quad_inputs(
             form,
             3,
             (self.group_rect_x_var, self.group_rect_y_var, self.group_rect_w_var, self.group_rect_h_var),
         )
 
-        ttk.Label(form, text="hit_rect").grid(row=4, column=0, sticky="e", padx=(0, 10), pady=(0, 4))
+        ttk.Label(form, text="hit_rect (parent-local)").grid(row=4, column=0, sticky="e", padx=(0, 10), pady=(0, 4))
         self.create_quad_inputs(
             form,
             4,
@@ -1586,14 +1633,14 @@ class ResourcePickerApp:
         ttk.Label(form, text="tags").grid(row=2, column=0, sticky="w", pady=(0, 4))
         ttk.Entry(form, textvariable=self.group_tags_var).grid(row=2, column=1, columnspan=3, sticky="ew", pady=(0, 4))
 
-        ttk.Label(form, text="rect").grid(row=3, column=0, sticky="w", pady=(0, 4))
+        ttk.Label(form, text="rect (parent-local)").grid(row=3, column=0, sticky="w", pady=(0, 4))
         self.create_quad_inputs(
             form,
             3,
             (self.group_rect_x_var, self.group_rect_y_var, self.group_rect_w_var, self.group_rect_h_var),
         )
 
-        ttk.Label(form, text="hit_rect").grid(row=4, column=0, sticky="w", pady=(0, 4))
+        ttk.Label(form, text="hit_rect (parent-local)").grid(row=4, column=0, sticky="w", pady=(0, 4))
         self.create_quad_inputs(
             form,
             4,
@@ -1614,9 +1661,9 @@ class ResourcePickerApp:
         ttk.Label(form, text="target").grid(row=7, column=2, sticky="w", padx=(8, 0), pady=(8, 4))
         ttk.Entry(form, textvariable=self.target_id_var).grid(row=7, column=3, sticky="ew", pady=(8, 4))
 
-        ttk.Label(form, text="layer x").grid(row=8, column=0, sticky="w", pady=(0, 4))
+        ttk.Label(form, text="layer x (group-local)").grid(row=8, column=0, sticky="w", pady=(0, 4))
         ttk.Entry(form, textvariable=self.layer_x_var, width=8).grid(row=8, column=1, sticky="ew", pady=(0, 4))
-        ttk.Label(form, text="layer y").grid(row=8, column=2, sticky="w", padx=(8, 0), pady=(0, 4))
+        ttk.Label(form, text="layer y (group-local)").grid(row=8, column=2, sticky="w", padx=(8, 0), pady=(0, 4))
         ttk.Entry(form, textvariable=self.layer_y_var, width=8).grid(row=8, column=3, sticky="ew", pady=(0, 4))
 
         ttk.Label(form, text="resource").grid(row=9, column=0, sticky="w", pady=(0, 4))
@@ -2243,6 +2290,11 @@ class ResourcePickerApp:
         )
         self.png_add_to_manifest_button.grid(row=2, column=0, sticky="ew", pady=(8, 0))
         self.png_add_to_manifest_button.grid_remove()
+        ttk.Button(
+            png_preview_tab,
+            text="Add folder to RM Manifest",
+            command=self.add_png_folder_to_rm_manifest,
+        ).grid(row=3, column=0, sticky="ew", pady=(8, 0))
         self.create_png_manifest_tree(png_manifest_tab)
         self.png_workbench_tabs.select(png_preview_tab)
 
@@ -2457,6 +2509,16 @@ class ResourcePickerApp:
             item_id = self.png_folder_items.get(folder_key)
             if item_id:
                 self.png_tree.item(item_id, open=True)
+
+    def get_selected_png_folder_path(self):
+        selection = self.png_tree.selection()
+        if not selection:
+            return None
+        item_id = selection[0]
+        for folder_key, folder_item_id in self.png_folder_items.items():
+            if folder_item_id == item_id:
+                return os.path.join(self.assets_dir, *folder_key.split("/"))
+        return None
 
     @staticmethod
     def format_frame_size(asset):
@@ -3058,7 +3120,7 @@ class ResourcePickerApp:
                         self.group_rect_w_var,
                         self.group_rect_h_var,
                     ),
-                    "Group rect",
+                    "Group rect (parent-local)",
                 )
             ),
             "hit_rect": list(
@@ -3069,7 +3131,7 @@ class ResourcePickerApp:
                         self.group_hit_w_var,
                         self.group_hit_h_var,
                     ),
-                    "Group hit_rect",
+                    "Group hit_rect (parent-local)",
                 )
             ),
             "scale_factor": self.read_float_var(self.group_scale_var, "Group scale", default=1.0, min_value=0.01),
@@ -3380,6 +3442,34 @@ class ResourcePickerApp:
         self.status_var.set("PNG added to RM Manifest")
         self.show_output(report.to_text())
 
+    def add_png_folder_to_rm_manifest(self):
+        folder_path = self.get_selected_png_folder_path()
+        initial_dir = folder_path or self.assets_dir
+        if self.selected_asset is not None:
+            initial_dir = os.path.dirname(self.selected_asset.path)
+        if folder_path is None:
+            folder_path = filedialog.askdirectory(
+                title="Select PNG folder inside assets",
+                initialdir=initial_dir,
+                mustexist=True,
+            )
+        if not folder_path:
+            return
+        try:
+            selected_key = self.selected_asset.resource_key if self.selected_asset is not None else ""
+            self.manifest, report = self.service.add_png_folder_to_manifest(folder_path)
+            self.rm_manifest_loaded = True
+        except Exception as error:
+            self.status_var.set("Folder was not added to RM Manifest")
+            self.show_output(str(error))
+            messagebox.showerror("RM Manifest error", str(error))
+            return
+        self.reload_index()
+        if selected_key:
+            self.reselect_asset(selected_key, show=False)
+        self.status_var.set("PNG folder added to RM Manifest")
+        self.show_output(report.to_text())
+
     def add_rm_resource_to_graphic_layer(self):
         if not self.selected_manifest_resource_key:
             self.status_var.set("Select an RM resource first")
@@ -3491,7 +3581,7 @@ class ResourcePickerApp:
 
         try:
             _group, group_report = self.save_current_group_metadata()
-            position = self.read_position_vars(self.layer_x_var, self.layer_y_var, "Layer position")
+            position = self.read_position_vars(self.layer_x_var, self.layer_y_var, "Layer position (group-local)")
             _layer, report = self.service.upsert_group_config_image_layer(
                 group_id,
                 layer_name,
@@ -3523,7 +3613,7 @@ class ResourcePickerApp:
 
         try:
             _group, group_report = self.save_current_group_metadata()
-            position = self.read_position_vars(self.layer_x_var, self.layer_y_var, "Layer position")
+            position = self.read_position_vars(self.layer_x_var, self.layer_y_var, "Layer position (group-local)")
             _layer, report = self.service.set_group_config_layer_position(
                 group_id,
                 layer_name,
@@ -3810,8 +3900,8 @@ class ResourcePickerApp:
             "text_key": text_key or None,
             "size": [max(1, size[0]), max(1, size[1])],
             "position": [
-                self.read_int_var(self.layer_x_var, "Layer position X"),
-                self.read_int_var(self.layer_y_var, "Layer position Y"),
+                self.read_int_var(self.layer_x_var, "Layer position X (group-local)"),
+                self.read_int_var(self.layer_y_var, "Layer position Y (group-local)"),
             ],
             "scale_percent": [
                 max(1, self.read_int_var(self.layer_scale_w_var, "Layer scale width", default=100)),

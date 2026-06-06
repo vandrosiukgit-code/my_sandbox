@@ -28,12 +28,26 @@ main.py
 - `group_config.json` owns durable GUI group metadata and layer definitions.
 - `group_config.py` exposes load/save/update helpers for that JSON.
 - `Group.from_config()` builds runtime image/text layers.
+- `Group` stores parent-frame-local geometry and exposes derived screen-space
+  rects for drawing and hit-testing.
 - `GroupStore.build()` builds configured groups directly from `group_config`.
 - `TableScreen` creates the current table layout with left/right/top/bottom
   player panels.
+- `Frame` stores parent-local geometry and converts nested frame/group
+  coordinates to screen coordinates.
 - `GameScreen` normalizes mouse input into `ScreenInputEvent`.
 - `GameScreen` dispatches `VisualCommand` objects through public GUI targets.
 - `GuiManifest` is derived from configured group `manifest_targets`.
+
+## Coordinate Contract
+
+- Each GUI hierarchy level owns a `pygame.Rect`.
+- `rect.topleft` is stored relative to the parent rect.
+- `rect.size` belongs to the object itself.
+- Screen-space rects are derived runtime projections used for draw, hit-test,
+  and movement interpolation.
+- Movement animations may run in absolute screen coordinates, but their final
+  position should be resolved back into the object's local rect.
 
 ## What Is Still Draft
 
