@@ -4,32 +4,11 @@
       "position": [20, 20],
       "scale_factor": null,
       "activity": {
-        "slot_count": 9,
-        "spacing": [12, 12],
-        "slot_offsets": [
-          [0, 0],
-          [-1, 0],
-          [1, 0],
-          [-2, 0],
-          [2, 0],
-          [-2, -1],
-          [-2, 1],
-          [2, -1],
-          [2, 1]
-        ]
+        "slot_count": 8
       },
       "children": {
         "cards_slot_frame": {
-          "scale_factor": null,
-          "activity": {
-            "cards": [
-              "cards.6_of_clubs",
-              "cards.7_of_clubs"
-            ],
-            "scale_factor": 0.7,
-            "radius": 80,
-            "center_offset": [0, 0]
-          }
+          "scale_factor": null
         }
       }
     }

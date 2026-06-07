@@ -75,23 +75,13 @@ class TableScreen(GameScreen):
         self.put_configured_group("top_player", "top_player_portrait", position=(0, 0))
         self.put_configured_group("bottom_player", "bottom_player_portrait", position=(0, 0))
 
-        cards_slot_activity = CardsSlotActivityDecorator(
-            BotHandActivity(
-                frame=self.get_screen_frame("cards_slot_frame"),
-                resource_manager=ResourceManager,
-                card_count=0,
-                group_id_prefix="cards_slot_frame.cards",
-                orientation_degrees=0,
-                center_offset=(0, 0),
-            ),
-            cards=(),
-            resource_manager=ResourceManager,
-        )
+        cards_slot_activity = self.create_cards_slot_activity(self.get_screen_frame("cards_slot_frame"))
         play_area_slots_activity = PlayAreaSlotsActivity(
             screen=self,
             play_area_frame=self.get_screen_frame("play_area_frame"),
             prototype_slot_frame=self.get_screen_frame("cards_slot_frame"),
             prototype_slot_activity=cards_slot_activity,
+            slot_activity_factory=self.create_cards_slot_activity,
         )
 
         self.hand_activities = {
@@ -140,6 +130,21 @@ class TableScreen(GameScreen):
         self._fixture_check_elapsed = 0.0
         self._fixture_check_interval = 0.2
         self.reload_fixture_if_changed(force=True)
+
+    def create_cards_slot_activity(self, frame, index=0):
+        _ = index
+        return CardsSlotActivityDecorator(
+            BotHandActivity(
+                frame=frame,
+                resource_manager=ResourceManager,
+                card_count=0,
+                group_id_prefix=f"{frame.id}.cards",
+                orientation_degrees=0,
+                center_offset=(0, 0),
+            ),
+            cards=(),
+            resource_manager=ResourceManager,
+        )
 
     def put_configured_group(self, group_id, frame_id, position=(0, 0)):
         if self.group_store is None or not self.group_store.has(group_id):

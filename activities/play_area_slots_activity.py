@@ -11,12 +11,35 @@ class PlayAreaSlotsActivity(Activity):
     placement, and size before Controller-driven slot state exists.
     """
 
+    DEFAULT_SLOT_OFFSETS = (
+        (0, 0),
+        (-1, 0),
+        (1, 0),
+        (-2, 0),
+        (2, 0),
+        (-2, -1),
+        (-2, 1),
+        (2, -1),
+        (2, 1),
+    )
+    DEFAULT_SLOT_ACTIVITY_FIXTURE = {
+        "cards": (
+            "cards.6_of_clubs",
+            "cards.7_of_clubs",
+        ),
+        "scale_factor": 0.7,
+        "radius": 80,
+        "center_offset": (0, 0),
+    }
+    DEFAULT_SPACING = (12, 12)
+
     def __init__(
         self,
         screen,
         play_area_frame,
         prototype_slot_frame,
         prototype_slot_activity=None,
+        slot_activity_factory=None,
         slot_id_prefix="cards_slot_frame",
     ):
         super().__init__(duration=0.0)
@@ -24,15 +47,20 @@ class PlayAreaSlotsActivity(Activity):
         self.play_area_frame = play_area_frame
         self.prototype_slot_frame = prototype_slot_frame
         self.prototype_slot_activity = prototype_slot_activity
+        self.slot_activity_factory = slot_activity_factory
         self.slot_id_prefix = slot_id_prefix
         self.slot_count = 1
         self.columns = 1
-        self.spacing = (24, 24)
+        self.spacing = self.DEFAULT_SPACING
         self.origin = None
         self.center = None
         self.step = None
         self.slot_offsets = None
+        self.slot_activity_fixture = dict(self.DEFAULT_SLOT_ACTIVITY_FIXTURE)
         self.managed_slot_ids = [self.prototype_slot_frame.id]
+        self.slot_activities = {}
+        if self.prototype_slot_activity is not None:
+            self.slot_activities[self.prototype_slot_frame.id] = self.prototype_slot_activity
 
     def update(self, dt):
         _ = dt
@@ -51,10 +79,15 @@ class PlayAreaSlotsActivity(Activity):
         if "step" in fixture:
             self.step = self.normalize_optional_pair(fixture.get("step"))
         self.slot_offsets = self.normalize_offsets(fixture.get("slot_offsets"))
+        self.slot_activity_fixture = dict(
+            fixture.get("slot_activity", self.DEFAULT_SLOT_ACTIVITY_FIXTURE)
+        )
         self.apply_layout()
 
     def apply_layout(self):
         self.ensure_slot_frames()
+        self.ensure_slot_activities()
+        self.apply_slot_activity_fixtures()
 
         slot_size = self.get_prototype_slot_size()
 
@@ -96,6 +129,7 @@ class PlayAreaSlotsActivity(Activity):
 
         for frame_id in tuple(self.managed_slot_ids):
             if frame_id not in target_ids:
+                self.remove_slot_activity(frame_id)
                 self.remove_slot_frame(frame_id)
 
         self.managed_slot_ids = []
@@ -113,6 +147,42 @@ class PlayAreaSlotsActivity(Activity):
             slot_frame.set_rect_visibility(False)
             self.managed_slot_ids.append(frame_id)
 
+    def ensure_slot_activities(self):
+        """Keep one CardsSlotActivity alive for each managed slot frame."""
+        for index, frame_id in enumerate(self.managed_slot_ids):
+            if frame_id in self.slot_activities:
+                continue
+            if self.slot_activity_factory is None:
+                continue
+
+            slot_frame = self.screen.get_screen_frame(frame_id)
+            activity = self.slot_activity_factory(slot_frame, index)
+            self.slot_activities[frame_id] = activity
+            if hasattr(self.screen, "hand_activities"):
+                self.screen.hand_activities[frame_id] = activity
+            self.screen.add_activity(activity)
+
+    def apply_slot_activity_fixtures(self):
+        """Apply shared slot contents to every CardsSlotActivity in the play area."""
+        if not self.slot_activity_fixture:
+            return
+        for activity in self.slot_activities.values():
+            if hasattr(activity, "apply_fixture"):
+                activity.apply_fixture(self.slot_activity_fixture)
+
+    def remove_slot_activity(self, frame_id):
+        """Stop and unregister the CardsSlotActivity owned by a removed slot."""
+        activity = self.slot_activities.pop(frame_id, None)
+        if activity is None or activity is self.prototype_slot_activity:
+            return
+
+        if hasattr(activity, "finish"):
+            activity.finish()
+        if activity in self.screen.active_activities:
+            self.screen.active_activities.remove(activity)
+        if hasattr(self.screen, "hand_activities"):
+            self.screen.hand_activities.pop(frame_id, None)
+
     def remove_slot_frame(self, frame_id):
         if frame_id == self.prototype_slot_frame.id:
             return
@@ -125,9 +195,29 @@ class PlayAreaSlotsActivity(Activity):
         return f"{self.slot_id_prefix}_{index + 1}"
 
     def get_slot_offset(self, index):
+        """Return layout offset for a slot by creation order.
+
+        Slot positions are a fixed table layout owned by this activity. The
+        fixture only changes how many CardsSlotActivity instances are active.
+        """
         if self.slot_offsets is not None and index < len(self.slot_offsets):
             return self.slot_offsets[index]
-        return self.get_center_out_offset(index)
+        return self.get_default_slot_offset(index)
+
+    def get_default_slot_offset(self, index):
+        if index < len(self.DEFAULT_SLOT_OFFSETS):
+            return self.DEFAULT_SLOT_OFFSETS[index]
+
+        ring_index = index - len(self.DEFAULT_SLOT_OFFSETS)
+        ring = 3 + ring_index // 4
+        side = ring_index % 4
+        if side == 0:
+            return -ring, 0
+        if side == 1:
+            return ring, 0
+        if side == 2:
+            return -ring, -1
+        return ring, 1
 
     @staticmethod
     def get_center_out_offset(index):
