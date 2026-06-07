@@ -30,7 +30,7 @@ class PlayAreaSlotsActivity(Activity):
         self.spacing = (24, 24)
         self.origin = None
         self.center = None
-        self.step = (180, 180)
+        self.step = None
         self.slot_offsets = None
         self.managed_slot_ids = [self.prototype_slot_frame.id]
 
@@ -48,7 +48,8 @@ class PlayAreaSlotsActivity(Activity):
         self.spacing = self.normalize_pair(fixture.get("spacing", self.spacing))
         self.origin = self.normalize_optional_pair(fixture.get("origin"))
         self.center = self.normalize_optional_pair(fixture.get("center"))
-        self.step = self.normalize_pair(fixture.get("step", self.step))
+        if "step" in fixture:
+            self.step = self.normalize_optional_pair(fixture.get("step"))
         self.slot_offsets = self.normalize_offsets(fixture.get("slot_offsets"))
         self.apply_layout()
 
@@ -69,9 +70,19 @@ class PlayAreaSlotsActivity(Activity):
         for index, frame_id in enumerate(self.managed_slot_ids):
             slot_frame = self.screen.get_screen_frame(frame_id)
             offset_x, offset_y = self.get_slot_offset(index)
-            x = center[0] + offset_x * self.step[0] - slot_size[0] // 2
-            y = center[1] + offset_y * self.step[1] - slot_size[1] // 2
+            step_x, step_y = self.get_slot_step(slot_size)
+            x = center[0] + offset_x * step_x - slot_size[0] // 2
+            y = center[1] + offset_y * step_y - slot_size[1] // 2
             slot_frame.set_local_rect((x, y, slot_size[0], slot_size[1]))
+
+    def get_slot_step(self, slot_size):
+        """Return distance between slot centers in play-area local coordinates."""
+        if self.step is not None:
+            return self.step
+        return (
+            int(slot_size[0] + self.spacing[0]),
+            int(slot_size[1] + self.spacing[1]),
+        )
 
     def get_prototype_slot_size(self):
         if self.prototype_slot_activity is not None:
