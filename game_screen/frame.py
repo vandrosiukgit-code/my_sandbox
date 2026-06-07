@@ -114,6 +114,11 @@ class Frame(BaseFrame):
             self._rect.y - old_position[1],
         )
 
+    def set_local_rect(self, rect):
+        """Set this frame rect inside its parent coordinate system."""
+        self._rect = self.round_rect(rect)
+        self._hit_rect = self._rect.copy()
+
     def set_scale_factor(self, scale_factor):
         """Set local content scale for this frame and its descendants."""
         self.scale_factor = None if scale_factor is None else float(scale_factor)

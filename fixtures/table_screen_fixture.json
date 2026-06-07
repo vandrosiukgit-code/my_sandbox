@@ -10,10 +10,6 @@
         }
       },
       "children": {
-        "play_area_frame": {
-          "position": [20, 20],
-          "scale_factor": null
-        },
         "left_player_frame": {
           "position": [0, 240],
           "scale_factor": 0.8,

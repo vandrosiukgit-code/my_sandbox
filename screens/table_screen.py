@@ -1,13 +1,19 @@
 import json
 import os
 
-from activities import BotHandActivity, VisibleCardsHandDecorator
+from activities import (
+    BotHandActivity,
+    CardsSlotActivityDecorator,
+    PlayAreaSlotsActivity,
+    VisibleCardsHandDecorator,
+)
 from core.resource import ResourceManager
 from game_screen.game_screen import GameScreen
 
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURE_PATH = os.path.join(PROJECT_DIR, "fixtures", "table_screen_fixture.json")
+PLAY_AREA_FIXTURE_PATH = os.path.join(PROJECT_DIR, "fixtures", "play_area_fixture.json")
 
 
 class TableScreen(GameScreen):
@@ -25,6 +31,7 @@ class TableScreen(GameScreen):
 
         self.create_frame("game_table", rect=(0, 0, 1280, 720))
         self.create_frame("play_area_frame", rect=(0, 0, 1240, 680)).set_rect_visibility(False)
+        self.create_frame("cards_slot_frame", rect=(0, 0, 920, 360)).set_rect_visibility(False)
 
         self.create_frame("left_player_frame", rect=(0, 0, 260, 300))
         self.create_frame("left_player_portrait", rect=(0, 0, 200, 200))
@@ -43,6 +50,7 @@ class TableScreen(GameScreen):
         self.create_frame("bottom_player_hand", rect=(0, 0, 300, 260))
 
         self.put_frame_in_frame("play_area_frame", "game_table", position=(20, 20))
+        self.put_frame_in_frame("cards_slot_frame", "play_area_frame", position=(180, 180))
 
         self.put_frame_in_frame("left_player_frame", "game_table", position=(0, 210))
         self.put_frame_in_frame("left_player_hand", "left_player_frame", position=(0, 0))
@@ -67,7 +75,27 @@ class TableScreen(GameScreen):
         self.put_configured_group("top_player", "top_player_portrait", position=(0, 0))
         self.put_configured_group("bottom_player", "bottom_player_portrait", position=(0, 0))
 
+        cards_slot_activity = CardsSlotActivityDecorator(
+            BotHandActivity(
+                frame=self.get_screen_frame("cards_slot_frame"),
+                resource_manager=ResourceManager,
+                card_count=0,
+                group_id_prefix="cards_slot_frame.cards",
+                orientation_degrees=0,
+                center_offset=(0, 0),
+            ),
+            cards=(),
+            resource_manager=ResourceManager,
+        )
+        play_area_slots_activity = PlayAreaSlotsActivity(
+            screen=self,
+            play_area_frame=self.get_screen_frame("play_area_frame"),
+            prototype_slot_frame=self.get_screen_frame("cards_slot_frame"),
+            prototype_slot_activity=cards_slot_activity,
+        )
+
         self.hand_activities = {
+            "play_area_frame": play_area_slots_activity,
             "left_player_hand": BotHandActivity(
                 frame=self.get_screen_frame("left_player_hand"),
                 resource_manager=ResourceManager,
@@ -103,11 +131,12 @@ class TableScreen(GameScreen):
                 cards=(),
                 resource_manager=ResourceManager,
             ),
+            "cards_slot_frame": cards_slot_activity,
         }
         for activity in self.hand_activities.values():
             self.add_activity(activity)
-        self.fixture_path = FIXTURE_PATH
-        self._fixture_mtime = None
+        self.fixture_paths = (FIXTURE_PATH, PLAY_AREA_FIXTURE_PATH)
+        self._fixture_mtimes = {}
         self._fixture_check_elapsed = 0.0
         self._fixture_check_interval = 0.2
         self.reload_fixture_if_changed(force=True)
@@ -158,22 +187,36 @@ class TableScreen(GameScreen):
 
     def reload_fixture_if_changed(self, force=False):
         """Hot reload dev fixture and apply it to screen activities."""
-        if not os.path.exists(self.fixture_path):
+        changed_paths = []
+        existing_paths = []
+        for fixture_path in self.fixture_paths:
+            if not os.path.exists(fixture_path):
+                continue
+
+            existing_paths.append(fixture_path)
+            mtime = os.path.getmtime(fixture_path)
+            if force or self._fixture_mtimes.get(fixture_path) != mtime:
+                changed_paths.append(fixture_path)
+
+        if not changed_paths:
             return
 
-        mtime = os.path.getmtime(self.fixture_path)
-        if not force and self._fixture_mtime == mtime:
-            return
+        for fixture_path in existing_paths:
+            fixture = self.load_fixture_file(fixture_path)
+            if fixture is None:
+                continue
 
+            self._fixture_mtimes[fixture_path] = os.path.getmtime(fixture_path)
+            self.apply_fixture(fixture)
+            print(f"Reloaded table fixture: {fixture_path}")
+
+    @staticmethod
+    def load_fixture_file(fixture_path):
         try:
-            with open(self.fixture_path, "r", encoding="utf-8") as fixture_file:
-                fixture = json.load(fixture_file)
+            with open(fixture_path, "r", encoding="utf-8") as fixture_file:
+                return json.load(fixture_file)
         except json.JSONDecodeError:
-            return
-
-        self._fixture_mtime = mtime
-        self.apply_fixture(fixture)
-        print(f"Reloaded table fixture: {self.fixture_path}")
+            return None
 
     def apply_fixture(self, fixture):
         """Apply dev fixture values that imitate controller visual commands."""
@@ -215,6 +258,9 @@ class TableScreen(GameScreen):
         for group_id, group_fixture in node.get("groups", {}).items():
             self.apply_group_fixture(group_id, group_fixture)
 
+        for child_frame_id, child_node in node.get("children", {}).items():
+            self.apply_gui_fixture_node(child_frame_id, child_node)
+
         activity_fixture = node.get("activity")
         if activity_fixture is not None and frame_id in self.hand_activities:
             self.hand_activities[frame_id].apply_fixture(activity_fixture)
@@ -222,9 +268,6 @@ class TableScreen(GameScreen):
         for activity_id, fixture in node.get("activities", {}).items():
             if activity_id in self.hand_activities:
                 self.hand_activities[activity_id].apply_fixture(fixture)
-
-        for child_frame_id, child_node in node.get("children", {}).items():
-            self.apply_gui_fixture_node(child_frame_id, child_node)
 
     def apply_frame_fixture(self, frame_id, fixture):
         """Apply dev fixture values for a Frame and its descendants."""
