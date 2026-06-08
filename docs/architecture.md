@@ -215,6 +215,30 @@ In architectural terms, `start_activity` should be used for durable visual
 behavior modes. A short finite command should map to an `Action`, either owned
 by the screen, a frame, or an activity.
 
+## Animation Types
+
+The project uses three architectural animation types:
+
+1. Coordinate animation.
+   Moves or scales a visual object by changing its position, rect, or
+   `scale_factor` over time. Examples: move a card from a hand to the table,
+   raise a hovered card, or enlarge a selected card.
+
+2. Sprite animation.
+   Changes the current frame of an image layer over time while the object's
+   placement can stay fixed. Examples: animated portraits, effects, or any
+   spritesheet-driven visual state.
+
+3. Combined animation.
+   Runs coordinate animation and sprite animation together as one visual step.
+   Examples: a card flying to the table while flipping, or an effect moving
+   across the table while its sprite frames advance.
+
+`Action` is the preferred owner for short finite animations. `Activity` can
+start and coordinate actions when a long-lived visual mode needs them. `Group`
+remains a passive drawable object: it exposes position, scale, layer frame, and
+layer resource APIs, but it does not decide animation timing or game meaning.
+
 ## Generated Visual Groups
 
 Some activities represent a visual projection rather than a fixed configured

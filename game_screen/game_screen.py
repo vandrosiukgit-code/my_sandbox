@@ -133,18 +133,25 @@ class GameScreen(BaseGameScreen):
         if input_event is None:
             return True
 
+        if self.forward_input_to_activities(input_event) is False:
+            return True
+
         visual_commands = self.forward_input_to_controller(input_event)
         self.dispatch_visual_commands(visual_commands)
         return True
 
     def build_input_event(self, event):
         """Convert a pygame event to a ScreenInputEvent when it matters."""
-        if event.type != pygame.MOUSEBUTTONDOWN:
+        if event.type not in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEMOTION):
             return None
 
-        button = self.normalize_mouse_button(event.button)
+        button = self.normalize_mouse_button(event.button) if event.type == pygame.MOUSEBUTTONDOWN else None
         hit = self.hit_test(event.pos)
-        click_type = self.resolve_click_type(button, hit, event.pos)
+        click_type = (
+            self.resolve_click_type(button, hit, event.pos)
+            if event.type == pygame.MOUSEBUTTONDOWN
+            else "hover"
+        )
         return ScreenInputEvent(
             type=click_type,
             button=button,
@@ -154,6 +161,14 @@ class GameScreen(BaseGameScreen):
             local_pos=hit.local_pos if hit else None,
             raw_event=event,
         )
+
+    def forward_input_to_activities(self, input_event):
+        """Let visual activities consume normalized input before controller rules."""
+        for activity in reversed(tuple(self.active_activities)):
+            handler = getattr(activity, "handle_input", None)
+            if handler is not None and handler(input_event) is False:
+                return False
+        return True
 
     def normalize_mouse_button(self, button):
         return {

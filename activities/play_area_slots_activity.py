@@ -11,17 +11,8 @@ class PlayAreaSlotsActivity(Activity):
     placement, and size before Controller-driven slot state exists.
     """
 
-    DEFAULT_SLOT_OFFSETS = (
-        (0, 0),
-        (-1, 0),
-        (1, 0),
-        (-2, 0),
-        (2, 0),
-        (-2, -1),
-        (-2, 1),
-        (2, -1),
-        (2, 1),
-    )
+    DEFAULT_CENTER_ROW_RADIUS = 2
+    DEFAULT_SIDE_ROW_RADIUS = 1
     DEFAULT_SLOT_ACTIVITY_FIXTURE = {
         "cards": (
             "cards.6_of_clubs",
@@ -98,24 +89,88 @@ class PlayAreaSlotsActivity(Activity):
                 self.origin[1] + slot_size[1] // 2,
             )
         if center is None:
-            center = self.play_area_frame.content_rect.center
+            center = self.get_default_layout_center()
+
+        slot_offsets = tuple(
+            self.get_slot_offset(index)
+            for index in range(len(self.managed_slot_ids))
+        )
+        step_x, step_y = self.get_slot_step(slot_size, slot_offsets)
 
         for index, frame_id in enumerate(self.managed_slot_ids):
             slot_frame = self.screen.get_screen_frame(frame_id)
-            offset_x, offset_y = self.get_slot_offset(index)
-            step_x, step_y = self.get_slot_step(slot_size)
+            offset_x, offset_y = slot_offsets[index]
             x = center[0] + offset_x * step_x - slot_size[0] // 2
             y = center[1] + offset_y * step_y - slot_size[1] // 2
             slot_frame.set_local_rect((x, y, slot_size[0], slot_size[1]))
 
-    def get_slot_step(self, slot_size):
+    def get_default_layout_center(self):
+        center_x, center_y = self.play_area_frame.content_rect.center
+        horizontal_bounds = self.get_player_inner_horizontal_bounds()
+        if horizontal_bounds is not None:
+            left, right = horizontal_bounds
+            center_x = int(round((left + right) / 2))
+        return center_x, center_y
+
+    def get_slot_step(self, slot_size, slot_offsets=None):
         """Return distance between slot centers in play-area local coordinates."""
         if self.step is not None:
             return self.step
+        slot_offsets = slot_offsets or ()
         return (
-            int(slot_size[0] + self.spacing[0]),
+            self.calculate_horizontal_slot_step(slot_size, slot_offsets),
             int(slot_size[1] + self.spacing[1]),
         )
+
+    def calculate_horizontal_slot_step(self, slot_size, slot_offsets):
+        horizontal_bounds = self.get_player_inner_horizontal_bounds()
+        if horizontal_bounds is None:
+            return int(slot_size[0] + self.spacing[0])
+
+        min_offset, max_offset = self.get_horizontal_offset_span(slot_offsets)
+        if min_offset == max_offset:
+            return int(slot_size[0] + self.spacing[0])
+
+        left, right = horizontal_bounds
+        available_width = max(1, right - left)
+        step = (available_width - slot_size[0]) / (max_offset - min_offset)
+        return max(1, int(round(step)))
+
+    def get_player_inner_horizontal_bounds(self):
+        left_rect = self.get_player_fan_or_frame_rect("left_player_hand", "left_player_frame")
+        right_rect = self.get_player_fan_or_frame_rect("right_player_hand", "right_player_frame")
+        if left_rect is None or right_rect is None:
+            return None
+
+        left_inner_x = self.play_area_frame.to_local((left_rect.right, 0))[0]
+        right_inner_x = self.play_area_frame.to_local((right_rect.left, 0))[0]
+        if left_inner_x >= right_inner_x:
+            return None
+
+        content_rect = self.play_area_frame.content_rect
+        return (
+            max(content_rect.left, left_inner_x),
+            min(content_rect.right, right_inner_x),
+        )
+
+    def get_player_fan_or_frame_rect(self, activity_id, frame_id):
+        activity = getattr(self.screen, "hand_activities", {}).get(activity_id)
+        if activity is not None and hasattr(activity, "calculate_fan_rect"):
+            fan_rect = activity.calculate_fan_rect()
+            if fan_rect is not None:
+                return fan_rect
+
+        try:
+            return self.screen.get_screen_frame(frame_id).rect
+        except KeyError:
+            return None
+
+    @staticmethod
+    def get_horizontal_offset_span(slot_offsets):
+        if not slot_offsets:
+            return 0, 0
+        x_offsets = [offset[0] for offset in slot_offsets]
+        return min(x_offsets), max(x_offsets)
 
     def get_prototype_slot_size(self):
         if self.prototype_slot_activity is not None:
@@ -197,27 +252,44 @@ class PlayAreaSlotsActivity(Activity):
     def get_slot_offset(self, index):
         """Return layout offset for a slot by creation order.
 
-        Slot positions are a fixed table layout owned by this activity. The
-        fixture only changes how many CardsSlotActivity instances are active.
+        Slot positions are generated from the center outward. The fixture can
+        still override offsets for debugging, but the default layout is derived.
         """
         if self.slot_offsets is not None and index < len(self.slot_offsets):
             return self.slot_offsets[index]
         return self.get_default_slot_offset(index)
 
-    def get_default_slot_offset(self, index):
-        if index < len(self.DEFAULT_SLOT_OFFSETS):
-            return self.DEFAULT_SLOT_OFFSETS[index]
+    @classmethod
+    def get_default_slot_offset(cls, index):
+        return cls.generate_default_slot_offsets(index + 1)[index]
 
-        ring_index = index - len(self.DEFAULT_SLOT_OFFSETS)
-        ring = 3 + ring_index // 4
-        side = ring_index % 4
-        if side == 0:
-            return -ring, 0
-        if side == 1:
-            return ring, 0
-        if side == 2:
-            return -ring, -1
-        return ring, 1
+    @classmethod
+    def generate_default_slot_offsets(cls, count):
+        offsets = []
+        for x in cls.iter_center_out_axis(cls.DEFAULT_CENTER_ROW_RADIUS):
+            offsets.append((x, 0))
+            if len(offsets) >= count:
+                return tuple(offsets)
+
+        side_x = cls.DEFAULT_CENTER_ROW_RADIUS
+        while len(offsets) < count:
+            for y in cls.iter_center_out_axis(cls.DEFAULT_SIDE_ROW_RADIUS):
+                if y == 0:
+                    continue
+                for x in (-side_x, side_x):
+                    offsets.append((x, y))
+                    if len(offsets) >= count:
+                        return tuple(offsets)
+            side_x += 1
+
+        return tuple(offsets)
+
+    @staticmethod
+    def iter_center_out_axis(radius):
+        yield 0
+        for distance in range(1, int(radius) + 1):
+            yield -distance
+            yield distance
 
     @staticmethod
     def get_center_out_offset(index):

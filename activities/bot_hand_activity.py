@@ -31,6 +31,8 @@ class BotHandActivity(Activity):
         center_offset=(50, 0),
         card_resource_provider=None,
         card_layer_name="card_back",
+        debug_fan_rect=False,
+        debug_fan_rect_color=(255, 232, 64),
     ):
         super().__init__(duration=0.0)
         self.frame = frame
@@ -47,6 +49,8 @@ class BotHandActivity(Activity):
         self.card_resource_provider = card_resource_provider
         self.card_layer_name = card_layer_name
         self.generated_groups = []
+        self.debug_fan_rect = bool(debug_fan_rect)
+        self.debug_fan_rect_color = tuple(debug_fan_rect_color)
 
     def start(self):
         """Запустить режим руки и подготовить первый визуальный snapshot."""
@@ -291,6 +295,19 @@ class BotHandActivity(Activity):
         """Отрисовать generated visual-only Group, которыми владеет Activity."""
         for group in self.generated_groups:
             group.draw(screen)
+        if self.debug_fan_rect:
+            self.draw_fan_rect(screen)
+
+    def draw_fan_rect(self, screen):
+        bounds = self.calculate_fan_rect()
+        if bounds is not None:
+            pygame.draw.rect(screen, self.debug_fan_rect_color, bounds, 2)
+
+    def calculate_fan_rect(self):
+        bounds = None
+        for group in self.generated_groups:
+            bounds = group.rect.copy() if bounds is None else bounds.union(group.rect)
+        return bounds
 
     def clear_generated_groups(self):
         """Удалить все generated visual-only Group из frame и владения."""

@@ -3,7 +3,10 @@ import os
 
 from activities import (
     BotHandActivity,
+    CardSelectionActivity,
     CardsSlotActivityDecorator,
+    PlayerHandActivity,
+    PlayerTurnActivity,
     PlayAreaSlotsActivity,
     VisibleCardsHandDecorator,
 )
@@ -21,6 +24,11 @@ class TableScreen(GameScreen):
 
     SCREEN_SIZE = (1280, 720)
     BG_COLOR = (30, 30, 30)
+    PLAY_AREA_INSET = 20
+    SIDE_PLAYER_FRAME_SIZE = (260, 300)
+    CENTER_PLAYER_FRAME_SIZE = (300, 260)
+    PORTRAIT_FRAME_SIZE = (200, 200)
+    CARD_SLOT_FRAME_SIZE_RATIO = (0.72, 0.53)
 
     def __init__(self, group_store, game_controller):
         super().__init__(
@@ -30,44 +38,28 @@ class TableScreen(GameScreen):
         )
 
         self.create_frame("game_table", rect=(0, 0, 1280, 720))
-        self.create_frame("play_area_frame", rect=(0, 0, 1240, 680)).set_rect_visibility(False)
-        self.create_frame("cards_slot_frame", rect=(0, 0, 920, 360)).set_rect_visibility(False)
+        self.create_frame("play_area_frame", rect=self.rect_from_size(self.calculate_play_area_size())).set_rect_visibility(False)
+        self.create_frame("cards_slot_frame", rect=self.rect_from_size(self.calculate_card_slot_frame_size())).set_rect_visibility(False)
 
-        self.create_frame("left_player_frame", rect=(0, 0, 260, 300))
-        self.create_frame("left_player_portrait", rect=(0, 0, 200, 200))
-        self.create_frame("left_player_hand", rect=(0, 0, 260, 300))
+        self.create_frame("left_player_frame", rect=self.rect_from_size(self.SIDE_PLAYER_FRAME_SIZE))
+        self.create_frame("left_player_portrait", rect=self.rect_from_size(self.PORTRAIT_FRAME_SIZE))
+        self.create_frame("left_player_hand", rect=self.rect_from_size(self.SIDE_PLAYER_FRAME_SIZE))
 
-        self.create_frame("right_player_frame", rect=(0, 0, 260, 300))
-        self.create_frame("right_player_portrait", rect=(0, 0, 200, 200))
-        self.create_frame("right_player_hand", rect=(0, 0, 260, 300))
+        self.create_frame("right_player_frame", rect=self.rect_from_size(self.SIDE_PLAYER_FRAME_SIZE))
+        self.create_frame("right_player_portrait", rect=self.rect_from_size(self.PORTRAIT_FRAME_SIZE))
+        self.create_frame("right_player_hand", rect=self.rect_from_size(self.SIDE_PLAYER_FRAME_SIZE))
 
-        self.create_frame("top_player_frame", rect=(0, 0, 300, 260))
-        self.create_frame("top_player_portrait",  rect=(0, 0, 200, 200))
-        self.create_frame("top_player_hand", rect=(0, 0, 300, 260))
+        self.create_frame("top_player_frame", rect=self.rect_from_size(self.CENTER_PLAYER_FRAME_SIZE))
+        self.create_frame("top_player_portrait", rect=self.rect_from_size(self.PORTRAIT_FRAME_SIZE))
+        self.create_frame("top_player_hand", rect=self.rect_from_size(self.CENTER_PLAYER_FRAME_SIZE))
 
-        self.create_frame("bottom_player_frame", rect=(0, 0, 300, 260))
-        self.create_frame("bottom_player_portrait", rect=(0, 0, 200, 200))
-        self.create_frame("bottom_player_hand", rect=(0, 0, 300, 260))
+        self.create_frame("bottom_player_frame", rect=self.rect_from_size(self.CENTER_PLAYER_FRAME_SIZE))
+        self.create_frame("bottom_player_portrait", rect=self.rect_from_size(self.PORTRAIT_FRAME_SIZE))
+        self.create_frame("bottom_player_hand", rect=self.rect_from_size(self.CENTER_PLAYER_FRAME_SIZE))
 
-        self.put_frame_in_frame("play_area_frame", "game_table", position=(20, 20))
-        self.put_frame_in_frame("cards_slot_frame", "play_area_frame", position=(180, 180))
+        self.layout_play_area_frames()
 
-        self.put_frame_in_frame("left_player_frame", "game_table", position=(0, 210))
-        self.put_frame_in_frame("left_player_hand", "left_player_frame", position=(0, 0))
-        self.put_frame_in_frame("left_player_portrait", "left_player_frame", position=(20, 46))
-
-        self.put_frame_in_frame("right_player_frame", "game_table", position=(1020, 210))
-        self.put_frame_in_frame("right_player_hand", "right_player_frame", position=(0, 0))
-        self.put_frame_in_frame("right_player_portrait", "right_player_frame", position=(20, 46))
-
-        self.put_frame_in_frame("top_player_frame", "game_table", position=(490, -10))
-        self.put_frame_in_frame("top_player_hand", "top_player_frame", position=(0, 0))
-        self.put_frame_in_frame("top_player_portrait", "top_player_frame", position=(50, 30))
-
-        self.put_frame_in_frame("bottom_player_frame", "game_table", position=(490, 488))
-        self.put_frame_in_frame("bottom_player_hand", "bottom_player_frame", position=(0, 0))
-        self.put_frame_in_frame("bottom_player_portrait", "bottom_player_frame", position=(50, 30))
-
+        self.layout_player_frames()
 
         self.put_configured_group("table_group", "game_table", position=(0, 0))
         self.put_configured_group("left_player", "left_player_portrait", position=(0, 0))
@@ -83,44 +75,61 @@ class TableScreen(GameScreen):
             prototype_slot_activity=cards_slot_activity,
             slot_activity_factory=self.create_cards_slot_activity,
         )
+        player_turn_activity = PlayerTurnActivity(play_area_slots_activity)
+        bottom_player_hand_activity = CardSelectionActivity(
+            VisibleCardsHandDecorator(
+                PlayerHandActivity(
+                    frame=self.get_screen_frame("bottom_player_hand"),
+                    resource_manager=ResourceManager,
+                    card_count=0,
+                    scale_factor=0.7,
+                    orientation_degrees=0,
+                    center_offset=(-5, -20),
+                    max_card_angle=60,
+                ),
+                cards=(),
+                resource_manager=ResourceManager,
+            ),
+            player_turn_activity=player_turn_activity,
+        )
 
         self.hand_activities = {
-            "play_area_frame": play_area_slots_activity,
             "left_player_hand": BotHandActivity(
                 frame=self.get_screen_frame("left_player_hand"),
                 resource_manager=ResourceManager,
                 resource_key="cards.card_back",
-                card_count=8,
+                card_count=9,
+                scale_factor=0.7,
+                radius=80,
                 orientation_degrees=90,
-                center_offset=(20, 0),
+                center_offset=(-30, 0),
+                debug_fan_rect=True,
+                debug_fan_rect_color=(255, 232, 64),
             ),
             "right_player_hand": BotHandActivity(
                 frame=self.get_screen_frame("right_player_hand"),
                 resource_manager=ResourceManager,
                 resource_key="cards.card_back",
-                card_count=8,
+                card_count=9,
+                scale_factor=0.7,
+                radius=80,
                 orientation_degrees=-90,
-                center_offset=(-20, 0),
+                center_offset=(18, 0),
+                debug_fan_rect=True,
+                debug_fan_rect_color=(64, 200, 255),
             ),
             "top_player_hand": BotHandActivity(
                 frame=self.get_screen_frame("top_player_hand"),
                 resource_manager=ResourceManager,
                 resource_key="cards.card_back",
-                card_count=8,
+                card_count=9,
+                scale_factor=0.7,
+                radius=80,
                 orientation_degrees=180,
-                center_offset=(0, 0),
+                center_offset=(0, -30),
             ),
-            "bottom_player_hand": VisibleCardsHandDecorator(
-                BotHandActivity(
-                    frame=self.get_screen_frame("bottom_player_hand"),
-                    resource_manager=ResourceManager,
-                    card_count=0,
-                    orientation_degrees=0,
-                    center_offset=(0, 0),
-                ),
-                cards=(),
-                resource_manager=ResourceManager,
-            ),
+            "bottom_player_hand": bottom_player_hand_activity,
+            "play_area_frame": player_turn_activity,
             "cards_slot_frame": cards_slot_activity,
         }
         for activity in self.hand_activities.values():
@@ -145,6 +154,120 @@ class TableScreen(GameScreen):
             cards=(),
             resource_manager=ResourceManager,
         )
+
+    def layout_play_area_frames(self):
+        play_area_size = self.calculate_play_area_size()
+        card_slot_size = self.calculate_card_slot_frame_size()
+        self.put_frame_in_frame(
+            "play_area_frame",
+            "game_table",
+            position=(self.PLAY_AREA_INSET, self.PLAY_AREA_INSET),
+        )
+        self.put_frame_in_frame(
+            "cards_slot_frame",
+            "play_area_frame",
+            position=self.center_child(play_area_size, card_slot_size),
+        )
+
+    def calculate_play_area_size(self):
+        inset = self.PLAY_AREA_INSET * 2
+        return (
+            max(1, self.SCREEN_SIZE[0] - inset),
+            max(1, self.SCREEN_SIZE[1] - inset),
+        )
+
+    def calculate_card_slot_frame_size(self):
+        play_area_width, play_area_height = self.calculate_play_area_size()
+        width_ratio, height_ratio = self.CARD_SLOT_FRAME_SIZE_RATIO
+        return (
+            max(1, int(round(play_area_width * width_ratio))),
+            max(1, int(round(play_area_height * height_ratio))),
+        )
+
+    def layout_player_frames(self):
+        """Place all player zones from anchors and frame sizes."""
+        self.layout_player_frame("left", self.SIDE_PLAYER_FRAME_SIZE)
+        self.layout_player_frame("right", self.SIDE_PLAYER_FRAME_SIZE)
+        self.layout_player_frame("top", self.CENTER_PLAYER_FRAME_SIZE)
+        self.layout_player_frame("bottom", self.CENTER_PLAYER_FRAME_SIZE)
+
+    def layout_player_frame(self, player_id, frame_size):
+        player_frame_id = f"{player_id}_player_frame"
+        hand_frame_id = f"{player_id}_player_hand"
+        portrait_frame_id = f"{player_id}_player_portrait"
+        player_frame_position = self.calculate_player_frame_position(player_id, frame_size)
+
+        self.put_frame_in_frame(
+            player_frame_id,
+            "game_table",
+            position=player_frame_position,
+        )
+        self.put_frame_in_frame(hand_frame_id, player_frame_id, position=(0, 0))
+        self.put_frame_in_frame(
+            portrait_frame_id,
+            player_frame_id,
+            position=self.calculate_player_portrait_position(
+                player_id,
+                frame_size,
+                player_frame_position,
+            ),
+        )
+
+    def calculate_player_frame_position(self, player_id, frame_size):
+        screen_width, screen_height = self.SCREEN_SIZE
+        frame_width, frame_height = frame_size
+
+        if player_id == "left":
+            return 0, self.center_axis(screen_height, frame_height)
+        if player_id == "right":
+            return screen_width - frame_width, self.center_axis(screen_height, frame_height)
+        if player_id == "top":
+            return self.center_axis(screen_width, frame_width), 0
+        if player_id == "bottom":
+            return self.center_axis(screen_width, frame_width), screen_height - frame_height
+
+        raise ValueError(f"Unknown player layout anchor: {player_id}")
+
+    def calculate_player_portrait_position(self, player_id, frame_size, frame_position):
+        """Place portrait so its outer edge touches the play-area border."""
+        portrait_x, portrait_y = self.center_child(frame_size, self.PORTRAIT_FRAME_SIZE)
+        play_area_left, play_area_top, play_area_right, play_area_bottom = self.calculate_play_area_bounds()
+        frame_x, frame_y = frame_position
+        portrait_width, portrait_height = self.PORTRAIT_FRAME_SIZE
+
+        if player_id == "left":
+            portrait_x = play_area_left - frame_x
+        elif player_id == "right":
+            portrait_x = play_area_right - frame_x - portrait_width
+        elif player_id == "top":
+            portrait_y = play_area_top - frame_y
+        elif player_id == "bottom":
+            portrait_y = play_area_bottom - frame_y - portrait_height
+        else:
+            raise ValueError(f"Unknown player portrait anchor: {player_id}")
+
+        return int(round(portrait_x)), int(round(portrait_y))
+
+    def calculate_play_area_bounds(self):
+        play_area_width, play_area_height = self.calculate_play_area_size()
+        left = self.PLAY_AREA_INSET
+        top = self.PLAY_AREA_INSET
+        return left, top, left + play_area_width, top + play_area_height
+
+    @staticmethod
+    def center_child(parent_size, child_size):
+        return (
+            TableScreen.center_axis(parent_size[0], child_size[0]),
+            TableScreen.center_axis(parent_size[1], child_size[1]),
+        )
+
+    @staticmethod
+    def center_axis(parent_size, child_size):
+        return int(round((parent_size - child_size) / 2))
+
+    @staticmethod
+    def rect_from_size(size):
+        return 0, 0, int(size[0]), int(size[1])
 
     def put_configured_group(self, group_id, frame_id, position=(0, 0)):
         if self.group_store is None or not self.group_store.has(group_id):
@@ -225,6 +348,10 @@ class TableScreen(GameScreen):
 
     def apply_fixture(self, fixture):
         """Apply dev fixture values that imitate controller visual commands."""
+        if "card_counts" in fixture:
+            self.apply_card_counts_fixture(fixture["card_counts"])
+            return
+
         if "gui" in fixture:
             self.apply_gui_fixture_tree(fixture["gui"])
             return
@@ -240,6 +367,22 @@ class TableScreen(GameScreen):
         activities = fixture.get("activities", {})
         for activity_id, activity in self.hand_activities.items():
             activity.apply_fixture(activities.get(activity_id, {}))
+
+    def apply_card_counts_fixture(self, card_counts):
+        """Apply the compact table fixture: only visible hand sizes stay public."""
+        if not isinstance(card_counts, dict):
+            return
+
+        for activity_id, card_count in card_counts.items():
+            activity = self.hand_activities.get(activity_id)
+            if activity is None:
+                continue
+
+            activity_fixture = {"card_count": card_count}
+            if activity_id == "bottom_player_hand":
+                activity_fixture["cards_from_manifest"] = True
+
+            activity.apply_fixture(activity_fixture)
 
     def apply_gui_fixture_tree(self, tree):
         """Apply a fixture shaped like the GUI frame hierarchy."""

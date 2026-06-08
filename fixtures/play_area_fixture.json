@@ -4,7 +4,7 @@
       "position": [20, 20],
       "scale_factor": null,
       "activity": {
-        "slot_count": 8
+        "slot_count": 9
       },
       "children": {
         "cards_slot_frame": {
