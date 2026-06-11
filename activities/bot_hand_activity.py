@@ -84,6 +84,14 @@ class BotHandActivity(Activity):
         self.sync_visual_groups()
         self.apply_fan_layout()
 
+    def configure_card_resources(self, provider=None, layer_name=None, card_count=None):
+        """Configure the public resource contract used for generated cards."""
+        self.card_resource_provider = provider
+        if layer_name is not None:
+            self.card_layer_name = layer_name
+        if card_count is not None:
+            self.card_count = max(0, int(card_count))
+
     def apply_fixture(self, fixture):
         """Применить dev fixture без участия правил игры.
 

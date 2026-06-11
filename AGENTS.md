@@ -18,6 +18,31 @@ Prefer explicit interpreter calls:
 & ".\.venv\Scripts\python.exe" -m py_compile <changed_file.py>
 ```
 
+Codex sandbox note:
+
+The virtual environment is valid on the host machine, but normal sandboxed
+execution may fail because `.venv\Scripts\python.exe` resolves its base
+interpreter outside the workspace:
+
+```text
+C:\Users\Zver\AppData\Local\Programs\Python\Python311\python.exe
+```
+
+If an explicit `.venv\Scripts\python.exe` command fails with `No Python at ...`
+or another sandbox-related access error, rerun the same check with elevated
+access instead of treating the virtual environment as broken.
+
+Allowed elevated command categories for this project:
+
+```powershell
+& ".\.venv\Scripts\python.exe" -m py_compile ...
+& ".\.venv\Scripts\python.exe" -m unittest ...
+& ".\.venv\Scripts\python.exe" -m code_map ...
+```
+
+Keep elevated requests narrow. Do not request broad approval for arbitrary
+`python`, `py`, or generic PowerShell execution.
+
 Do not run:
 
 ```powershell
@@ -28,7 +53,8 @@ py ...
 
 unless the user explicitly asks to debug shell activation.
 
-If the explicit interpreter path fails, stop and report the exact error instead of trying random Python installations.
+If the explicit interpreter path still fails after the allowed elevated retry,
+stop and report the exact error instead of trying random Python installations.
 
 ---
 

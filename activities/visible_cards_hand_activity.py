@@ -17,25 +17,54 @@ class VisibleCardsHandDecorator(Activity):
         cards=None,
         resource_manager=None,
         max_cards=None,
+        strict_max_cards=False,
         owns_hand_activity=True,
     ):
         super().__init__(duration=0.0)
         self.hand_activity = hand_activity
+        self.validate_hand_activity(hand_activity)
         self.resource_manager = resource_manager
         self.max_cards = self.normalize_max_cards(max_cards)
+        self.strict_max_cards = bool(strict_max_cards)
         self.owns_hand_activity = bool(owns_hand_activity)
         self.card_resource_keys = self.limit_cards(self.normalize_cards(cards or ()))
-        self.hand_activity.card_resource_provider = self.get_card_resource_key
-        self.hand_activity.card_layer_name = "card"
-        self.hand_activity.card_count = len(self.card_resource_keys)
+        self.configure_hand_activity()
+
+    @staticmethod
+    def validate_hand_activity(hand_activity):
+        required_methods = (
+            "start",
+            "update",
+            "draw",
+            "apply_fixture",
+            "clear_generated_groups",
+            "sync_visual_groups",
+            "apply_fan_layout",
+            "is_finished",
+            "finish",
+            "configure_card_resources",
+        )
+        for method_name in required_methods:
+            if not callable(getattr(hand_activity, method_name, None)):
+                raise TypeError(f"hand_activity must provide {method_name}()")
+
+    def configure_hand_activity(self):
+        self.hand_activity.configure_card_resources(
+            provider=self.get_card_resource_key,
+            layer_name="card",
+            card_count=len(self.card_resource_keys),
+        )
 
     def start(self):
         if self.started:
             return
         super().start()
-        self.hand_activity.start()
+        if not getattr(self.hand_activity, "started", False):
+            self.hand_activity.start()
 
     def update(self, dt):
+        if not self.started:
+            self.start()
         self.hand_activity.update(dt)
 
     def draw(self, screen):
@@ -55,24 +84,23 @@ class VisibleCardsHandDecorator(Activity):
         decorated_fixture.pop("resource_key", None)
         self.hand_activity.apply_fixture(decorated_fixture)
 
-    def set_cards(self, cards):
+    def set_cards(self, cards, force=False):
         """Replace visible cards and force generated groups to use new resources."""
         next_keys = self.limit_cards(self.normalize_cards(cards))
-        if next_keys == self.card_resource_keys:
+        if not force and next_keys == self.card_resource_keys:
             return
 
         self.hand_activity.clear_generated_groups()
         self.card_resource_keys = next_keys
-        self.hand_activity.card_count = len(self.card_resource_keys)
+        self.configure_hand_activity()
         if getattr(self.hand_activity, "started", False):
             self.hand_activity.sync_visual_groups()
             self.hand_activity.apply_fan_layout()
 
     def get_card_resource_key(self, index):
-        try:
-            return self.card_resource_keys[index]
-        except IndexError as error:
-            raise RuntimeError("VisibleCardsHandDecorator card index is out of range") from error
+        if index < 0 or index >= len(self.card_resource_keys):
+            raise RuntimeError("VisibleCardsHandDecorator card index is out of range")
+        return self.card_resource_keys[index]
 
     def is_finished(self):
         return self._finished or self.hand_activity.is_finished()
@@ -108,11 +136,11 @@ class VisibleCardsHandDecorator(Activity):
     def get_manifest_card_keys(self, fixture):
         """Temporary GUI debug source; Controller must provide real hand cards."""
         if self.resource_manager is None:
-            return ()
+            raise RuntimeError("cards_from_manifest requires resource_manager")
 
         resource_keys = tuple(
             key
-            for key in self.resource_manager.get_runtime_cache()
+            for key in sorted(self.resource_manager.get_runtime_cache())
             if key.startswith("cards.") and key != "cards.card_back"
         )
         start, stop = self.get_fixture_slice_bounds(fixture)
@@ -126,13 +154,18 @@ class VisibleCardsHandDecorator(Activity):
                 normalized.append(card)
             elif isinstance(card, dict):
                 resource_key = card.get("resource_key") or card.get("key")
-                if resource_key:
-                    normalized.append(str(resource_key))
+                if not resource_key:
+                    raise TypeError(f"Card descriptor requires resource_key or key: {card!r}")
+                normalized.append(str(resource_key))
+            else:
+                raise TypeError(f"Unsupported card descriptor: {card!r}")
         return tuple(normalized)
 
     def limit_cards(self, cards):
         if self.max_cards is None:
             return tuple(cards)
+        if self.strict_max_cards and len(cards) > self.max_cards:
+            raise ValueError(f"Too many cards: {len(cards)} > {self.max_cards}")
         return tuple(cards)[: self.max_cards]
 
     @staticmethod
@@ -150,11 +183,16 @@ class VisibleCardsHandDecorator(Activity):
             start = card_slice.get("start", 0)
             stop = card_slice.get("stop", card_slice.get("end"))
         else:
+            if not isinstance(card_slice, (tuple, list)):
+                raise TypeError("card_slice must be dict, tuple or list")
             values = tuple(card_slice)
             start = values[0] if len(values) >= 1 else 0
             stop = values[1] if len(values) >= 2 else None
         start = 0 if start is None else int(start)
         stop = None if stop is None else int(stop)
+        start = max(0, start)
+        if stop is not None:
+            stop = max(start, stop)
         return start, stop
 
     @classmethod
