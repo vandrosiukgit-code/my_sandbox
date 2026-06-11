@@ -110,6 +110,10 @@ class VisibleCardsHandDecorator(Activity):
             self.hand_activity.finish()
         super().finish()
 
+    def iter_generated_groups(self):
+        """Return generated visual groups owned by the wrapped hand activity."""
+        return tuple(getattr(self.hand_activity, "generated_groups", ()))
+
     def get_card_selection_context(self, group):
         """Return controller-facing selection data for a wrapped hand group."""
         if not hasattr(self.hand_activity, "get_card_selection_context"):
