@@ -26,6 +26,7 @@ class CardSelectionActivity(Activity):
         self.selected_card_context = None
         self.selection_actions = {}
         self.rest_states = {}
+        self._last_hand_layout_signature = None
 
     @staticmethod
     def validate_hand_activity(hand_activity):
@@ -47,6 +48,7 @@ class CardSelectionActivity(Activity):
             self.start()
             return
         self.hand_activity.update(dt)
+        self.invalidate_rest_states_if_layout_changed()
         self.prune_stale_group_state()
         self.refresh_rest_states()
         self.update_selection_actions(dt)
@@ -173,23 +175,13 @@ class CardSelectionActivity(Activity):
         return visible
 
     def iter_card_groups(self):
-        owner = self.get_generated_group_owner()
-        if owner is None:
-            return ()
-        if hasattr(owner, "iter_generated_groups"):
-            return tuple(owner.iter_generated_groups())
-        return tuple(getattr(owner, "generated_groups", ()))
+        if hasattr(self.hand_activity, "iter_generated_groups"):
+            return tuple(self.hand_activity.iter_generated_groups())
+        return ()
 
     def iter_generated_groups(self):
         """Return visual hand groups for the screen draw pipeline."""
         return self.iter_card_groups()
-
-    def get_generated_group_owner(self):
-        if hasattr(self.hand_activity, "generated_groups"):
-            return self.hand_activity
-        if hasattr(self.hand_activity, "hand_activity"):
-            return self.hand_activity.hand_activity
-        return None
 
     def get_base_scale(self, group):
         self.ensure_rest_state(group)
@@ -241,6 +233,35 @@ class CardSelectionActivity(Activity):
         selected_group_id = self.get_selected_group_id()
         if selected_group_id is not None and selected_group_id not in current_ids:
             self.selected_card_context = None
+        elif selected_group_id is not None:
+            self.selected_card_context = self.get_card_selection_context(
+                current_groups[selected_group_id]
+            )
+
+    def invalidate_rest_states_if_layout_changed(self):
+        current_signature = self.get_hand_layout_signature()
+        if current_signature == self._last_hand_layout_signature:
+            return
+        self._last_hand_layout_signature = current_signature
+        self.rest_states = {}
+        for action in self.selection_actions.values():
+            if hasattr(action, "cancel"):
+                action.cancel()
+        self.selection_actions = {}
+        self.hovered_group = None
+
+    def get_hand_layout_signature(self):
+        getter = getattr(self.hand_activity, "get_layout_signature", None)
+        if callable(getter):
+            return getter()
+        return tuple(
+            (
+                group.id,
+                tuple(group.local_rect),
+                1.0 if group.scale_factor is None else group.scale_factor,
+            )
+            for group in self.iter_card_groups()
+        )
 
     def get_selected_group_id(self):
         if not self.selected_card_context:

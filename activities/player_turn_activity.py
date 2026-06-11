@@ -32,7 +32,6 @@ class PlayerTurnActivity(Activity):
         if self.started:
             return
         super().start()
-        self.turn_active = True
         if not getattr(self.play_area_slots_activity, "started", False):
             self.play_area_slots_activity.start()
 
@@ -40,10 +39,16 @@ class PlayerTurnActivity(Activity):
         """Start one visual turn with controller-facing context."""
         if self.turn_active:
             return False
+        if not self.started:
+            self.start()
         self.turn_context = dict(turn_context or {})
         self.turn_active = True
-        self.start()
         return True
+
+    def finish_turn(self):
+        """Finish the current visual turn without finishing the activity."""
+        self.turn_active = False
+        self.turn_context = None
 
     def update(self, dt):
         if not self.started:

@@ -10,6 +10,7 @@ import math
 import pygame
 
 from activities.base_activity import Activity
+from game_screen import debug_overlay
 from group import Group
 
 
@@ -52,6 +53,7 @@ class BotHandActivity(Activity):
         self.group_hand_indices = {}
         self.group_card_ids = {}
         self.group_resource_keys = {}
+        self.group_base_frames = {}
         self._last_layout_signature = None
         self.debug_fan_rect = bool(debug_fan_rect)
         self.debug_fan_rect_color = tuple(debug_fan_rect_color)
@@ -167,6 +169,7 @@ class BotHandActivity(Activity):
             self.group_hand_indices.pop(group.id, None)
             self.group_card_ids.pop(group.id, None)
             self.group_resource_keys.pop(group.id, None)
+            self.group_base_frames.pop(group.id, None)
 
     def apply_fan_layout(self):
         """Рассчитать и применить веер закрытых карт внутри frame.
@@ -191,7 +194,6 @@ class BotHandActivity(Activity):
             angle = self.orientation_degrees + local_angle
             pivot_x, pivot_y = self.calculate_pivot_position(center_x, center_y, angle)
             self.apply_card_transform(group, angle, (pivot_x, pivot_y))
-            self.frame.set_group_origin(group.id, group.local_rect.topleft)
         self._last_layout_signature = self.get_layout_signature()
 
     @staticmethod
@@ -239,7 +241,7 @@ class BotHandActivity(Activity):
 
     def apply_card_transform(self, group, angle_degrees, pivot_position):
         """Повернуть карту вокруг нижнего центра и поставить в pivot."""
-        base_surface = group._bot_hand_base_frames[0]
+        base_surface = self.group_base_frames[group.id][0]
         rotated_surface = pygame.transform.rotate(base_surface, -angle_degrees)
 
         group.set_primary_layer_frames([rotated_surface], position=(0, 0))
@@ -251,12 +253,20 @@ class BotHandActivity(Activity):
             angle_degrees,
         )
         offset_scale = self.get_activity_local_scale()
-        group.set_local_rect((
-            int(round(pivot_position[0] - pivot_offset[0] * offset_scale)),
-            int(round(pivot_position[1] - pivot_offset[1] * offset_scale)),
-            rotated_surface.get_width(),
-            rotated_surface.get_height(),
-        ))
+        self.set_group_local_rect(
+            group,
+            (
+                int(round(pivot_position[0] - pivot_offset[0] * offset_scale)),
+                int(round(pivot_position[1] - pivot_offset[1] * offset_scale)),
+                rotated_surface.get_width(),
+                rotated_surface.get_height(),
+            ),
+        )
+
+    def set_group_local_rect(self, group, local_rect):
+        """Set group local rect and sync the frame-local group origin."""
+        group.set_local_rect(local_rect)
+        self.frame.set_group_origin(group.id, group.local_rect.topleft)
 
     def get_layout_signature(self):
         """Return frame-local inputs that require fan layout recalculation."""
@@ -342,7 +352,10 @@ class BotHandActivity(Activity):
             ((self.card_layer_name, resource_key),),
             resource_manager=self.resource_manager,
         )
-        group._bot_hand_base_frames = tuple(frame.copy() for frame in group.get_primary_layer_frames())
+        self.group_base_frames[group.id] = tuple(
+            frame.copy()
+            for frame in group.get_primary_layer_frames()
+        )
         self.generated_groups.append(group)
         self.group_hand_indices[group.id] = index
         self.group_resource_keys[group.id] = resource_key
@@ -382,7 +395,7 @@ class BotHandActivity(Activity):
         self.draw_debug_overlay(screen)
 
     def draw_debug_overlay(self, screen):
-        if self.debug_fan_rect:
+        if self.debug_fan_rect and debug_overlay.should_draw_activity_rect():
             self.draw_fan_rect(screen)
 
     def draw_fan_rect(self, screen):
@@ -404,6 +417,7 @@ class BotHandActivity(Activity):
         self.group_hand_indices = {}
         self.group_card_ids = {}
         self.group_resource_keys = {}
+        self.group_base_frames = {}
         self._last_layout_signature = None
 
     def is_finished(self):

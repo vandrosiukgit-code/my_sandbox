@@ -554,7 +554,7 @@ class Group(BaseGroup):
 
     def should_draw_debug_rects(self):
         """Return True when this Group should draw debug rects."""
-        return debug_overlay.DEBUG_RECTS or not self.hide_rect
+        return debug_overlay.should_draw_group_rect(self)
 
     @staticmethod
     def normalize_rect_debug_layer_ids(layer_ids):

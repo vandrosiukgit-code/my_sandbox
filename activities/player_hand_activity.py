@@ -30,7 +30,8 @@ class PlayerHandActivity(BotHandActivity):
         *args,
         max_card_angle=45,
         edge_padding_ratio=0.02,
-        fan_width_ratio=0.75,
+        fan_width_ratio=0.95,
+        use_stable_reference_fan=False,
         **kwargs,
     ):
         normalized_max_card_angle = self.normalize_non_negative_float(
@@ -50,6 +51,15 @@ class PlayerHandActivity(BotHandActivity):
             "fan_width_ratio",
             maximum=1.0,
         )
+        self.use_stable_reference_fan = bool(use_stable_reference_fan)
+        self.fan_area_local_rect = None
+
+    def set_fan_area_local_rect(self, rect):
+        """Set explicit frame-local layout area for the player hand fan."""
+        if rect is None:
+            self.fan_area_local_rect = None
+            return
+        self.fan_area_local_rect = self.frame.round_rect(rect)
 
     def apply_fixture(self, fixture):
         if not fixture:
@@ -72,6 +82,9 @@ class PlayerHandActivity(BotHandActivity):
             "fan_width_ratio",
             maximum=1.0,
         )
+        self.use_stable_reference_fan = bool(
+            fixture.get("use_stable_reference_fan", self.use_stable_reference_fan)
+        )
 
         super().apply_fixture(fixture)
 
@@ -92,6 +105,7 @@ class PlayerHandActivity(BotHandActivity):
         """
         count = len(self.generated_groups)
         if count <= 0:
+            self._last_layout_signature = self.get_layout_signature()
             return
 
         geometry = self.calculate_fan_geometry()
@@ -115,12 +129,21 @@ class PlayerHandActivity(BotHandActivity):
                 self.orientation_degrees + local_angle,
                 pivot_position,
             )
+        self._last_layout_signature = self.get_layout_signature()
 
-            self.frame.set_group_origin(group.id, group.local_rect.topleft)
+    def get_layout_signature(self):
+        return (
+            super().get_layout_signature(),
+            self.max_card_angle,
+            self.edge_padding_ratio,
+            self.fan_width_ratio,
+            self.use_stable_reference_fan,
+            None if self.fan_area_local_rect is None else tuple(self.fan_area_local_rect),
+        )
 
     def calculate_fan_geometry(self):
         """Calculate all fan geometry from frame size, density, and max angle."""
-        frame_rect = self.frame.content_rect
+        frame_rect = self.get_fan_area_local_rect()
 
         padding = self.calculate_edge_padding(frame_rect)
         left_bound = frame_rect.left + padding
@@ -128,7 +151,10 @@ class PlayerHandActivity(BotHandActivity):
         card_half_width = self.get_card_local_half_width()
 
         center_x, center_y = self.get_fan_center(frame_rect)
-        center_x = max(left_bound, min(right_bound, center_x))
+        center_x = max(
+            left_bound + card_half_width,
+            min(right_bound - card_half_width, center_x),
+        )
         available_half_span = max(
             0,
             min(center_x - left_bound, right_bound - center_x) - card_half_width,
@@ -140,7 +166,8 @@ class PlayerHandActivity(BotHandActivity):
         angle_radians = math.radians(max_angle)
 
         radius = None
-        if half_span > 0 and angle_radians > 0:
+        min_angle_radians = math.radians(0.5)
+        if half_span > 0 and angle_radians >= min_angle_radians:
             radius = half_span / math.sin(angle_radians)
 
         return FanGeometry(
@@ -151,20 +178,37 @@ class PlayerHandActivity(BotHandActivity):
             radius=radius,
         )
 
+    def get_fan_area_local_rect(self):
+        if self.fan_area_local_rect is None:
+            return self.frame.content_rect
+        return self.fan_area_local_rect.copy()
+
     def calculate_edge_padding(self, frame_rect):
         return max(0, int(round(frame_rect.width * self.edge_padding_ratio)))
 
     def get_card_local_half_width(self):
-        if not self.generated_groups:
-            return 0.0
-        return max(0.0, self.generated_groups[0].local_rect.width / 2)
+        return max(
+            (group.local_rect.width / 2 for group in self.generated_groups),
+            default=0.0,
+        )
+
+    def get_fan_center(self, frame_rect):
+        """Return bottom-hand baseline center in frame-local coordinates."""
+        local_scale = self.get_activity_local_scale()
+        return (
+            frame_rect.centerx + int(round(self.center_offset[0] * local_scale)),
+            frame_rect.bottom + int(round(self.center_offset[1] * local_scale)),
+        )
 
     def calculate_slot_position(self, index, count):
         """Return a compact normalized slot centered around the fan middle."""
         if count <= 1:
             return 0.0
 
-        reference_count = max(count, self.reference_card_count)
+        if self.use_stable_reference_fan:
+            reference_count = max(count, self.reference_card_count)
+        else:
+            reference_count = count
         max_slot_offset = max(1.0, (reference_count - 1) / 2)
         slot_offset = index - (count - 1) / 2
 
@@ -177,7 +221,7 @@ class PlayerHandActivity(BotHandActivity):
         if radius is None:
             return 0
 
-        return radius * (1 - math.cos(math.radians(angle_degrees)))
+        return -radius * (1 - math.cos(math.radians(angle_degrees)))
 
     def draw(self, screen):
         """Draw debug overlays for this activity; groups are drawn by GameScreen."""
@@ -188,7 +232,7 @@ class PlayerHandActivity(BotHandActivity):
         return self.iter_groups_in_draw_order()
 
     def iter_groups_in_draw_order(self):
-        return tuple(sorted(self.generated_groups, key=self.get_group_draw_x))
+        return tuple(self.generated_groups)
 
     @staticmethod
     def get_group_draw_x(group):

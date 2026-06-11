@@ -351,7 +351,7 @@ class Frame(BaseFrame):
         pygame.draw.rect(screen, debug_overlay.get_rect_color(depth), self.rect, 2)
 
     def draw_debug_tree(self, screen, depth=0):
-        if self.should_draw_debug_rects():
+        if self.should_draw_debug_rects(depth):
             self.draw_debug_rects(screen, depth)
         for child_frame in self.child_frames.values():
             child_frame.draw_debug_tree(screen, depth + 1)
@@ -361,9 +361,9 @@ class Frame(BaseFrame):
         self.hide_rect = bool(hide_rect)
         return self
 
-    def should_draw_debug_rects(self):
+    def should_draw_debug_rects(self, depth=0):
         """Return True when this Frame should draw debug rects."""
-        return debug_overlay.DEBUG_RECTS or not self.hide_rect
+        return debug_overlay.should_draw_frame_rect(self, depth)
 
     def _to_screen_rect(self, rect):
         """Convert a rect from parent-frame coordinates to screen coordinates."""

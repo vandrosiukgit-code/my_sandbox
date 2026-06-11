@@ -1,0 +1,10 @@
+{
+  "debug": {
+    "enabled": true,
+    "frames": true,
+    "groups": false,
+    "activities": false,
+    "frame_depths": [2],
+    "frame_id_prefixes": ["cards_slot_frame"]
+  }
+}

@@ -122,6 +122,20 @@ class VisibleCardsHandDecorator(Activity):
             return tuple(self.hand_activity.iter_generated_groups())
         return tuple(getattr(self.hand_activity, "generated_groups", ()))
 
+    def get_layout_signature(self):
+        """Return the wrapped hand layout signature when available."""
+        getter = getattr(self.hand_activity, "get_layout_signature", None)
+        if callable(getter):
+            return getter()
+        return tuple(
+            (
+                group.id,
+                tuple(group.local_rect),
+                1.0 if group.scale_factor is None else group.scale_factor,
+            )
+            for group in self.iter_generated_groups()
+        )
+
     def get_card_selection_context(self, group):
         """Return controller-facing selection data for a wrapped hand group."""
         if not hasattr(self.hand_activity, "get_card_selection_context"):

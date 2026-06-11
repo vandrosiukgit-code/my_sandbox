@@ -96,11 +96,7 @@ class PlayAreaSlotsActivity(Activity):
         return tuple(groups)
 
     def draw_debug_overlay(self, screen):
-        for activity in self.slot_activities.values():
-            if hasattr(activity, "draw_debug_overlay"):
-                activity.draw_debug_overlay(screen)
-            elif hasattr(activity, "draw"):
-                activity.draw(screen)
+        _ = screen
 
     def apply_fixture(self, fixture):
         if not fixture:

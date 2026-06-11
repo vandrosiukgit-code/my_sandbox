@@ -1,6 +1,8 @@
 import json
 import os
 
+import pygame
+
 from activities import (
     BotHandActivity,
     CardSelectionActivity,
@@ -11,12 +13,14 @@ from activities import (
     VisibleCardsHandDecorator,
 )
 from core.resource import ResourceManager
+from game_screen import debug_overlay
 from game_screen.game_screen import GameScreen
 
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURE_PATH = os.path.join(PROJECT_DIR, "fixtures", "table_screen_fixture.json")
 PLAY_AREA_FIXTURE_PATH = os.path.join(PROJECT_DIR, "fixtures", "play_area_fixture.json")
+DEBUG_OVERLAY_FIXTURE_PATH = os.path.join(PROJECT_DIR, "fixtures", "debug_overlay_fixture.json")
 
 
 class TableScreen(GameScreen):
@@ -29,6 +33,9 @@ class TableScreen(GameScreen):
     CENTER_PLAYER_FRAME_SIZE = (300, 260)
     PORTRAIT_FRAME_SIZE = (200, 200)
     CARD_SLOT_FRAME_SIZE_RATIO = (0.72, 0.53)
+    BOTTOM_PLAYER_HAND_PROBE_ENABLED = False
+    BOTTOM_PLAYER_HAND_PROBE_COLOR = (255, 0, 0)
+    BOTTOM_PLAYER_HAND_PROBE_BOTTOM_OFFSET = 50
 
     def __init__(self, group_store, game_controller):
         super().__init__(
@@ -82,9 +89,9 @@ class TableScreen(GameScreen):
                     frame=self.get_screen_frame("bottom_player_hand"),
                     resource_manager=ResourceManager,
                     card_count=0,
-                    scale_factor=0.7,
+                    scale_factor=0.85,
                     orientation_degrees=0,
-                    center_offset=(-5, -20),
+                    center_offset=(-5, -18),
                     max_card_angle=60,
                 ),
                 cards=(),
@@ -135,7 +142,7 @@ class TableScreen(GameScreen):
         for activity_id, activity in activity_map.items():
             self.register_named_activity(activity_id, activity)
             self.add_activity(activity)
-        self.fixture_paths = (FIXTURE_PATH, PLAY_AREA_FIXTURE_PATH)
+        self.fixture_paths = (FIXTURE_PATH, PLAY_AREA_FIXTURE_PATH, DEBUG_OVERLAY_FIXTURE_PATH)
         self._fixture_mtimes = {}
         self._fixture_check_elapsed = 0.0
         self._fixture_check_interval = 0.2
@@ -316,6 +323,7 @@ class TableScreen(GameScreen):
         if self._fixture_check_elapsed >= self._fixture_check_interval:
             self._fixture_check_elapsed = 0.0
             self.reload_fixture_if_changed()
+        self.configure_bottom_player_hand_fan_area()
         super().update(dt)
 
     def draw(self, screen):
@@ -346,6 +354,8 @@ class TableScreen(GameScreen):
         ):
             self.draw_group_if_active(group_id, screen)
 
+        self.draw_bottom_player_hand_probe(screen)
+
         for frame in self.iter_root_frames():
             frame.draw_debug_tree(screen)
 
@@ -361,6 +371,8 @@ class TableScreen(GameScreen):
         seen_group_ids = set()
         groups = []
         for activity in self.iter_active_activities():
+            if self.should_hide_activity_generated_groups(activity):
+                continue
             if not hasattr(activity, "iter_generated_groups"):
                 continue
             for group in activity.iter_generated_groups():
@@ -369,6 +381,119 @@ class TableScreen(GameScreen):
                 seen_group_ids.add(group.id)
                 groups.append(group)
         return tuple(groups)
+
+    def should_hide_activity_generated_groups(self, activity):
+        if not self.BOTTOM_PLAYER_HAND_PROBE_ENABLED:
+            return False
+        return activity is self.get_named_activity("bottom_player_hand")
+
+    def draw_bottom_player_hand_probe(self, screen):
+        if not self.BOTTOM_PLAYER_HAND_PROBE_ENABLED:
+            return
+        probe_rect = self.calculate_bottom_player_hand_available_screen_rect()
+        if probe_rect.width <= 0 or probe_rect.height <= 0:
+            return
+        pygame.draw.rect(screen, self.BOTTOM_PLAYER_HAND_PROBE_COLOR, probe_rect)
+
+    def calculate_bottom_player_hand_available_screen_rect(self):
+        """Return screen-space area reserved for the bottom hand arc probe."""
+        hand_frame = self.get_screen_frame("bottom_player_hand")
+        hand_rect = hand_frame.rect.copy()
+        lower_slot_bounds = self.calculate_lower_play_area_slot_screen_bounds()
+        if lower_slot_bounds is None:
+            return hand_rect
+
+        left, _lower_slot_bottom, right = lower_slot_bounds
+        central_slot_bottom = self.calculate_central_play_area_slots_bottom()
+        top = central_slot_bottom if central_slot_bottom is not None else _lower_slot_bottom
+        return pygame.Rect(
+            left,
+            top,
+            max(0, right - left),
+            max(
+                0,
+                self.get_screen_frame("bottom_player_portrait").rect.centery
+                + self.BOTTOM_PLAYER_HAND_PROBE_BOTTOM_OFFSET
+                - top,
+            ),
+        )
+
+    def configure_bottom_player_hand_fan_area(self):
+        activity = self.find_nested_activity_with_method(
+            self.get_named_activity("bottom_player_hand"),
+            "set_fan_area_local_rect",
+        )
+        if activity is None:
+            return
+        screen_rect = self.calculate_bottom_player_hand_available_screen_rect()
+        local_rect = self.screen_rect_to_frame_local_rect(
+            screen_rect,
+            self.get_screen_frame("bottom_player_hand"),
+        )
+        activity.set_fan_area_local_rect(local_rect)
+
+    @staticmethod
+    def find_nested_activity_with_method(activity, method_name):
+        while activity is not None:
+            if callable(getattr(activity, method_name, None)):
+                return activity
+            activity = getattr(activity, "hand_activity", None)
+        return None
+
+    @staticmethod
+    def screen_rect_to_frame_local_rect(screen_rect, frame):
+        left, top = frame.to_local(screen_rect.topleft)
+        right, bottom = frame.to_local(screen_rect.bottomright)
+        return pygame.Rect(left, top, max(0, right - left), max(0, bottom - top))
+
+    def calculate_lower_play_area_slot_screen_bounds(self):
+        slot_rects = self.get_play_area_slot_screen_rects()
+        if not slot_rects:
+            return None
+
+        max_bottom = max(rect.bottom for rect in slot_rects)
+        lower_slots = [rect for rect in slot_rects if rect.bottom == max_bottom]
+        if len(lower_slots) < 2:
+            return None
+
+        hand_center_x = self.get_screen_frame("bottom_player_hand").rect.centerx
+        left_slots = [rect for rect in lower_slots if rect.centerx < hand_center_x]
+        right_slots = [rect for rect in lower_slots if rect.centerx > hand_center_x]
+        if not left_slots or not right_slots:
+            return None
+
+        left = max(rect.right for rect in left_slots)
+        right = min(rect.left for rect in right_slots)
+        return left, max_bottom, right
+
+    def calculate_central_play_area_slots_bottom(self):
+        slot_rects = self.get_play_area_slot_screen_rects()
+        if len(slot_rects) < 3:
+            return None
+
+        play_area_center_x = self.get_screen_frame("play_area_frame").rect.centerx
+        central_slots = sorted(
+            slot_rects,
+            key=lambda rect: abs(rect.centerx - play_area_center_x),
+        )[:3]
+        return max(rect.bottom for rect in central_slots)
+
+    def calculate_play_area_slot_screen_bounds(self):
+        slot_rects = self.get_play_area_slot_screen_rects()
+        if not slot_rects:
+            return None
+        return slot_rects[0].unionall(slot_rects[1:])
+
+    def get_play_area_slot_screen_rects(self):
+        return [
+            self.get_screen_frame(activity_id).rect
+            for activity_id, _activity in self.iter_named_activities()
+            if self.is_play_area_slot_frame_id(activity_id) and self.has_screen_frame(activity_id)
+        ]
+
+    @staticmethod
+    def is_play_area_slot_frame_id(frame_id):
+        return frame_id == "cards_slot_frame" or frame_id.startswith("cards_slot_frame_")
 
     def dispatch_visual_command(self, command):
         """Handle table-specific visual commands after controller decisions."""
@@ -421,13 +546,14 @@ class TableScreen(GameScreen):
 
     def apply_fixture(self, fixture):
         """Apply dev fixture values that imitate controller visual commands."""
+        if "debug" in fixture:
+            debug_overlay.configure(fixture["debug"])
+
         if "card_counts" in fixture:
             self.apply_card_counts_fixture(fixture["card_counts"])
-            return
 
         if "gui" in fixture:
             self.apply_gui_fixture_tree(fixture["gui"])
-            return
 
         frames = fixture.get("frames", {})
         for frame_id, frame_fixture in frames.items():
