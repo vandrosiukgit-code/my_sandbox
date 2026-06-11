@@ -12,7 +12,7 @@ class CardSelectionActivity(Activity):
     """
 
     HOVER_SCALE_MULTIPLIER = 1.18
-    HOVER_ANIMATION_SECONDS = 0.08
+    HOVER_ANIMATION_SECONDS = 0.16
     HOVER_LIFT_PIXELS = 28
     HOVER_HYSTERESIS_PIXELS = 8
     HOVER_EDGE_CARD_HYSTERESIS_PIXELS = 18
@@ -277,8 +277,14 @@ class CardSelectionActivity(Activity):
 
     def animate_group_to_hover(self, group):
         base_x, base_y = self.get_base_position(group)
-        target_position = (base_x, base_y - self.HOVER_LIFT_PIXELS)
-        target_scale = self.get_base_scale(group) * self.HOVER_SCALE_MULTIPLIER
+        base_scale = self.get_base_scale(group)
+        target_scale = base_scale * self.HOVER_SCALE_MULTIPLIER
+        target_position = self.calculate_centered_hover_position(
+            group,
+            (base_x, base_y),
+            base_scale,
+            target_scale,
+        )
         self.selection_actions[group.id] = CardSelectionAction(
             group,
             to_position=target_position,
@@ -295,6 +301,29 @@ class CardSelectionActivity(Activity):
             to_position=self.get_base_position(group),
             to_scale=self.get_base_scale(group),
             duration=self.HOVER_ANIMATION_SECONDS,
+        )
+
+    def calculate_centered_hover_position(self, group, base_position, base_scale, target_scale):
+        base_width, base_height = self.calculate_group_scaled_local_size(group, base_scale)
+        target_width, target_height = self.calculate_group_scaled_local_size(group, target_scale)
+        base_center = (
+            base_position[0] + base_width / 2,
+            base_position[1] + base_height / 2,
+        )
+        target_center = (
+            base_center[0],
+            base_center[1] - self.HOVER_LIFT_PIXELS,
+        )
+        return (
+            int(round(target_center[0] - target_width / 2)),
+            int(round(target_center[1] - target_height / 2)),
+        )
+
+    @staticmethod
+    def calculate_group_scaled_local_size(group, scale):
+        return (
+            int(round(group.local_rect.width * scale)),
+            int(round(group.local_rect.height * scale)),
         )
 
     def restore_non_hovered_groups(self, hovered_group):

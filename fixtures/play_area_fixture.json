@@ -4,7 +4,16 @@
       "position": [20, 20],
       "scale_factor": null,
       "activity": {
-        "slot_count": 9
+        "slot_count": 7,
+        "slot_offsets": [
+          [0, 0],
+          [-1, 0],
+          [1, 0],
+          [-2, 0],
+          [2, 0],
+          [-2, -1],
+          [2, -1]
+        ]
       },
       "children": {
         "cards_slot_frame": {

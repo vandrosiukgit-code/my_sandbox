@@ -179,6 +179,15 @@ class Frame(BaseFrame):
         """Move an already placed group using frame-local coordinates."""
         return self.place_group_local(group, local_position)
 
+    def place_group_center_local(self, group, local_center):
+        """Place a group so its projected local center matches local_center."""
+        scaled_rect = group.get_scaled_local_rect() if hasattr(group, "get_scaled_local_rect") else group.local_rect
+        local_position = (
+            local_center[0] - scaled_rect.width / 2,
+            local_center[1] - scaled_rect.height / 2,
+        )
+        return self.place_group_local(group, local_position)
+
     def set_group_origin(self, group_id, local_position):
         """Store the latest frame-local layout origin for a group."""
         self.group_origins[group_id] = self.round_pair(local_position)

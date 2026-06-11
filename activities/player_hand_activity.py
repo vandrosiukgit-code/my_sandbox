@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 import math
 
+import pygame
+
 from activities.bot_hand_activity import BotHandActivity
 from activities.cards_slot_activity import CardsSlotActivityDecorator
 from activities.visible_cards_hand_activity import VisibleCardsHandDecorator
@@ -31,6 +33,7 @@ class PlayerHandActivity(BotHandActivity):
         max_card_angle=45,
         edge_padding_ratio=0.02,
         fan_width_ratio=0.95,
+        sector_angle_extra=0,
         use_stable_reference_fan=False,
         **kwargs,
     ):
@@ -50,6 +53,11 @@ class PlayerHandActivity(BotHandActivity):
             fan_width_ratio,
             "fan_width_ratio",
             maximum=1.0,
+        )
+        self.sector_angle_extra = self.normalize_non_negative_float(
+            sector_angle_extra,
+            "sector_angle_extra",
+            maximum=90.0,
         )
         self.use_stable_reference_fan = bool(use_stable_reference_fan)
         self.fan_area_local_rect = None
@@ -82,6 +90,11 @@ class PlayerHandActivity(BotHandActivity):
             "fan_width_ratio",
             maximum=1.0,
         )
+        self.sector_angle_extra = self.normalize_non_negative_float(
+            fixture.get("sector_angle_extra", self.sector_angle_extra),
+            "sector_angle_extra",
+            maximum=90.0,
+        )
         self.use_stable_reference_fan = bool(
             fixture.get("use_stable_reference_fan", self.use_stable_reference_fan)
         )
@@ -99,9 +112,8 @@ class PlayerHandActivity(BotHandActivity):
     def apply_fan_layout(self):
         """Lay cards out as an interactive bottom-hand arc.
 
-        Cards are distributed along a shallow arc and rotated by their position
-        on that arc. This keeps the hand readable while leaving broad visible
-        hit zones for CardSelectionActivity.
+        Card centers are placed on the middle arc of the hand sector. Each
+        card's long axis follows the radial ray from the sector center.
         """
         count = len(self.generated_groups)
         if count <= 0:
@@ -114,20 +126,12 @@ class PlayerHandActivity(BotHandActivity):
             slot = self.calculate_slot_position(index, count)
             local_angle = slot * geometry.max_angle
 
-            pivot_position = (
-                int(round(geometry.center_x + slot * geometry.half_span)),
-                int(
-                    round(
-                        geometry.center_y
-                        + self.calculate_arc_y(local_angle, geometry)
-                    )
-                ),
-            )
+            center_position = self.calculate_center_arc_position(local_angle, geometry)
 
-            self.apply_card_transform(
+            self.apply_card_center_transform(
                 group,
                 self.orientation_degrees + local_angle,
-                pivot_position,
+                center_position,
             )
         self._last_layout_signature = self.get_layout_signature()
 
@@ -137,6 +141,7 @@ class PlayerHandActivity(BotHandActivity):
             self.max_card_angle,
             self.edge_padding_ratio,
             self.fan_width_ratio,
+            self.sector_angle_extra,
             self.use_stable_reference_fan,
             None if self.fan_area_local_rect is None else tuple(self.fan_area_local_rect),
         )
@@ -155,20 +160,22 @@ class PlayerHandActivity(BotHandActivity):
             left_bound + card_half_width,
             min(right_bound - card_half_width, center_x),
         )
-        available_half_span = max(
+        half_span = max(
             0,
             min(center_x - left_bound, right_bound - center_x) - card_half_width,
         )
 
-        half_span = available_half_span * self.fan_width_ratio
+        half_span *= self.fan_width_ratio
 
-        max_angle = abs(float(self.max_card_angle))
-        angle_radians = math.radians(max_angle)
+        radius = self.calculate_center_arc_radius(frame_rect)
+        max_angle = 0.0
+        if radius > 0 and half_span > 0:
+            max_angle = math.degrees(math.asin(max(-1.0, min(1.0, half_span / radius))))
+            max_angle += self.sector_angle_extra / 2
+            max_angle = min(max_angle, abs(float(self.max_card_angle)))
 
-        radius = None
-        min_angle_radians = math.radians(0.5)
-        if half_span > 0 and angle_radians >= min_angle_radians:
-            radius = half_span / math.sin(angle_radians)
+        if max_angle < 0.5:
+            radius = None
 
         return FanGeometry(
             center_x=center_x,
@@ -183,36 +190,80 @@ class PlayerHandActivity(BotHandActivity):
             return self.frame.content_rect
         return self.fan_area_local_rect.copy()
 
+    def apply_card_center_transform(self, group, angle_degrees, center_position):
+        """Rotate a card and place its rectangle center on the fan center arc."""
+        base_surface = self.group_base_frames[group.id][0]
+        rotated_surface = self.rotate_card_surface(base_surface, angle_degrees)
+
+        group.set_primary_layer_frames([rotated_surface], position=(0, 0))
+        group.set_scale_factor(self.scale_factor)
+        group.set_local_rect((0, 0, rotated_surface.get_width(), rotated_surface.get_height()))
+        self.frame.place_group_center_local(group, center_position)
+
+    @staticmethod
+    def rotate_card_surface(surface, angle_degrees):
+        return pygame.transform.rotate(surface, -angle_degrees)
+
+    @staticmethod
+    def calculate_center_arc_position(angle_degrees, geometry):
+        radius = geometry.radius
+        if radius is None:
+            return geometry.center_x, geometry.center_y
+        radians = math.radians(angle_degrees)
+        return (
+            int(round(geometry.center_x + radius * math.sin(radians))),
+            int(round(geometry.center_y - radius * math.cos(radians))),
+        )
+
     def calculate_edge_padding(self, frame_rect):
         return max(0, int(round(frame_rect.width * self.edge_padding_ratio)))
 
     def get_card_local_half_width(self):
         return max(
-            (group.local_rect.width / 2 for group in self.generated_groups),
+            (frames[0].get_width() / 2 for frames in self.group_base_frames.values() if frames),
             default=0.0,
         )
 
     def get_fan_center(self, frame_rect):
-        """Return bottom-hand baseline center in frame-local coordinates."""
+        """Return sector center for the bottom-hand middle arc."""
         local_scale = self.get_activity_local_scale()
+        radius = self.calculate_center_arc_radius(frame_rect)
+        card_half_height = self.get_card_local_half_height()
         return (
             frame_rect.centerx + int(round(self.center_offset[0] * local_scale)),
-            frame_rect.bottom + int(round(self.center_offset[1] * local_scale)),
+            frame_rect.top
+            + int(round(card_half_height + radius))
+            + int(round(self.center_offset[1] * local_scale)),
+        )
+
+    def calculate_center_arc_radius(self, frame_rect):
+        card_half_width = self.get_card_local_half_width()
+        card_half_height = self.get_card_local_half_height()
+        half_span = max(0.0, frame_rect.width / 2 - self.calculate_edge_padding(frame_rect) - card_half_width)
+        sagitta = max(1.0, frame_rect.height - card_half_height * 2)
+        return (half_span * half_span + sagitta * sagitta) / (2 * sagitta)
+
+    def get_card_local_half_height(self):
+        return max(
+            (frames[0].get_height() / 2 for frames in self.group_base_frames.values() if frames),
+            default=0.0,
         )
 
     def calculate_slot_position(self, index, count):
-        """Return a compact normalized slot centered around the fan middle."""
+        """Return one of count evenly spaced sector rays, assigned center-out."""
         if count <= 1:
             return 0.0
+        return self.calculate_dense_slot_position(index, count)
 
-        if self.use_stable_reference_fan:
-            reference_count = max(count, self.reference_card_count)
-        else:
-            reference_count = count
-        max_slot_offset = max(1.0, (reference_count - 1) / 2)
-        slot_offset = index - (count - 1) / 2
-
-        return max(-1.0, min(1.0, slot_offset / max_slot_offset))
+    @staticmethod
+    def calculate_dense_slot_position(index, count):
+        """Return one of count evenly spaced sector rays, assigned center-out."""
+        slots = [
+            -1.0 + 2.0 * slot_index / (count - 1)
+            for slot_index in range(count)
+        ]
+        center_out_slots = sorted(slots, key=lambda slot: (abs(slot), -slot))
+        return center_out_slots[index]
 
     @staticmethod
     def calculate_arc_y(angle_degrees, geometry):
@@ -221,7 +272,7 @@ class PlayerHandActivity(BotHandActivity):
         if radius is None:
             return 0
 
-        return -radius * (1 - math.cos(math.radians(angle_degrees)))
+        return -radius * math.cos(math.radians(angle_degrees))
 
     def draw(self, screen):
         """Draw debug overlays for this activity; groups are drawn by GameScreen."""
@@ -232,7 +283,7 @@ class PlayerHandActivity(BotHandActivity):
         return self.iter_groups_in_draw_order()
 
     def iter_groups_in_draw_order(self):
-        return tuple(self.generated_groups)
+        return tuple(sorted(self.generated_groups, key=self.get_group_draw_x))
 
     @staticmethod
     def get_group_draw_x(group):

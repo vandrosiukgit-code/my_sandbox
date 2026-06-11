@@ -91,8 +91,9 @@ class TableScreen(GameScreen):
                     card_count=0,
                     scale_factor=0.85,
                     orientation_degrees=0,
-                    center_offset=(-5, -18),
+                    center_offset=(0, 0),
                     max_card_angle=60,
+                    sector_angle_extra=30,
                 ),
                 cards=(),
                 resource_manager=ResourceManager,
@@ -399,17 +400,19 @@ class TableScreen(GameScreen):
         """Return screen-space area reserved for the bottom hand arc probe."""
         hand_frame = self.get_screen_frame("bottom_player_hand")
         hand_rect = hand_frame.rect.copy()
-        lower_slot_bounds = self.calculate_lower_play_area_slot_screen_bounds()
-        if lower_slot_bounds is None:
+        side_slot_bounds = self.calculate_side_play_area_slot_screen_bounds()
+        if side_slot_bounds is None:
             return hand_rect
 
-        left, _lower_slot_bottom, right = lower_slot_bounds
+        left, _side_slot_bottom, right = side_slot_bounds
         central_slot_bottom = self.calculate_central_play_area_slots_bottom()
         top = central_slot_bottom if central_slot_bottom is not None else _lower_slot_bottom
+        width = max(0, right - left)
+        center_x = self.get_screen_frame("bottom_player_portrait").rect.centerx
         return pygame.Rect(
-            left,
+            int(round(center_x - width / 2)),
             top,
-            max(0, right - left),
+            width,
             max(
                 0,
                 self.get_screen_frame("bottom_player_portrait").rect.centery
@@ -447,24 +450,22 @@ class TableScreen(GameScreen):
         return pygame.Rect(left, top, max(0, right - left), max(0, bottom - top))
 
     def calculate_lower_play_area_slot_screen_bounds(self):
+        return self.calculate_side_play_area_slot_screen_bounds()
+
+    def calculate_side_play_area_slot_screen_bounds(self):
         slot_rects = self.get_play_area_slot_screen_rects()
         if not slot_rects:
             return None
 
-        max_bottom = max(rect.bottom for rect in slot_rects)
-        lower_slots = [rect for rect in slot_rects if rect.bottom == max_bottom]
-        if len(lower_slots) < 2:
-            return None
-
         hand_center_x = self.get_screen_frame("bottom_player_hand").rect.centerx
-        left_slots = [rect for rect in lower_slots if rect.centerx < hand_center_x]
-        right_slots = [rect for rect in lower_slots if rect.centerx > hand_center_x]
+        left_slots = [rect for rect in slot_rects if rect.centerx < hand_center_x]
+        right_slots = [rect for rect in slot_rects if rect.centerx > hand_center_x]
         if not left_slots or not right_slots:
             return None
 
-        left = max(rect.right for rect in left_slots)
-        right = min(rect.left for rect in right_slots)
-        return left, max_bottom, right
+        left_boundary_slot = min(left_slots, key=lambda rect: rect.centerx)
+        right_boundary_slot = max(right_slots, key=lambda rect: rect.centerx)
+        return left_boundary_slot.right, max(left_boundary_slot.bottom, right_boundary_slot.bottom), right_boundary_slot.left
 
     def calculate_central_play_area_slots_bottom(self):
         slot_rects = self.get_play_area_slot_screen_rects()
