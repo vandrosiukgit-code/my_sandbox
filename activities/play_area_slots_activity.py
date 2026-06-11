@@ -47,22 +47,34 @@ class PlayAreaSlotsActivity(Activity):
         self.center = None
         self.step = None
         self.slot_offsets = None
-        self.slot_activity_fixture = dict(self.DEFAULT_SLOT_ACTIVITY_FIXTURE)
+        self.slot_activity_fixture = self.merge_slot_activity_fixture(None)
         self.managed_slot_ids = [self.prototype_slot_frame.id]
         self.slot_activities = {}
+        self._last_layout_signature = None
         if self.prototype_slot_activity is not None:
             self.slot_activities[self.prototype_slot_frame.id] = self.prototype_slot_activity
+
+    def start(self):
+        if self.started:
+            return
+        super().start()
+        self.apply_layout()
 
     def update(self, dt):
         _ = dt
         if not self.started:
             self.start()
+            return
+
+        layout_signature = self.get_layout_signature()
+        if layout_signature != self._last_layout_signature:
+            self.apply_layout()
 
     def apply_fixture(self, fixture):
         if not fixture:
             return
 
-        self.slot_count = max(0, int(fixture.get("slot_count", self.slot_count)))
+        self.slot_count = max(1, int(fixture.get("slot_count", self.slot_count)))
         self.columns = max(1, int(fixture.get("columns", self.columns)))
         self.spacing = self.normalize_pair(fixture.get("spacing", self.spacing))
         self.origin = self.normalize_optional_pair(fixture.get("origin"))
@@ -70,9 +82,7 @@ class PlayAreaSlotsActivity(Activity):
         if "step" in fixture:
             self.step = self.normalize_optional_pair(fixture.get("step"))
         self.slot_offsets = self.normalize_offsets(fixture.get("slot_offsets"))
-        self.slot_activity_fixture = dict(
-            fixture.get("slot_activity", self.DEFAULT_SLOT_ACTIVITY_FIXTURE)
-        )
+        self.slot_activity_fixture = self.merge_slot_activity_fixture(fixture.get("slot_activity"))
         self.apply_layout()
 
     def apply_layout(self):
@@ -103,6 +113,42 @@ class PlayAreaSlotsActivity(Activity):
             x = center[0] + offset_x * step_x - slot_size[0] // 2
             y = center[1] + offset_y * step_y - slot_size[1] // 2
             slot_frame.set_local_rect((x, y, slot_size[0], slot_size[1]))
+            activity = self.slot_activities.get(frame_id)
+            if activity is not None and hasattr(activity, "normalize_slot_content"):
+                activity.normalize_slot_content()
+
+        self._last_layout_signature = self.get_layout_signature()
+
+    @classmethod
+    def merge_slot_activity_fixture(cls, fixture):
+        merged = dict(cls.DEFAULT_SLOT_ACTIVITY_FIXTURE)
+        if fixture:
+            merged.update(fixture)
+        return merged
+
+    def get_layout_signature(self):
+        return (
+            self.slot_count,
+            self.columns,
+            self.spacing,
+            self.origin,
+            self.center,
+            self.step,
+            self.slot_offsets,
+            self.get_prototype_slot_size(),
+            tuple(self.play_area_frame.local_rect),
+            tuple(self.prototype_slot_frame.local_rect),
+            self.get_player_inner_horizontal_bounds(),
+            self.freeze_mapping(self.slot_activity_fixture),
+        )
+
+    @classmethod
+    def freeze_mapping(cls, value):
+        if isinstance(value, dict):
+            return tuple(sorted((key, cls.freeze_mapping(item)) for key, item in value.items()))
+        if isinstance(value, (list, tuple)):
+            return tuple(cls.freeze_mapping(item) for item in value)
+        return value
 
     def get_default_layout_center(self):
         center_x, center_y = self.play_area_frame.content_rect.center
@@ -226,10 +272,11 @@ class PlayAreaSlotsActivity(Activity):
 
     def remove_slot_activity(self, frame_id):
         """Stop and unregister the CardsSlotActivity owned by a removed slot."""
-        activity = self.slot_activities.pop(frame_id, None)
+        activity = self.slot_activities.get(frame_id)
         if activity is None or activity is self.prototype_slot_activity:
             return
 
+        self.slot_activities.pop(frame_id, None)
         if hasattr(activity, "finish"):
             activity.finish()
         self.screen.remove_activity(activity, finish=False)
@@ -255,9 +302,13 @@ class PlayAreaSlotsActivity(Activity):
             return self.slot_offsets[index]
         return self.get_default_slot_offset(index)
 
-    @classmethod
-    def get_default_slot_offset(cls, index):
-        return cls.generate_default_slot_offsets(index + 1)[index]
+    def get_default_slot_offset(self, index):
+        if self.columns <= 1:
+            return self.generate_default_slot_offsets(index + 1)[index]
+
+        column = index % self.columns
+        row = index // self.columns
+        return column - (self.columns - 1) / 2, row
 
     @classmethod
     def generate_default_slot_offsets(cls, count):
@@ -288,29 +339,11 @@ class PlayAreaSlotsActivity(Activity):
             yield distance
 
     @staticmethod
-    def get_center_out_offset(index):
-        if index <= 0:
-            return 0, 0
-
-        pattern = (
-            (-1, 0),
-            (1, 0),
-            (0, -1),
-            (0, 1),
-            (-1, -1),
-            (1, -1),
-            (-1, 1),
-            (1, 1),
-        )
-        index -= 1
-        ring = index // len(pattern) + 1
-        offset_x, offset_y = pattern[index % len(pattern)]
-        return offset_x * ring, offset_y * ring
-
-    @staticmethod
     def normalize_pair(value):
         if isinstance(value, dict):
             return int(round(float(value.get("x", 0)))), int(round(float(value.get("y", 0))))
+        if not isinstance(value, (tuple, list)) or len(value) < 2:
+            raise ValueError(f"Expected pair as dict/list/tuple: {value!r}")
         return int(round(float(value[0]))), int(round(float(value[1])))
 
     @classmethod
@@ -323,4 +356,6 @@ class PlayAreaSlotsActivity(Activity):
     def normalize_offsets(cls, offsets):
         if offsets is None:
             return None
+        if not isinstance(offsets, (tuple, list)):
+            raise ValueError(f"slot_offsets must be a list or tuple of pairs: {offsets!r}")
         return tuple(cls.normalize_pair(offset) for offset in offsets)
