@@ -9,9 +9,16 @@ already accepted the game intent and returned a visual command.
 class Action:
     """Composable visual script executed by an Frame."""
 
+    animated_properties = ()
+
     def __init__(self, group_ids=None, animations=None):
         self.group_ids = tuple(group_ids or ())
         self.animations = list(animations or ())
+        self.animated_properties = tuple(
+            property_name
+            for animation in self.animations
+            for property_name in getattr(animation, "animated_properties", ())
+        )
         self.started = False
         self._finished = False
 
@@ -39,6 +46,13 @@ class Action:
             self.finish()
 
     def finish(self):
+        self._finished = True
+        self.started = False
+
+    def cancel(self):
+        for animation in self.animations:
+            if hasattr(animation, "cancel"):
+                animation.cancel()
         self._finished = True
         self.started = False
 

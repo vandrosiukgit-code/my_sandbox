@@ -37,6 +37,19 @@ class GameScreen(BaseGameScreen):
     def set_game_controller(self, game_controller):
         self.game_controller = game_controller
 
+    def start(self):
+        """Start screen-owned activities that were registered before runtime."""
+        for activity in tuple(self.active_activities):
+            if hasattr(activity, "start") and not getattr(activity, "started", False):
+                activity.start()
+
+    def finish(self):
+        """Finish screen-owned activities during runtime shutdown."""
+        for activity in tuple(self.active_activities):
+            if hasattr(activity, "finish") and not self.is_activity_finished(activity):
+                activity.finish()
+        self.active_activities = []
+
     def create_frame(
         self,
         frame_id,
@@ -67,15 +80,27 @@ class GameScreen(BaseGameScreen):
         self.screen_frames[frame_id] = frame_config
         return frame_config
 
+    def has_screen_frame(self, frame_id):
+        return frame_id in self.screen_frames
+
     def get_screen_frame(self, frame_id):
         return self.screen_frames[frame_id]
+
+    def remove_screen_frame(self, frame_id):
+        """Remove a registered frame and detach it from its parent frame."""
+        frame = self.screen_frames.pop(frame_id, None)
+        if frame is None:
+            return None
+        if frame.parent_frame is not None:
+            frame.parent_frame.remove_child_frame(frame.id)
+        return frame
 
     def put_frame_in_frame(self, child_frame_id, parent_frame_id, position=None):
         """Attach an existing registered frame as a child of another frame."""
         child_frame = self.get_screen_frame(child_frame_id)
         parent_frame = self.get_screen_frame(parent_frame_id)
         if child_frame.parent_frame is not None:
-            child_frame.parent_frame.child_frames.pop(child_frame.id, None)
+            child_frame.parent_frame.remove_child_frame(child_frame.id)
         if position is not None:
             child_frame.set_local_position(*position)
         parent_frame.add_child_frame(child_frame)
@@ -85,16 +110,7 @@ class GameScreen(BaseGameScreen):
         """Put an already active group at a local position inside a frame."""
         group = self.get_group(group_id)
         frame = self.get_screen_frame(frame_id)
-        frame.add_group_id(group_id)
-
-        if hasattr(group, "set_parent_frame"):
-            group.set_parent_frame(frame)
-        if hasattr(group, "set_local_position"):
-            group.set_local_position(*position)
-        else:
-            group.set_position(*frame.to_screen(position))
-        frame.group_origins[group_id] = tuple(position)
-        return group
+        return frame.place_group_local(group, position)
 
     def apply_frame_layout(self, frame_id):
         if self.group_store is None:
@@ -122,10 +138,39 @@ class GameScreen(BaseGameScreen):
             yield self.get_group(group_id)
 
     def add_activity(self, activity):
-        self.active_activities.append(activity)
+        if activity not in self.active_activities:
+            self.active_activities.append(activity)
         if hasattr(activity, "start"):
             activity.start()
         return activity
+
+    def remove_activity(self, activity, finish=True):
+        """Remove an activity from the screen lifecycle."""
+        if finish and hasattr(activity, "finish") and not self.is_activity_finished(activity):
+            activity.finish()
+        if activity in self.active_activities:
+            self.active_activities.remove(activity)
+        return activity
+
+    def register_named_activity(self, activity_id, activity):
+        """Register an activity under a stable screen-local ID."""
+        if not hasattr(self, "hand_activities"):
+            self.hand_activities = {}
+        self.hand_activities[activity_id] = activity
+        return activity
+
+    def unregister_named_activity(self, activity_id, finish=True):
+        """Unregister a named activity and optionally finish it."""
+        activities = getattr(self, "hand_activities", None)
+        if activities is None:
+            return None
+        activity = activities.pop(activity_id, None)
+        if activity is not None:
+            self.remove_activity(activity, finish=finish)
+        return activity
+
+    def get_named_activity(self, activity_id, default=None):
+        return getattr(self, "hand_activities", {}).get(activity_id, default)
 
     def handle_event(self, event):
         """Normalize pygame input and forward it to GameController."""
@@ -273,7 +318,7 @@ class GameScreen(BaseGameScreen):
         frame_id = payload.get("frame_id", self.get_command_value(command, "frame_id"))
         frame = self.get_screen_frame(frame_id) if frame_id else self.find_frame_for_group(group_id)
         group = self.get_group(group_id)
-        return frame.add_action(MoveGroupAction(group, to_position, duration=duration))
+        return frame.add_action(MoveGroupAction(group, to_position, duration=duration, frame=frame))
 
     def resolve_move_target_position(self, command, payload):
         """Resolve a move target to absolute screen coordinates."""

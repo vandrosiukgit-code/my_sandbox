@@ -105,6 +105,17 @@ class Frame(BaseFrame):
         """Return a direct child frame by ID."""
         return self.child_frames[frame_id]
 
+    def remove_child_frame(self, frame_id):
+        """Detach and return a direct child frame by ID."""
+        frame = self.child_frames.pop(frame_id, None)
+        if frame is not None:
+            frame.parent_frame = None
+        return frame
+
+    def has_child_frame(self, frame_id):
+        """Return True when this frame directly owns child frame_id."""
+        return frame_id in self.child_frames
+
     def set_local_position(self, x, y):
         """Move this frame inside its parent coordinate system."""
         old_position = self._rect.topleft
@@ -140,6 +151,7 @@ class Frame(BaseFrame):
         """Убрать group ID из зоны, если он там есть."""
         if group_id in self.group_ids:
             self.group_ids.remove(group_id)
+        self.group_origins.pop(group_id, None)
 
     def calculate_group_position(self, index, group_count, group=None):
         """Рассчитать screen-позицию group-а внутри зоны.
@@ -149,6 +161,32 @@ class Frame(BaseFrame):
         центрирование, стопку колоды или любую другую схему.
         """
         return self.to_screen(self.calculate_group_local_position(index, group_count, group))
+
+    def place_group_local(self, group, local_position):
+        """Place a group in this frame using frame-local coordinates."""
+        local_position = self.round_pair(local_position)
+        self.add_group_id(group.id)
+        if hasattr(group, "set_parent_frame"):
+            group.set_parent_frame(self)
+        if hasattr(group, "set_local_position"):
+            group.set_local_position(*local_position)
+        else:
+            group.set_position(*self.to_screen(local_position))
+        self.set_group_origin(group.id, local_position)
+        return group
+
+    def move_group_local(self, group, local_position):
+        """Move an already placed group using frame-local coordinates."""
+        return self.place_group_local(group, local_position)
+
+    def set_group_origin(self, group_id, local_position):
+        """Store the latest frame-local layout origin for a group."""
+        self.group_origins[group_id] = self.round_pair(local_position)
+
+    def remove_group(self, group_id):
+        """Remove group placement and origin metadata from this frame."""
+        self.remove_group_id(group_id)
+        self.group_origins.pop(group_id, None)
 
     def calculate_group_local_position(self, index, group_count, group=None):
         """Return group position in the frame local coordinate system."""
@@ -167,20 +205,33 @@ class Frame(BaseFrame):
         for index, group_id in enumerate(self.group_ids):
             group = group_store.get(group_id)
             local_position = self.calculate_group_local_position(index, group_count, group)
-            if hasattr(group, "set_parent_frame"):
-                group.set_parent_frame(self)
-            if hasattr(group, "set_local_position"):
-                group.set_local_position(*local_position)
-            else:
-                group.set_position(*self.to_screen(local_position))
-            self.group_origins[group_id] = local_position
+            self.place_group_local(group, local_position)
 
     def add_action(self, action):
         """Add a visual Action owned by this frame."""
+        self.cancel_conflicting_actions(action)
         self.actions.append(action)
         if hasattr(action, "start"):
             action.start()
         return action
+
+    def cancel_conflicting_actions(self, next_action):
+        """Cancel running actions that target the same group property."""
+        next_group_ids = set(getattr(next_action, "group_ids", ()))
+        next_properties = set(getattr(next_action, "animated_properties", ()))
+        if not next_group_ids or not next_properties:
+            return
+
+        kept_actions = []
+        for action in self.actions:
+            group_conflict = next_group_ids.intersection(getattr(action, "group_ids", ()))
+            property_conflict = next_properties.intersection(getattr(action, "animated_properties", ()))
+            if group_conflict and property_conflict:
+                if hasattr(action, "cancel"):
+                    action.cancel()
+            else:
+                kept_actions.append(action)
+        self.actions = kept_actions
 
     def update_actions(self, dt):
         """Update active visual Actions and drop finished ones."""

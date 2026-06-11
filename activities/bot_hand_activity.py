@@ -49,6 +49,8 @@ class BotHandActivity(Activity):
         self.card_resource_provider = card_resource_provider
         self.card_layer_name = card_layer_name
         self.generated_groups = []
+        self.group_hand_indices = {}
+        self.group_card_ids = {}
         self.debug_fan_rect = bool(debug_fan_rect)
         self.debug_fan_rect_color = tuple(debug_fan_rect_color)
 
@@ -122,8 +124,9 @@ class BotHandActivity(Activity):
 
         while len(self.generated_groups) > self.card_count:
             group = self.generated_groups.pop()
-            self.frame.remove_group_id(group.id)
-            self.frame.group_origins.pop(group.id, None)
+            self.frame.remove_group(group.id)
+            self.group_hand_indices.pop(group.id, None)
+            self.group_card_ids.pop(group.id, None)
 
     def apply_fan_layout(self):
         """Рассчитать и применить веер закрытых карт внутри frame.
@@ -147,7 +150,7 @@ class BotHandActivity(Activity):
             angle = self.orientation_degrees + local_angle
             pivot_x, pivot_y = self.calculate_pivot_position(center_x, center_y, angle)
             self.apply_card_transform(group, angle, (pivot_x, pivot_y))
-            self.frame.group_origins[group.id] = group.local_rect.topleft
+            self.frame.set_group_origin(group.id, group.local_rect.topleft)
 
     @staticmethod
     def calculate_card_angle(index, occupied_angle, angle_step):
@@ -197,8 +200,7 @@ class BotHandActivity(Activity):
         base_surface = group._bot_hand_base_frames[0]
         rotated_surface = pygame.transform.rotate(base_surface, -angle_degrees)
 
-        group.layers[0].frames = [rotated_surface]
-        group.layers[0].position = (0, 0)
+        group.set_primary_layer_frames([rotated_surface], position=(0, 0))
         group.set_scale_factor(self.scale_factor)
 
         pivot_offset = self.calculate_rotated_pivot_offset(
@@ -263,7 +265,10 @@ class BotHandActivity(Activity):
     def normalize_scale_factor(value):
         if value is None:
             return None
-        return float(value)
+        scale = float(value)
+        if scale <= 0:
+            raise ValueError(f"scale_factor must be positive: {value!r}")
+        return scale
 
     def add_generated_group(self, index):
         """Создать одну visual-only Group рубашки карты."""
@@ -279,11 +284,29 @@ class BotHandActivity(Activity):
             ((self.card_layer_name, resource_key),),
             resource_manager=self.resource_manager,
         )
-        group._bot_hand_base_frames = tuple(frame.copy() for frame in group.layers[0].frames)
-        group.set_parent_frame(self.frame)
+        group._bot_hand_base_frames = tuple(frame.copy() for frame in group.get_primary_layer_frames())
         self.generated_groups.append(group)
-        self.frame.add_group_id(group.id)
+        self.group_hand_indices[group.id] = index
+        self.group_card_ids[group.id] = self.get_card_id(index, resource_key)
+        self.frame.place_group_local(group, (0, 0))
         return group
+
+    def get_card_id(self, index, resource_key):
+        """Return stable visual-selection ID for a generated card slot."""
+        return f"{self.group_id_prefix}.card.{index}:{resource_key}"
+
+    def get_card_selection_context(self, group):
+        """Return controller-facing selection data for a visual group."""
+        hand_index = self.group_hand_indices.get(group.id)
+        if hand_index is None:
+            return None
+        return {
+            "group_id": group.id,
+            "hand_index": hand_index,
+            "card_id": self.group_card_ids.get(group.id, group.id),
+            "resource_key": self.get_card_resource_key(hand_index),
+            "frame_id": self.frame.id,
+        }
 
     def get_card_resource_key(self, index):
         """Return the resource key for a generated card slot."""
@@ -312,9 +335,10 @@ class BotHandActivity(Activity):
     def clear_generated_groups(self):
         """Удалить все generated visual-only Group из frame и владения."""
         for group in self.generated_groups:
-            self.frame.remove_group_id(group.id)
-            self.frame.group_origins.pop(group.id, None)
+            self.frame.remove_group(group.id)
         self.generated_groups = []
+        self.group_hand_indices = {}
+        self.group_card_ids = {}
 
     def is_finished(self):
         """Рука бота - долгоживущий режим, сама по времени не завершается."""

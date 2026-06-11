@@ -11,17 +11,27 @@ class VisibleCardsHandDecorator(Activity):
     key per generated card slot.
     """
 
-    def __init__(self, hand_activity, cards=None, resource_manager=None, max_cards=None):
+    def __init__(
+        self,
+        hand_activity,
+        cards=None,
+        resource_manager=None,
+        max_cards=None,
+        owns_hand_activity=True,
+    ):
         super().__init__(duration=0.0)
         self.hand_activity = hand_activity
         self.resource_manager = resource_manager
-        self.max_cards = max_cards
+        self.max_cards = self.normalize_max_cards(max_cards)
+        self.owns_hand_activity = bool(owns_hand_activity)
         self.card_resource_keys = self.limit_cards(self.normalize_cards(cards or ()))
         self.hand_activity.card_resource_provider = self.get_card_resource_key
         self.hand_activity.card_layer_name = "card"
         self.hand_activity.card_count = len(self.card_resource_keys)
 
     def start(self):
+        if self.started:
+            return
         super().start()
         self.hand_activity.start()
 
@@ -54,6 +64,9 @@ class VisibleCardsHandDecorator(Activity):
         self.hand_activity.clear_generated_groups()
         self.card_resource_keys = next_keys
         self.hand_activity.card_count = len(self.card_resource_keys)
+        if getattr(self.hand_activity, "started", False):
+            self.hand_activity.sync_visual_groups()
+            self.hand_activity.apply_fan_layout()
 
     def get_card_resource_key(self, index):
         try:
@@ -62,11 +75,27 @@ class VisibleCardsHandDecorator(Activity):
             raise RuntimeError("VisibleCardsHandDecorator card index is out of range") from error
 
     def is_finished(self):
-        return self.hand_activity.is_finished()
+        return self._finished or self.hand_activity.is_finished()
 
     def finish(self):
-        self.hand_activity.finish()
+        if self.owns_hand_activity:
+            self.hand_activity.finish()
         super().finish()
+
+    def get_card_selection_context(self, group):
+        """Return controller-facing selection data for a wrapped hand group."""
+        if not hasattr(self.hand_activity, "get_card_selection_context"):
+            return None
+        context = self.hand_activity.get_card_selection_context(group)
+        if context is None:
+            return None
+        hand_index = context.get("hand_index")
+        if hand_index is not None and 0 <= hand_index < len(self.card_resource_keys):
+            resource_key = self.card_resource_keys[hand_index]
+            context = dict(context)
+            context["card_id"] = resource_key
+            context["resource_key"] = resource_key
+        return context
 
     def get_fixture_cards(self, fixture):
         for key in ("cards", "card_resource_keys", "resource_keys"):
@@ -104,7 +133,16 @@ class VisibleCardsHandDecorator(Activity):
     def limit_cards(self, cards):
         if self.max_cards is None:
             return tuple(cards)
-        return tuple(cards)[: max(0, int(self.max_cards))]
+        return tuple(cards)[: self.max_cards]
+
+    @staticmethod
+    def normalize_max_cards(max_cards):
+        if max_cards is None:
+            return None
+        value = int(max_cards)
+        if value < 0:
+            raise ValueError(f"max_cards must be non-negative: {max_cards!r}")
+        return value
 
     @staticmethod
     def normalize_slice(card_slice):

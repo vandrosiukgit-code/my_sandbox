@@ -8,6 +8,9 @@ or another drawable property. It does not know game rules or controller state.
 class Animation:
     """Time-based visual primitive."""
 
+    animated_properties = ()
+    coordinate_space = None
+
     def __init__(self, duration=0.0):
         self.duration = max(0.0, float(duration))
         self.elapsed = 0.0
@@ -19,13 +22,19 @@ class Animation:
         self._finished = False
         self.elapsed = 0.0
 
+    def reset(self):
+        """Return the animation to its initial not-started state."""
+        self.elapsed = 0.0
+        self.started = False
+        self._finished = False
+
     def update(self, dt):
         if self._finished:
             return
         if not self.started:
             self.start()
 
-        self.elapsed += dt
+        self.elapsed += self.normalize_dt(dt)
         self.apply(self.get_progress())
 
         if self.elapsed >= self.duration:
@@ -35,6 +44,12 @@ class Animation:
         _ = progress
 
     def finish(self):
+        self.apply(1.0)
+        self._finished = True
+        self.started = False
+
+    def cancel(self):
+        """Stop the animation without forcing the target final state."""
         self._finished = True
         self.started = False
 
@@ -45,5 +60,13 @@ class Animation:
         if self.duration <= 0:
             return 1.0
         return max(0.0, min(1.0, self.elapsed / self.duration))
+
+    @staticmethod
+    def normalize_dt(dt):
+        try:
+            value = float(dt)
+        except (TypeError, ValueError):
+            return 0.0
+        return max(0.0, value)
 
 

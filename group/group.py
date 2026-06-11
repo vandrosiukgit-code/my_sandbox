@@ -647,6 +647,34 @@ class Group(BaseGroup):
             self.refresh_rect_from_layers()
             self.apply_scale()
 
+    def get_layer_frames(self, layer_name):
+        """Return a copy of frame references for a named layer."""
+        return tuple(self.get_layer(layer_name).frames)
+
+    def set_layer_position(self, layer_name, local_position):
+        """Set one layer position in group-local coordinates."""
+        self.get_layer(layer_name).position = self.normalize_layer_position(local_position)
+
+    def get_primary_layer(self):
+        """Return the first drawable layer."""
+        if not self.layers:
+            raise ValueError(f"Group has no layers: {self.id}")
+        return self.layers[0]
+
+    def get_primary_layer_frames(self):
+        """Return a copy of frame references from the first drawable layer."""
+        return tuple(self.get_primary_layer().frames)
+
+    def set_primary_layer_frames(self, frames, position=(0, 0)):
+        """Replace frames on the first drawable layer without exposing layer internals."""
+        layer = self.get_primary_layer()
+        layer.frames = list(frames)
+        layer.position = self.normalize_layer_position(position)
+        layer.set_frame(0)
+        if self._base_rect.size == (0, 0):
+            self.refresh_rect_from_layers()
+            self.apply_scale()
+
     def get_layer(self, layer_name):
         """Найти слой по имени."""
         for layer in self.layers:

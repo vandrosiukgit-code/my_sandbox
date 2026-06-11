@@ -154,7 +154,7 @@ class PlayAreaSlotsActivity(Activity):
         )
 
     def get_player_fan_or_frame_rect(self, activity_id, frame_id):
-        activity = getattr(self.screen, "hand_activities", {}).get(activity_id)
+        activity = self.screen.get_named_activity(activity_id)
         if activity is not None and hasattr(activity, "calculate_fan_rect"):
             fan_rect = activity.calculate_fan_rect()
             if fan_rect is not None:
@@ -191,7 +191,7 @@ class PlayAreaSlotsActivity(Activity):
         for index, frame_id in enumerate(target_ids):
             if index == 0:
                 slot_frame = self.prototype_slot_frame
-            elif frame_id in self.screen.screen_frames:
+            elif self.screen.has_screen_frame(frame_id):
                 slot_frame = self.screen.get_screen_frame(frame_id)
             else:
                 slot_frame = self.screen.create_frame(
@@ -213,8 +213,7 @@ class PlayAreaSlotsActivity(Activity):
             slot_frame = self.screen.get_screen_frame(frame_id)
             activity = self.slot_activity_factory(slot_frame, index)
             self.slot_activities[frame_id] = activity
-            if hasattr(self.screen, "hand_activities"):
-                self.screen.hand_activities[frame_id] = activity
+            self.screen.register_named_activity(frame_id, activity)
             self.screen.add_activity(activity)
 
     def apply_slot_activity_fixtures(self):
@@ -233,16 +232,13 @@ class PlayAreaSlotsActivity(Activity):
 
         if hasattr(activity, "finish"):
             activity.finish()
-        if activity in self.screen.active_activities:
-            self.screen.active_activities.remove(activity)
-        if hasattr(self.screen, "hand_activities"):
-            self.screen.hand_activities.pop(frame_id, None)
+        self.screen.remove_activity(activity, finish=False)
+        self.screen.unregister_named_activity(frame_id, finish=False)
 
     def remove_slot_frame(self, frame_id):
         if frame_id == self.prototype_slot_frame.id:
             return
-        self.play_area_frame.child_frames.pop(frame_id, None)
-        self.screen.screen_frames.pop(frame_id, None)
+        self.screen.remove_screen_frame(frame_id)
 
     def get_slot_frame_id(self, index):
         if index == 0:

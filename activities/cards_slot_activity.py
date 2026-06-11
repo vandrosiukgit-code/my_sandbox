@@ -33,8 +33,10 @@ class CardsSlotActivityDecorator(VisibleCardsHandDecorator):
 
         for group in self.hand_activity.generated_groups:
             rect = group.local_rect
-            group.set_local_position(rect.x - bounds.x, rect.y - bounds.y)
-            self.hand_activity.frame.group_origins[group.id] = group.local_rect.topleft
+            self.hand_activity.frame.move_group_local(
+                group,
+                (rect.x - bounds.x, rect.y - bounds.y),
+            )
 
         self.slot_content_rect = pygame.Rect(0, 0, bounds.width, bounds.height)
 

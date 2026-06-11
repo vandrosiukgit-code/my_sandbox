@@ -1,10 +1,20 @@
 """Interactive player hand activity with player-specific fan geometry."""
 
+from dataclasses import dataclass
 import math
 
 from activities.bot_hand_activity import BotHandActivity
 from activities.cards_slot_activity import CardsSlotActivityDecorator
 from activities.visible_cards_hand_activity import VisibleCardsHandDecorator
+
+
+@dataclass(frozen=True)
+class FanGeometry:
+    center_x: int
+    center_y: int
+    half_span: float
+    max_angle: float
+    radius: float | None
 
 
 class PlayerHandActivity(BotHandActivity):
@@ -23,21 +33,27 @@ class PlayerHandActivity(BotHandActivity):
         fan_width_ratio=0.75,
         **kwargs,
     ):
-        super().__init__(*args, max_total_angle=max_card_angle * 2, **kwargs)
-        self.max_card_angle = float(max_card_angle)
-        self.edge_padding_ratio = float(edge_padding_ratio)
-        self.fan_width_ratio = float(fan_width_ratio)
+        normalized_max_card_angle = self.normalize_non_negative_float(max_card_angle, "max_card_angle")
+        super().__init__(*args, max_total_angle=normalized_max_card_angle * 2, **kwargs)
+        self.max_card_angle = normalized_max_card_angle
+        self.edge_padding_ratio = self.normalize_ratio(edge_padding_ratio, "edge_padding_ratio")
+        self.fan_width_ratio = self.normalize_ratio(fan_width_ratio, "fan_width_ratio")
 
     def apply_fixture(self, fixture):
         if not fixture:
             return
 
-        self.max_card_angle = float(fixture.get("max_card_angle", self.max_card_angle))
-        self.edge_padding_ratio = float(
-            fixture.get("edge_padding_ratio", self.edge_padding_ratio)
+        self.max_card_angle = self.normalize_non_negative_float(
+            fixture.get("max_card_angle", self.max_card_angle),
+            "max_card_angle",
         )
-        self.fan_width_ratio = float(
-            fixture.get("fan_width_ratio", self.fan_width_ratio)
+        self.edge_padding_ratio = self.normalize_ratio(
+            fixture.get("edge_padding_ratio", self.edge_padding_ratio),
+            "edge_padding_ratio",
+        )
+        self.fan_width_ratio = self.normalize_ratio(
+            fixture.get("fan_width_ratio", self.fan_width_ratio),
+            "fan_width_ratio",
         )
 
         super().apply_fixture(fixture)
@@ -57,13 +73,13 @@ class PlayerHandActivity(BotHandActivity):
 
         for index, group in enumerate(self.generated_groups):
             slot = self.calculate_slot_position(index, count)
-            local_angle = slot * geometry["max_angle"]
+            local_angle = slot * geometry.max_angle
 
             pivot_position = (
-                int(round(geometry["center_x"] + slot * geometry["half_span"])),
+                int(round(geometry.center_x + slot * geometry.half_span)),
                 int(
                     round(
-                        geometry["center_y"]
+                        geometry.center_y
                         + self.calculate_arc_y(local_angle, geometry)
                     )
                 ),
@@ -75,7 +91,7 @@ class PlayerHandActivity(BotHandActivity):
                 pivot_position,
             )
 
-            self.frame.group_origins[group.id] = group.local_rect.topleft
+            self.frame.set_group_origin(group.id, group.local_rect.topleft)
 
     def calculate_fan_geometry(self):
         """Calculate all fan geometry from frame size, density, and max angle."""
@@ -101,13 +117,13 @@ class PlayerHandActivity(BotHandActivity):
         if half_span > 0 and angle_radians > 0:
             radius = half_span / math.sin(angle_radians)
 
-        return {
-            "center_x": center_x,
-            "center_y": center_y,
-            "half_span": half_span,
-            "max_angle": max_angle,
-            "radius": radius,
-        }
+        return FanGeometry(
+            center_x=center_x,
+            center_y=center_y,
+            half_span=half_span,
+            max_angle=max_angle,
+            radius=radius,
+        )
 
     def calculate_edge_padding(self, frame_rect):
         return max(0, int(round(frame_rect.width * self.edge_padding_ratio)))
@@ -125,7 +141,7 @@ class PlayerHandActivity(BotHandActivity):
 
     @staticmethod
     def calculate_arc_y(angle_degrees, geometry):
-        radius = geometry["radius"]
+        radius = geometry.radius
 
         if radius is None:
             return 0
@@ -143,6 +159,20 @@ class PlayerHandActivity(BotHandActivity):
     @staticmethod
     def get_group_draw_x(group):
         return group.local_rect.centerx
+
+    @staticmethod
+    def normalize_ratio(value, name):
+        value = float(value)
+        if value < 0:
+            raise ValueError(f"{name} must be non-negative: {value!r}")
+        return value
+
+    @staticmethod
+    def normalize_non_negative_float(value, name):
+        value = float(value)
+        if value < 0:
+            raise ValueError(f"{name} must be non-negative: {value!r}")
+        return value
 
 
 __all__ = [

@@ -91,9 +91,10 @@ class TableScreen(GameScreen):
                 resource_manager=ResourceManager,
             ),
             player_turn_activity=player_turn_activity,
+            owns_hand_activity=True,
         )
 
-        self.hand_activities = {
+        activity_map = {
             "left_player_hand": BotHandActivity(
                 frame=self.get_screen_frame("left_player_hand"),
                 resource_manager=ResourceManager,
@@ -132,7 +133,9 @@ class TableScreen(GameScreen):
             "play_area_frame": player_turn_activity,
             "cards_slot_frame": cards_slot_activity,
         }
-        for activity in self.hand_activities.values():
+        self.hand_activities = {}
+        for activity_id, activity in activity_map.items():
+            self.register_named_activity(activity_id, activity)
             self.add_activity(activity)
         self.fixture_paths = (FIXTURE_PATH, PLAY_AREA_FIXTURE_PATH)
         self._fixture_mtimes = {}
@@ -374,7 +377,7 @@ class TableScreen(GameScreen):
             return
 
         for activity_id, card_count in card_counts.items():
-            activity = self.hand_activities.get(activity_id)
+            activity = self.get_named_activity(activity_id)
             if activity is None:
                 continue
 
@@ -410,16 +413,18 @@ class TableScreen(GameScreen):
             self.apply_gui_fixture_node(child_frame_id, child_node)
 
         activity_fixture = node.get("activity")
-        if activity_fixture is not None and frame_id in self.hand_activities:
-            self.hand_activities[frame_id].apply_fixture(activity_fixture)
+        activity = self.get_named_activity(frame_id)
+        if activity_fixture is not None and activity is not None:
+            activity.apply_fixture(activity_fixture)
 
         for activity_id, fixture in node.get("activities", {}).items():
-            if activity_id in self.hand_activities:
-                self.hand_activities[activity_id].apply_fixture(fixture)
+            activity = self.get_named_activity(activity_id)
+            if activity is not None:
+                activity.apply_fixture(fixture)
 
     def apply_frame_fixture(self, frame_id, fixture):
         """Apply dev fixture values for a Frame and its descendants."""
-        if not fixture or frame_id not in self.screen_frames:
+        if not fixture or not self.has_screen_frame(frame_id):
             return
 
         frame = self.get_screen_frame(frame_id)
@@ -465,9 +470,7 @@ class TableScreen(GameScreen):
         if local_position is None:
             return
 
-        group.set_parent_frame(frame)
-        group.set_local_position(*local_position)
-        frame.group_origins[group_id] = tuple(local_position)
+        frame.place_group_local(group, local_position)
 
     @staticmethod
     def get_group_fixture_local_position(frame, fixture):

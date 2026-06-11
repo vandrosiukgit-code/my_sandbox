@@ -49,7 +49,7 @@ def create_screen_factory(app_context):
     ResourceManager загружает PNG через convert_alpha(), а он требует уже
     созданное окно. Поэтому runtime-кэш и GroupStore собираются именно тут.
     """
-    def screen_factory():
+    def screen_factory(_render_context=None):
         ResourceManager.build_runtime_cache(app_context["assets_dir"])
         app_context["group_store"].build()
         return TableScreen(

@@ -17,16 +17,22 @@ class CardSelectionActivity(Activity):
     HOVER_HYSTERESIS_PIXELS = 8
     HOVER_EDGE_CARD_HYSTERESIS_PIXELS = 18
 
-    def __init__(self, hand_activity, player_turn_activity=None):
+    def __init__(self, hand_activity, player_turn_activity=None, owns_hand_activity=False):
         super().__init__(duration=0.0)
         self.hand_activity = hand_activity
         self.player_turn_activity = player_turn_activity
+        self.owns_hand_activity = bool(owns_hand_activity)
         self.hovered_group = None
+        self.selected_card_context = None
         self.selection_animations = {}
+        self.rest_states = {}
 
     def start(self):
+        if self.started:
+            return
         super().start()
-        self.hand_activity.start()
+        if not getattr(self.hand_activity, "started", False):
+            self.hand_activity.start()
 
     def update(self, dt):
         if not self.started:
@@ -48,9 +54,9 @@ class CardSelectionActivity(Activity):
             self.handle_hover(input_event.screen_pos)
             return False
         if input_event.type == "double_click" and input_event.button == "left":
-            selected_group = self.find_card_at(input_event.screen_pos)
-            if selected_group is not None:
-                self.start_player_turn(selected_group)
+            clicked_group = self.find_card_at(input_event.screen_pos)
+            if clicked_group is not None:
+                self.start_player_turn(self.get_card_selection_context(clicked_group))
                 return False
         return True
 
@@ -66,10 +72,25 @@ class CardSelectionActivity(Activity):
             self.ensure_rest_state(self.hovered_group)
             self.animate_group_to_hover(self.hovered_group)
 
-    def start_player_turn(self, selected_group):
-        self.selected_group = selected_group
+    def start_player_turn(self, selected_context):
+        self.selected_card_context = selected_context
         if self.player_turn_activity is not None:
-            self.player_turn_activity.start()
+            if hasattr(self.player_turn_activity, "start_turn"):
+                self.player_turn_activity.start_turn(selected_context)
+            else:
+                self.player_turn_activity.start()
+
+    def get_card_selection_context(self, group):
+        if hasattr(self.hand_activity, "get_card_selection_context"):
+            context = self.hand_activity.get_card_selection_context(group)
+            if context is not None:
+                return context
+        return {
+            "group_id": group.id,
+            "card_id": group.id,
+            "hand_index": None,
+            "resource_key": None,
+        }
 
     def find_card_at(self, screen_pos):
         visible_hit_rects = self.get_visible_hit_rects()
@@ -139,11 +160,11 @@ class CardSelectionActivity(Activity):
 
     def get_base_scale(self, group):
         self.ensure_rest_state(group)
-        return group._card_selection_base_scale
+        return self.rest_states[group.id]["scale"]
 
     def get_base_position(self, group):
         self.ensure_rest_state(group)
-        return group._card_selection_base_position
+        return self.rest_states[group.id]["position"]
 
     def refresh_rest_states(self):
         for group in self.iter_card_groups():
@@ -153,23 +174,21 @@ class CardSelectionActivity(Activity):
                 continue
             self.capture_rest_state(group)
 
-    @staticmethod
-    def capture_rest_state(group):
-        group._card_selection_base_position = tuple(group.local_rect.topleft)
-        group._card_selection_base_scale = 1.0 if group.scale_factor is None else group.scale_factor
+    def capture_rest_state(self, group):
+        self.rest_states[group.id] = {
+            "position": tuple(group.local_rect.topleft),
+            "scale": 1.0 if group.scale_factor is None else group.scale_factor,
+        }
 
-    @staticmethod
-    def ensure_rest_state(group):
-        if not hasattr(group, "_card_selection_base_position"):
-            group._card_selection_base_position = tuple(group.local_rect.topleft)
-        if not hasattr(group, "_card_selection_base_scale"):
-            group._card_selection_base_scale = 1.0 if group.scale_factor is None else group.scale_factor
+    def ensure_rest_state(self, group):
+        if group.id not in self.rest_states:
+            self.capture_rest_state(group)
 
     def get_rest_hit_rect(self, group):
         self.get_base_position(group)
         self.get_base_scale(group)
         local_hit_rect = group.local_hit_rect.copy()
-        local_hit_rect.topleft = group._card_selection_base_position
+        local_hit_rect.topleft = self.get_base_position(group)
         return group.local_rect_to_screen_rect(local_hit_rect)
 
     def animate_group_to_hover(self, group):
@@ -221,5 +240,11 @@ class CardSelectionActivity(Activity):
         return self._finished
 
     def finish(self):
-        self.hand_activity.finish()
+        for animation in self.selection_animations.values():
+            if hasattr(animation, "cancel"):
+                animation.cancel()
+        self.selection_animations = {}
+        self.hovered_group = None
+        if self.owns_hand_activity:
+            self.hand_activity.finish()
         super().finish()

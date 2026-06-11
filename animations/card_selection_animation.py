@@ -10,6 +10,9 @@ class CardSelectionAnimation(Animation):
     and scale factor over time, but it does not advance sprite frames.
     """
 
+    animated_properties = ("local_position", "scale_factor")
+    coordinate_space = "frame_local"
+
     def __init__(
         self,
         group,
@@ -25,14 +28,19 @@ class CardSelectionAnimation(Animation):
         self.to_position = self.normalize_position(to_position)
         self.from_scale = float(from_scale) if from_scale is not None else None
         self.to_scale = float(to_scale)
+        self._initial_from_position = self.from_position
+        self._initial_from_scale = self.from_scale
 
     def start(self):
         super().start()
-        if self.from_position is None:
-            self.from_position = tuple(self.group.local_rect.topleft)
-        if self.from_scale is None:
-            self.from_scale = self.get_group_scale(self.group)
+        self.from_position = tuple(self.group.local_rect.topleft) if self.from_position is None else self.from_position
+        self.from_scale = self.get_group_scale(self.group) if self.from_scale is None else self.from_scale
         self.apply(0.0)
+
+    def reset(self):
+        super().reset()
+        self.from_position = self._initial_from_position
+        self.from_scale = self._initial_from_scale
 
     def apply(self, progress):
         progress = self.ease_out(progress)
@@ -42,11 +50,18 @@ class CardSelectionAnimation(Animation):
 
         self.group.set_scale_factor(scale)
         self.group.set_local_position(x, y)
+        self.sync_frame_origin()
 
     def finish(self):
         self.group.set_scale_factor(self.to_scale)
         self.group.set_local_position(*self.to_position)
+        self.sync_frame_origin()
         super().finish()
+
+    def sync_frame_origin(self):
+        frame = getattr(self.group, "parent_frame", None)
+        if frame is not None and hasattr(frame, "set_group_origin"):
+            frame.set_group_origin(self.group.id, self.group.local_rect.topleft)
 
     @staticmethod
     def get_group_scale(group):

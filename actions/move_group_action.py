@@ -7,8 +7,9 @@ from animations.move_group_animation import MoveGroupAnimation
 class MoveGroupAction(Action):
     """Frame-owned visual process for moving a Group."""
 
-    def __init__(self, group, to_position, duration=0.25, from_position=None):
+    def __init__(self, group, to_position, duration=0.25, from_position=None, frame=None):
         self.group = group
+        self.frame = frame
         super().__init__(
             group_ids=(group.id,),
             animations=(
@@ -17,6 +18,7 @@ class MoveGroupAction(Action):
                     from_position=from_position,
                     to_position=to_position,
                     duration=duration,
+                    frame=frame,
                 ),
             ),
         )
