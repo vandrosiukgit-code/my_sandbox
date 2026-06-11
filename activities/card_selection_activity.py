@@ -19,13 +19,23 @@ class CardSelectionActivity(Activity):
 
     def __init__(self, hand_activity, player_turn_activity=None, owns_hand_activity=False):
         super().__init__(duration=0.0)
+        self.validate_hand_activity(hand_activity)
         self.hand_activity = hand_activity
         self.player_turn_activity = player_turn_activity
         self.owns_hand_activity = bool(owns_hand_activity)
         self.hovered_group = None
+        self.selected_group = None
         self.selected_card_context = None
         self.selection_animations = {}
         self.rest_states = {}
+
+    @staticmethod
+    def validate_hand_activity(hand_activity):
+        if hand_activity is None:
+            raise ValueError("CardSelectionActivity requires hand_activity")
+        for method_name in ("start", "update", "finish"):
+            if not callable(getattr(hand_activity, method_name, None)):
+                raise TypeError(f"hand_activity must provide {method_name}()")
 
     def start(self):
         if self.started:
@@ -37,7 +47,9 @@ class CardSelectionActivity(Activity):
     def update(self, dt):
         if not self.started:
             self.start()
+            return
         self.hand_activity.update(dt)
+        self.prune_stale_group_state()
         self.refresh_rest_states()
         self.update_selection_animations(dt)
 
@@ -50,13 +62,17 @@ class CardSelectionActivity(Activity):
             self.hand_activity.apply_fixture(fixture)
 
     def handle_input(self, input_event):
-        if input_event.type == "hover":
-            self.handle_hover(input_event.screen_pos)
+        event_type = getattr(input_event, "type", None)
+        if event_type == "hover":
+            screen_pos = getattr(input_event, "screen_pos", None)
+            if screen_pos is not None:
+                self.handle_hover(screen_pos)
             return False
-        if input_event.type == "double_click" and input_event.button == "left":
-            clicked_group = self.find_card_at(input_event.screen_pos)
+        if event_type == "double_click" and getattr(input_event, "button", None) == "left":
+            screen_pos = getattr(input_event, "screen_pos", None)
+            clicked_group = self.find_selectable_card_at(screen_pos)
             if clicked_group is not None:
-                self.start_player_turn(self.get_card_selection_context(clicked_group))
+                self.start_player_turn(clicked_group)
                 return False
         return True
 
@@ -72,13 +88,21 @@ class CardSelectionActivity(Activity):
             self.ensure_rest_state(self.hovered_group)
             self.animate_group_to_hover(self.hovered_group)
 
-    def start_player_turn(self, selected_context):
-        self.selected_card_context = selected_context
+    def start_player_turn(self, selected_group):
+        self.selected_group = selected_group
+        self.selected_card_context = self.get_card_selection_context(selected_group)
         if self.player_turn_activity is not None:
             if hasattr(self.player_turn_activity, "start_turn"):
-                self.player_turn_activity.start_turn(selected_context)
+                self.player_turn_activity.start_turn(self.selected_card_context)
             else:
                 self.player_turn_activity.start()
+
+    def find_selectable_card_at(self, screen_pos):
+        if self.hovered_group is not None:
+            return self.hovered_group
+        if screen_pos is None:
+            return None
+        return self.find_card_at(screen_pos)
 
     def get_card_selection_context(self, group):
         if hasattr(self.hand_activity, "get_card_selection_context"):
@@ -149,6 +173,8 @@ class CardSelectionActivity(Activity):
         owner = self.get_generated_group_owner()
         if owner is None:
             return ()
+        if hasattr(owner, "iter_generated_groups"):
+            return tuple(owner.iter_generated_groups())
         return tuple(getattr(owner, "generated_groups", ()))
 
     def get_generated_group_owner(self):
@@ -183,6 +209,30 @@ class CardSelectionActivity(Activity):
     def ensure_rest_state(self, group):
         if group.id not in self.rest_states:
             self.capture_rest_state(group)
+
+    def prune_stale_group_state(self):
+        current_groups = {group.id: group for group in self.iter_card_groups()}
+        current_ids = set(current_groups)
+        self.rest_states = {
+            group_id: state
+            for group_id, state in self.rest_states.items()
+            if group_id in current_ids
+        }
+        kept_animations = {}
+        for group_id, animation in self.selection_animations.items():
+            is_current = (
+                group_id in current_ids
+                and getattr(animation, "group", current_groups[group_id]) is current_groups[group_id]
+            )
+            if is_current:
+                kept_animations[group_id] = animation
+            elif hasattr(animation, "cancel"):
+                animation.cancel()
+        self.selection_animations = kept_animations
+        if self.hovered_group is not None and self.hovered_group.id not in current_ids:
+            self.hovered_group = None
+        if self.selected_group is not None and self.selected_group.id not in current_ids:
+            self.selected_group = None
 
     def get_rest_hit_rect(self, group):
         self.get_base_position(group)
@@ -245,6 +295,9 @@ class CardSelectionActivity(Activity):
                 animation.cancel()
         self.selection_animations = {}
         self.hovered_group = None
+        self.selected_group = None
+        self.selected_card_context = None
+        self.rest_states = {}
         if self.owns_hand_activity:
             self.hand_activity.finish()
         super().finish()

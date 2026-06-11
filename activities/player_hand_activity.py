@@ -33,30 +33,55 @@ class PlayerHandActivity(BotHandActivity):
         fan_width_ratio=0.75,
         **kwargs,
     ):
-        normalized_max_card_angle = self.normalize_non_negative_float(max_card_angle, "max_card_angle")
+        normalized_max_card_angle = self.normalize_non_negative_float(
+            max_card_angle,
+            "max_card_angle",
+            maximum=90.0,
+        )
         super().__init__(*args, max_total_angle=normalized_max_card_angle * 2, **kwargs)
-        self.max_card_angle = normalized_max_card_angle
-        self.edge_padding_ratio = self.normalize_ratio(edge_padding_ratio, "edge_padding_ratio")
-        self.fan_width_ratio = self.normalize_ratio(fan_width_ratio, "fan_width_ratio")
+        self.set_max_card_angle(normalized_max_card_angle)
+        self.edge_padding_ratio = self.normalize_ratio(
+            edge_padding_ratio,
+            "edge_padding_ratio",
+            maximum=0.45,
+        )
+        self.fan_width_ratio = self.normalize_ratio(
+            fan_width_ratio,
+            "fan_width_ratio",
+            maximum=1.0,
+        )
 
     def apply_fixture(self, fixture):
         if not fixture:
             return
 
-        self.max_card_angle = self.normalize_non_negative_float(
-            fixture.get("max_card_angle", self.max_card_angle),
-            "max_card_angle",
+        self.set_max_card_angle(
+            self.normalize_non_negative_float(
+                fixture.get("max_card_angle", self.max_card_angle),
+                "max_card_angle",
+                maximum=90.0,
+            )
         )
         self.edge_padding_ratio = self.normalize_ratio(
             fixture.get("edge_padding_ratio", self.edge_padding_ratio),
             "edge_padding_ratio",
+            maximum=0.45,
         )
         self.fan_width_ratio = self.normalize_ratio(
             fixture.get("fan_width_ratio", self.fan_width_ratio),
             "fan_width_ratio",
+            maximum=1.0,
         )
 
         super().apply_fixture(fixture)
+
+    def set_max_card_angle(self, value):
+        self.max_card_angle = self.normalize_non_negative_float(
+            value,
+            "max_card_angle",
+            maximum=90.0,
+        )
+        self.max_total_angle = self.max_card_angle * 2
 
     def apply_fan_layout(self):
         """Lay cards out as an interactive bottom-hand arc.
@@ -97,15 +122,16 @@ class PlayerHandActivity(BotHandActivity):
         """Calculate all fan geometry from frame size, density, and max angle."""
         frame_rect = self.frame.content_rect
 
-        center_x, center_y = self.get_fan_center(frame_rect)
-
         padding = self.calculate_edge_padding(frame_rect)
         left_bound = frame_rect.left + padding
         right_bound = frame_rect.right - padding
+        card_half_width = self.get_card_local_half_width()
 
+        center_x, center_y = self.get_fan_center(frame_rect)
+        center_x = max(left_bound, min(right_bound, center_x))
         available_half_span = max(
             0,
-            min(center_x - left_bound, right_bound - center_x),
+            min(center_x - left_bound, right_bound - center_x) - card_half_width,
         )
 
         half_span = available_half_span * self.fan_width_ratio
@@ -127,6 +153,11 @@ class PlayerHandActivity(BotHandActivity):
 
     def calculate_edge_padding(self, frame_rect):
         return max(0, int(round(frame_rect.width * self.edge_padding_ratio)))
+
+    def get_card_local_half_width(self):
+        if not self.generated_groups:
+            return 0.0
+        return max(0.0, self.generated_groups[0].local_rect.width / 2)
 
     def calculate_slot_position(self, index, count):
         """Return a compact normalized slot centered around the fan middle."""
@@ -161,17 +192,21 @@ class PlayerHandActivity(BotHandActivity):
         return group.local_rect.centerx
 
     @staticmethod
-    def normalize_ratio(value, name):
+    def normalize_ratio(value, name, maximum=None):
         value = float(value)
         if value < 0:
             raise ValueError(f"{name} must be non-negative: {value!r}")
+        if maximum is not None and value > maximum:
+            raise ValueError(f"{name} must be <= {maximum}: {value!r}")
         return value
 
     @staticmethod
-    def normalize_non_negative_float(value, name):
+    def normalize_non_negative_float(value, name, maximum=None):
         value = float(value)
         if value < 0:
             raise ValueError(f"{name} must be non-negative: {value!r}")
+        if maximum is not None and value > maximum:
+            raise ValueError(f"{name} must be <= {maximum}: {value!r}")
         return value
 
 

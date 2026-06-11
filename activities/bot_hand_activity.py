@@ -51,6 +51,8 @@ class BotHandActivity(Activity):
         self.generated_groups = []
         self.group_hand_indices = {}
         self.group_card_ids = {}
+        self.group_resource_keys = {}
+        self._last_layout_signature = None
         self.debug_fan_rect = bool(debug_fan_rect)
         self.debug_fan_rect_color = tuple(debug_fan_rect_color)
 
@@ -77,6 +79,10 @@ class BotHandActivity(Activity):
         _ = dt
         if not self.started:
             self.start()
+            return
+
+        if self.get_layout_signature() != self._last_layout_signature:
+            self.apply_fan_layout()
 
     def set_card_count(self, card_count):
         """Обновить число закрытых карт, которое нужно отобразить."""
@@ -86,11 +92,32 @@ class BotHandActivity(Activity):
 
     def configure_card_resources(self, provider=None, layer_name=None, card_count=None):
         """Configure the public resource contract used for generated cards."""
+        should_sync = self.started or bool(self.generated_groups)
+        resources_changed = (
+            provider is not self.card_resource_provider
+            or (layer_name is not None and layer_name != self.card_layer_name)
+        )
         self.card_resource_provider = provider
         if layer_name is not None:
             self.card_layer_name = layer_name
         if card_count is not None:
             self.card_count = max(0, int(card_count))
+        if resources_changed:
+            self.clear_generated_groups()
+        if should_sync:
+            self.sync_visual_groups()
+            self.apply_fan_layout()
+
+    def set_resource_key(self, resource_key):
+        """Set the card-back resource key and rebuild generated groups if needed."""
+        if resource_key == self.resource_key:
+            return
+        should_sync = self.started or bool(self.generated_groups)
+        self.resource_key = resource_key
+        self.clear_generated_groups()
+        if should_sync:
+            self.sync_visual_groups()
+            self.apply_fan_layout()
 
     def apply_fixture(self, fixture):
         """Применить dev fixture без участия правил игры.
@@ -108,10 +135,8 @@ class BotHandActivity(Activity):
         if not fixture:
             return
 
-        resource_key = fixture.get("resource_key", self.resource_key)
-        if resource_key != self.resource_key:
-            self.clear_generated_groups()
-            self.resource_key = resource_key
+        if "resource_key" in fixture:
+            self.set_resource_key(fixture["resource_key"])
 
         if "scale_factor" in fixture:
             self.scale_factor = self.normalize_scale_factor(fixture["scale_factor"])
@@ -127,6 +152,12 @@ class BotHandActivity(Activity):
         Если групп меньше card_count, создает недостающие Group из resource_key.
         Если групп больше card_count, удаляет лишние Group из frame и владения.
         """
+        for index, group in enumerate(tuple(self.generated_groups)):
+            expected_key = self.get_card_resource_key(index)
+            if self.group_resource_keys.get(group.id) != expected_key:
+                self.clear_generated_groups()
+                break
+
         while len(self.generated_groups) < self.card_count:
             self.add_generated_group(len(self.generated_groups))
 
@@ -135,6 +166,7 @@ class BotHandActivity(Activity):
             self.frame.remove_group(group.id)
             self.group_hand_indices.pop(group.id, None)
             self.group_card_ids.pop(group.id, None)
+            self.group_resource_keys.pop(group.id, None)
 
     def apply_fan_layout(self):
         """Рассчитать и применить веер закрытых карт внутри frame.
@@ -147,6 +179,7 @@ class BotHandActivity(Activity):
         """
         count = len(self.generated_groups)
         if count <= 0:
+            self._last_layout_signature = self.get_layout_signature()
             return
 
         frame_rect = self.frame.content_rect
@@ -159,6 +192,7 @@ class BotHandActivity(Activity):
             pivot_x, pivot_y = self.calculate_pivot_position(center_x, center_y, angle)
             self.apply_card_transform(group, angle, (pivot_x, pivot_y))
             self.frame.set_group_origin(group.id, group.local_rect.topleft)
+        self._last_layout_signature = self.get_layout_signature()
 
     @staticmethod
     def calculate_card_angle(index, occupied_angle, angle_step):
@@ -176,7 +210,7 @@ class BotHandActivity(Activity):
         and compress the step.
         """
         if count <= 1:
-            return self.max_total_angle / self.reference_card_count, 0.0
+            return 0.0, 0.0
 
         reference_step = self.max_total_angle / self.reference_card_count
         if count <= self.reference_card_count:
@@ -223,6 +257,22 @@ class BotHandActivity(Activity):
             rotated_surface.get_width(),
             rotated_surface.get_height(),
         ))
+
+    def get_layout_signature(self):
+        """Return frame-local inputs that require fan layout recalculation."""
+        frame_rect = self.frame.content_rect
+        return (
+            (frame_rect.x, frame_rect.y, frame_rect.width, frame_rect.height),
+            self.get_frame_screen_scale(),
+            self.scale_factor,
+            self.max_total_angle,
+            self.reference_card_count,
+            self.radius,
+            self.orientation_degrees,
+            self.center_offset,
+            self.card_count,
+            tuple(self.get_card_resource_key(index) for index in range(self.card_count)),
+        )
 
     def get_frame_screen_scale(self):
         if hasattr(self.frame, "get_content_screen_scale"):
@@ -295,6 +345,7 @@ class BotHandActivity(Activity):
         group._bot_hand_base_frames = tuple(frame.copy() for frame in group.get_primary_layer_frames())
         self.generated_groups.append(group)
         self.group_hand_indices[group.id] = index
+        self.group_resource_keys[group.id] = resource_key
         self.group_card_ids[group.id] = self.get_card_id(index, resource_key)
         self.frame.place_group_local(group, (0, 0))
         return group
@@ -322,6 +373,10 @@ class BotHandActivity(Activity):
             return self.card_resource_provider(index)
         return self.resource_key
 
+    def iter_generated_groups(self):
+        """Return generated visual-only groups owned by this activity."""
+        return tuple(self.generated_groups)
+
     def draw(self, screen):
         """Отрисовать generated visual-only Group, которыми владеет Activity."""
         for group in self.generated_groups:
@@ -347,6 +402,8 @@ class BotHandActivity(Activity):
         self.generated_groups = []
         self.group_hand_indices = {}
         self.group_card_ids = {}
+        self.group_resource_keys = {}
+        self._last_layout_signature = None
 
     def is_finished(self):
         """Рука бота - долгоживущий режим, сама по времени не завершается."""

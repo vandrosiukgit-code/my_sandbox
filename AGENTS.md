@@ -32,6 +32,15 @@ If an explicit `.venv\Scripts\python.exe` command fails with `No Python at ...`
 or another sandbox-related access error, rerun the same check with elevated
 access instead of treating the virtual environment as broken.
 
+Do not describe this as a broken `.venv` in validation reports. The correct
+description is:
+
+```text
+Normal sandbox execution of .\.venv\Scripts\python.exe is unavailable because
+the venv resolves its base interpreter outside the workspace. The same check
+must be rerun with elevated access.
+```
+
 Allowed elevated command categories for this project:
 
 ```powershell
@@ -55,6 +64,19 @@ unless the user explicitly asks to debug shell activation.
 
 If the explicit interpreter path still fails after the allowed elevated retry,
 stop and report the exact error instead of trying random Python installations.
+
+Validation wording for Python checks:
+
+```text
+py_compile passed through the project .venv with elevated access.
+```
+
+or, if the elevated retry was not approved or still failed:
+
+```text
+py_compile was not completed. Normal sandbox execution of .\.venv\Scripts\python.exe
+cannot access the venv base interpreter outside the workspace: <exact error>.
+```
 
 ---
 
