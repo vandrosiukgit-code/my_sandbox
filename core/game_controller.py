@@ -7,6 +7,7 @@
 
 from base import BaseGameController
 from core.game_state import CardState, GameState
+from game_screen.events import VisualCommand
 
 
 class GameController(BaseGameController):
@@ -62,6 +63,15 @@ class GameController(BaseGameController):
         if input_event.group_id and input_event.type in ("click", "double_click"):
             self.on_group_clicked(input_event.group_id)
 
+        selected_card = (getattr(input_event, "payload", {}) or {}).get("selected_card")
+        if input_event.type == "double_click" and selected_card:
+            return (
+                VisualCommand(
+                    type="start_player_turn",
+                    payload={"turn_context": dict(selected_card)},
+                ),
+            )
+
         return ()
 
     def get_state(self):
@@ -90,5 +100,4 @@ class GameController(BaseGameController):
                 CardState("card_j_clubs", "j", "clubs", "bottom_hand"),
             ]
         )
-
 

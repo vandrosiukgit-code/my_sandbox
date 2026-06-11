@@ -28,6 +28,7 @@ class ScreenInputEvent:
     frame_id: str | None = None
     screen_pos: tuple[int, int] | None = None
     local_pos: tuple[int, int] | None = None
+    payload: dict = field(default_factory=dict)
     raw_event: object | None = None
 
 

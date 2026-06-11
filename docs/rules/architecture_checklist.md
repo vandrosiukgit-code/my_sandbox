@@ -314,6 +314,10 @@ After code changes:
 & ".\.venv\Scripts\python.exe" -m py_compile <changed_file.py>
 ```
 
+- [ ] If `py_compile` or `code_map` fails with `No Python at ...` or another
+      sandbox-related access error, rerun the same command with elevated access.
+- [ ] Do not describe this project case as a broken `.venv`; normal sandbox
+      execution cannot access the venv base interpreter outside the workspace.
 - [ ] Run relevant smoke script if applicable.
 - [ ] Confirm no forbidden internals were newly mutated.
 - [ ] Confirm coordinate names remain explicit.
@@ -344,6 +348,7 @@ After code changes:
 ### Validation
 
 - ...
+- Python checks must use the canonical environment wording from `AGENTS.md`.
 ```
 
 Do not hide architecture deviations under generic refactor language.

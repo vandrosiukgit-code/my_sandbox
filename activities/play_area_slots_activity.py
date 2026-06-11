@@ -51,8 +51,26 @@ class PlayAreaSlotsActivity(Activity):
         self.managed_slot_ids = [self.prototype_slot_frame.id]
         self.slot_activities = {}
         self._last_layout_signature = None
+        self.validate_screen_slot_owner(screen)
         if self.prototype_slot_activity is not None:
             self.slot_activities[self.prototype_slot_frame.id] = self.prototype_slot_activity
+
+    @staticmethod
+    def validate_screen_slot_owner(screen):
+        required_methods = (
+            "ensure_play_area_slot_frame",
+            "ensure_play_area_slot_activity",
+            "remove_play_area_slot_activity",
+            "remove_play_area_slot_frame",
+        )
+        missing_methods = [
+            method_name
+            for method_name in required_methods
+            if not callable(getattr(screen, method_name, None))
+        ]
+        if missing_methods:
+            missing = ", ".join(missing_methods)
+            raise TypeError(f"PlayAreaSlotsActivity requires screen slot owner API: {missing}")
 
     def start(self):
         if self.started:
@@ -69,6 +87,20 @@ class PlayAreaSlotsActivity(Activity):
         layout_signature = self.get_layout_signature()
         if layout_signature != self._last_layout_signature:
             self.apply_layout()
+
+    def iter_generated_groups(self):
+        groups = []
+        for activity in self.slot_activities.values():
+            if hasattr(activity, "iter_generated_groups"):
+                groups.extend(activity.iter_generated_groups())
+        return tuple(groups)
+
+    def draw_debug_overlay(self, screen):
+        for activity in self.slot_activities.values():
+            if hasattr(activity, "draw_debug_overlay"):
+                activity.draw_debug_overlay(screen)
+            elif hasattr(activity, "draw"):
+                activity.draw(screen)
 
     def apply_fixture(self, fixture):
         if not fixture:
@@ -235,18 +267,14 @@ class PlayAreaSlotsActivity(Activity):
 
         self.managed_slot_ids = []
         for index, frame_id in enumerate(target_ids):
-            if index == 0:
-                slot_frame = self.prototype_slot_frame
-            elif self.screen.has_screen_frame(frame_id):
-                slot_frame = self.screen.get_screen_frame(frame_id)
-            else:
-                slot_frame = self.screen.create_frame(
-                    frame_id,
-                    rect=self.prototype_slot_frame.local_rect,
-                    parent_frame_id=self.play_area_frame.id,
-                )
+            slot_frame = self.ensure_slot_frame(frame_id, index)
             slot_frame.set_rect_visibility(False)
             self.managed_slot_ids.append(frame_id)
+
+    def ensure_slot_frame(self, frame_id, index):
+        """Request a screen-owned slot frame."""
+        _ = index
+        return self.screen.ensure_play_area_slot_frame(frame_id, self.prototype_slot_frame)
 
     def ensure_slot_activities(self):
         """Keep one CardsSlotActivity alive for each managed slot frame."""
@@ -257,10 +285,12 @@ class PlayAreaSlotsActivity(Activity):
                 continue
 
             slot_frame = self.screen.get_screen_frame(frame_id)
-            activity = self.slot_activity_factory(slot_frame, index)
+            activity = self.ensure_slot_activity(frame_id, slot_frame, index)
             self.slot_activities[frame_id] = activity
-            self.screen.register_named_activity(frame_id, activity)
-            self.screen.add_activity(activity)
+
+    def ensure_slot_activity(self, frame_id, slot_frame, index):
+        """Request a screen-owned slot activity."""
+        return self.screen.ensure_play_area_slot_activity(frame_id, slot_frame, index)
 
     def apply_slot_activity_fixtures(self):
         """Apply shared slot contents to every CardsSlotActivity in the play area."""
@@ -277,15 +307,12 @@ class PlayAreaSlotsActivity(Activity):
             return
 
         self.slot_activities.pop(frame_id, None)
-        if hasattr(activity, "finish"):
-            activity.finish()
-        self.screen.remove_activity(activity, finish=False)
-        self.screen.unregister_named_activity(frame_id, finish=False)
+        self.screen.remove_play_area_slot_activity(frame_id, finish=True)
 
     def remove_slot_frame(self, frame_id):
         if frame_id == self.prototype_slot_frame.id:
             return
-        self.screen.remove_screen_frame(frame_id)
+        self.screen.remove_play_area_slot_frame(frame_id, self.prototype_slot_frame.id)
 
     def get_slot_frame_id(self, index):
         if index == 0:

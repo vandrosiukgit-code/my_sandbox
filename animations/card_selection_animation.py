@@ -1,6 +1,7 @@
 """Coordinate animation for card selection feedback."""
 
 from animations.base_animation import Animation
+from animations.easing import ease_out_quad, lerp_float
 
 
 class CardSelectionAnimation(Animation):
@@ -21,20 +22,26 @@ class CardSelectionAnimation(Animation):
         duration=0.12,
         from_position=None,
         from_scale=None,
+        on_finish=None,
     ):
-        super().__init__(duration=duration)
+        super().__init__(duration=duration, on_finish=on_finish)
+        self.validate_group(group)
         self.group = group
         self.from_position = self.normalize_position(from_position) if from_position is not None else None
         self.to_position = self.normalize_position(to_position)
-        self.from_scale = float(from_scale) if from_scale is not None else None
-        self.to_scale = float(to_scale)
+        self.from_scale = self.normalize_scale(from_scale, "from_scale") if from_scale is not None else None
+        self.to_scale = self.normalize_scale(to_scale, "to_scale")
         self._initial_from_position = self.from_position
         self._initial_from_scale = self.from_scale
+        self._explicit_from_position = from_position is not None
+        self._explicit_from_scale = from_scale is not None
 
     def start(self):
         super().start()
-        self.from_position = tuple(self.group.local_rect.topleft) if self.from_position is None else self.from_position
-        self.from_scale = self.get_group_scale(self.group) if self.from_scale is None else self.from_scale
+        if not self._explicit_from_position:
+            self.from_position = tuple(self.group.local_rect.topleft)
+        if not self._explicit_from_scale:
+            self.from_scale = self.get_group_scale(self.group)
         self.apply(0.0)
 
     def reset(self):
@@ -43,19 +50,16 @@ class CardSelectionAnimation(Animation):
         self.from_scale = self._initial_from_scale
 
     def apply(self, progress):
-        progress = self.ease_out(progress)
-        x = self.interpolate(self.from_position[0], self.to_position[0], progress)
-        y = self.interpolate(self.from_position[1], self.to_position[1], progress)
-        scale = self.interpolate(self.from_scale, self.to_scale, progress)
+        progress = ease_out_quad(progress)
+        x = lerp_float(self.from_position[0], self.to_position[0], progress)
+        y = lerp_float(self.from_position[1], self.to_position[1], progress)
+        scale = lerp_float(self.from_scale, self.to_scale, progress)
 
         self.group.set_scale_factor(scale)
         self.group.set_local_position(x, y)
         self.sync_frame_origin()
 
     def finish(self):
-        self.group.set_scale_factor(self.to_scale)
-        self.group.set_local_position(*self.to_position)
-        self.sync_frame_origin()
         super().finish()
 
     def sync_frame_origin(self):
@@ -69,13 +73,20 @@ class CardSelectionAnimation(Animation):
 
     @staticmethod
     def normalize_position(position):
+        if not isinstance(position, (tuple, list)) or len(position) < 2:
+            raise TypeError(f"position must be a pair: {position!r}")
         return int(round(float(position[0]))), int(round(float(position[1])))
 
     @staticmethod
-    def interpolate(start, end, progress):
-        return start + (end - start) * progress
+    def normalize_scale(value, name):
+        scale = float(value)
+        if scale <= 0:
+            raise ValueError(f"{name} must be positive: {value!r}")
+        return scale
 
     @staticmethod
-    def ease_out(progress):
-        progress = max(0.0, min(1.0, float(progress)))
-        return 1.0 - (1.0 - progress) * (1.0 - progress)
+    def validate_group(group):
+        required = ("local_rect", "scale_factor", "set_scale_factor", "set_local_position")
+        missing = [name for name in required if not hasattr(group, name)]
+        if missing:
+            raise TypeError(f"group is not compatible with CardSelectionAnimation: missing {missing!r}")

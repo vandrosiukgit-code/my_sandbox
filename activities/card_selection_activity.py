@@ -1,14 +1,14 @@
 """High-level activity for selecting a card from a player hand."""
 
 from activities.base_activity import Activity
-from animations import CardSelectionAnimation
+from actions import CardSelectionAction
 
 
 class CardSelectionActivity(Activity):
     """Own the visual process of choosing a card from a hand.
 
     It watches generated hand-card groups, enlarges the card under the cursor,
-    and starts the player-turn activity on double left click.
+    and exposes controller-facing card context for selection input.
     """
 
     HOVER_SCALE_MULTIPLIER = 1.18
@@ -17,16 +17,14 @@ class CardSelectionActivity(Activity):
     HOVER_HYSTERESIS_PIXELS = 8
     HOVER_EDGE_CARD_HYSTERESIS_PIXELS = 18
 
-    def __init__(self, hand_activity, player_turn_activity=None, owns_hand_activity=False):
+    def __init__(self, hand_activity, owns_hand_activity=False):
         super().__init__(duration=0.0)
         self.validate_hand_activity(hand_activity)
         self.hand_activity = hand_activity
-        self.player_turn_activity = player_turn_activity
         self.owns_hand_activity = bool(owns_hand_activity)
         self.hovered_group = None
-        self.selected_group = None
         self.selected_card_context = None
-        self.selection_animations = {}
+        self.selection_actions = {}
         self.rest_states = {}
 
     @staticmethod
@@ -51,10 +49,15 @@ class CardSelectionActivity(Activity):
         self.hand_activity.update(dt)
         self.prune_stale_group_state()
         self.refresh_rest_states()
-        self.update_selection_animations(dt)
+        self.update_selection_actions(dt)
 
     def draw(self, screen):
-        if hasattr(self.hand_activity, "draw"):
+        self.draw_debug_overlay(screen)
+
+    def draw_debug_overlay(self, screen):
+        if hasattr(self.hand_activity, "draw_debug_overlay"):
+            self.hand_activity.draw_debug_overlay(screen)
+        elif hasattr(self.hand_activity, "draw"):
             self.hand_activity.draw(screen)
 
     def apply_fixture(self, fixture):
@@ -68,12 +71,6 @@ class CardSelectionActivity(Activity):
             if screen_pos is not None:
                 self.handle_hover(screen_pos)
             return False
-        if event_type == "double_click" and getattr(input_event, "button", None) == "left":
-            screen_pos = getattr(input_event, "screen_pos", None)
-            clicked_group = self.find_selectable_card_at(screen_pos)
-            if clicked_group is not None:
-                self.start_player_turn(clicked_group)
-                return False
         return True
 
     def handle_hover(self, screen_pos):
@@ -88,14 +85,20 @@ class CardSelectionActivity(Activity):
             self.ensure_rest_state(self.hovered_group)
             self.animate_group_to_hover(self.hovered_group)
 
-    def start_player_turn(self, selected_group):
-        self.selected_group = selected_group
-        self.selected_card_context = self.get_card_selection_context(selected_group)
-        if self.player_turn_activity is not None:
-            if hasattr(self.player_turn_activity, "start_turn"):
-                self.player_turn_activity.start_turn(self.selected_card_context)
-            else:
-                self.player_turn_activity.start()
+    def select_card_context(self, card_group):
+        self.selected_card_context = self.get_card_selection_context(card_group)
+        return self.selected_card_context
+
+    def get_input_context(self, input_event):
+        """Return controller-facing card context for selection input."""
+        if getattr(input_event, "type", None) != "double_click":
+            return {}
+        if getattr(input_event, "button", None) != "left":
+            return {}
+        clicked_group = self.find_selectable_card_at(getattr(input_event, "screen_pos", None))
+        if clicked_group is None:
+            return {}
+        return {"selected_card": self.select_card_context(clicked_group)}
 
     def find_selectable_card_at(self, screen_pos):
         if self.hovered_group is not None:
@@ -177,6 +180,10 @@ class CardSelectionActivity(Activity):
             return tuple(owner.iter_generated_groups())
         return tuple(getattr(owner, "generated_groups", ()))
 
+    def iter_generated_groups(self):
+        """Return visual hand groups for the screen draw pipeline."""
+        return self.iter_card_groups()
+
     def get_generated_group_owner(self):
         if hasattr(self.hand_activity, "generated_groups"):
             return self.hand_activity
@@ -196,7 +203,7 @@ class CardSelectionActivity(Activity):
         for group in self.iter_card_groups():
             if group is self.hovered_group:
                 continue
-            if group.id in self.selection_animations:
+            if group.id in self.selection_actions:
                 continue
             self.capture_rest_state(group)
 
@@ -218,21 +225,27 @@ class CardSelectionActivity(Activity):
             for group_id, state in self.rest_states.items()
             if group_id in current_ids
         }
-        kept_animations = {}
-        for group_id, animation in self.selection_animations.items():
+        kept_actions = {}
+        for group_id, action in self.selection_actions.items():
             is_current = (
                 group_id in current_ids
-                and getattr(animation, "group", current_groups[group_id]) is current_groups[group_id]
+                and getattr(action, "group", current_groups[group_id]) is current_groups[group_id]
             )
             if is_current:
-                kept_animations[group_id] = animation
-            elif hasattr(animation, "cancel"):
-                animation.cancel()
-        self.selection_animations = kept_animations
+                kept_actions[group_id] = action
+            elif hasattr(action, "cancel"):
+                action.cancel()
+        self.selection_actions = kept_actions
         if self.hovered_group is not None and self.hovered_group.id not in current_ids:
             self.hovered_group = None
-        if self.selected_group is not None and self.selected_group.id not in current_ids:
-            self.selected_group = None
+        selected_group_id = self.get_selected_group_id()
+        if selected_group_id is not None and selected_group_id not in current_ids:
+            self.selected_card_context = None
+
+    def get_selected_group_id(self):
+        if not self.selected_card_context:
+            return None
+        return self.selected_card_context.get("group_id")
 
     def get_rest_hit_rect(self, group):
         self.get_base_position(group)
@@ -245,7 +258,7 @@ class CardSelectionActivity(Activity):
         base_x, base_y = self.get_base_position(group)
         target_position = (base_x, base_y - self.HOVER_LIFT_PIXELS)
         target_scale = self.get_base_scale(group) * self.HOVER_SCALE_MULTIPLIER
-        self.selection_animations[group.id] = CardSelectionAnimation(
+        self.selection_actions[group.id] = CardSelectionAction(
             group,
             to_position=target_position,
             to_scale=target_scale,
@@ -254,9 +267,9 @@ class CardSelectionActivity(Activity):
 
     def animate_group_to_rest(self, group):
         if self.is_group_at_rest(group):
-            self.selection_animations.pop(group.id, None)
+            self.selection_actions.pop(group.id, None)
             return
-        self.selection_animations[group.id] = CardSelectionAnimation(
+        self.selection_actions[group.id] = CardSelectionAction(
             group,
             to_position=self.get_base_position(group),
             to_scale=self.get_base_scale(group),
@@ -278,24 +291,23 @@ class CardSelectionActivity(Activity):
             and abs(current_scale - base_scale) < 0.001
         )
 
-    def update_selection_animations(self, dt):
+    def update_selection_actions(self, dt):
         running = {}
-        for group_id, animation in self.selection_animations.items():
-            animation.update(dt)
-            if not animation.is_finished():
-                running[group_id] = animation
-        self.selection_animations = running
+        for group_id, action in self.selection_actions.items():
+            action.update(dt)
+            if not action.is_finished():
+                running[group_id] = action
+        self.selection_actions = running
 
     def is_finished(self):
         return self._finished
 
     def finish(self):
-        for animation in self.selection_animations.values():
-            if hasattr(animation, "cancel"):
-                animation.cancel()
-        self.selection_animations = {}
+        for action in self.selection_actions.values():
+            if hasattr(action, "cancel"):
+                action.cancel()
+        self.selection_actions = {}
         self.hovered_group = None
-        self.selected_group = None
         self.selected_card_context = None
         self.rest_states = {}
         if self.owns_hand_activity:

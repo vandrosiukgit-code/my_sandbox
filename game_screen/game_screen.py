@@ -1,5 +1,7 @@
 ﻿"""Base screen scene for frames, input normalization, and active groups."""
 
+from dataclasses import replace
+
 import pygame
 
 from base import BaseGameScreen
@@ -28,6 +30,7 @@ class GameScreen(BaseGameScreen):
         self.active_group_ids = []
         self.active_activities = []
         self.screen_frames = {}
+        self.hand_activities = {}
         self.gui_activities = dict(DEFAULT_GUI_ACTIVITIES)
         self._last_click = None
 
@@ -128,6 +131,10 @@ class GameScreen(BaseGameScreen):
         if group_id in self.active_group_ids:
             self.active_group_ids.remove(group_id)
 
+    def is_group_active(self, group_id):
+        """Return True when a configured group is active on this screen."""
+        return group_id in self.active_group_ids
+
     def get_group(self, group_id):
         if self.group_store is None:
             raise RuntimeError("GameScreen.group_store is not connected")
@@ -144,6 +151,10 @@ class GameScreen(BaseGameScreen):
             activity.start()
         return activity
 
+    def iter_active_activities(self):
+        """Yield active screen-owned activities in draw/update order."""
+        return tuple(self.active_activities)
+
     def remove_activity(self, activity, finish=True):
         """Remove an activity from the screen lifecycle."""
         if finish and hasattr(activity, "finish") and not self.is_activity_finished(activity):
@@ -154,29 +165,30 @@ class GameScreen(BaseGameScreen):
 
     def register_named_activity(self, activity_id, activity):
         """Register an activity under a stable screen-local ID."""
-        if not hasattr(self, "hand_activities"):
-            self.hand_activities = {}
         self.hand_activities[activity_id] = activity
         return activity
 
     def unregister_named_activity(self, activity_id, finish=True):
         """Unregister a named activity and optionally finish it."""
-        activities = getattr(self, "hand_activities", None)
-        if activities is None:
-            return None
-        activity = activities.pop(activity_id, None)
+        activity = self.hand_activities.pop(activity_id, None)
         if activity is not None:
             self.remove_activity(activity, finish=finish)
         return activity
 
     def get_named_activity(self, activity_id, default=None):
-        return getattr(self, "hand_activities", {}).get(activity_id, default)
+        return self.hand_activities.get(activity_id, default)
+
+    def iter_named_activities(self):
+        """Yield stable screen-local activity IDs with their activities."""
+        return tuple(self.hand_activities.items())
 
     def handle_event(self, event):
         """Normalize pygame input and forward it to GameController."""
         input_event = self.build_input_event(event)
         if input_event is None:
             return True
+
+        input_event = self.enrich_input_event(input_event)
 
         if self.forward_input_to_activities(input_event) is False:
             return True
@@ -204,8 +216,23 @@ class GameScreen(BaseGameScreen):
             frame_id=hit.frame_id if hit else None,
             screen_pos=tuple(event.pos),
             local_pos=hit.local_pos if hit else None,
+            payload={},
             raw_event=event,
         )
+
+    def enrich_input_event(self, input_event):
+        """Attach controller-facing visual context from screen activities."""
+        payload = dict(input_event.payload or {})
+        for activity in reversed(tuple(self.iter_active_activities())):
+            context_provider = getattr(activity, "get_input_context", None)
+            if context_provider is None:
+                continue
+            context = context_provider(input_event)
+            if context:
+                payload.update(context)
+        if payload == input_event.payload:
+            return input_event
+        return replace(input_event, payload=payload)
 
     def forward_input_to_activities(self, input_event):
         """Let visual activities consume normalized input before controller rules."""

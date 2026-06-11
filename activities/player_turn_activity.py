@@ -52,8 +52,18 @@ class PlayerTurnActivity(Activity):
         self.play_area_slots_activity.update(dt)
 
     def draw(self, screen):
-        if hasattr(self.play_area_slots_activity, "draw"):
+        self.draw_debug_overlay(screen)
+
+    def draw_debug_overlay(self, screen):
+        if hasattr(self.play_area_slots_activity, "draw_debug_overlay"):
+            self.play_area_slots_activity.draw_debug_overlay(screen)
+        elif hasattr(self.play_area_slots_activity, "draw"):
             self.play_area_slots_activity.draw(screen)
+
+    def iter_generated_groups(self):
+        if hasattr(self.play_area_slots_activity, "iter_generated_groups"):
+            return tuple(self.play_area_slots_activity.iter_generated_groups())
+        return ()
 
     def apply_fixture(self, fixture):
         if hasattr(self.play_area_slots_activity, "apply_fixture"):

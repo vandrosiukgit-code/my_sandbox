@@ -180,9 +180,12 @@ class PlayerHandActivity(BotHandActivity):
         return radius * (1 - math.cos(math.radians(angle_degrees)))
 
     def draw(self, screen):
-        """Draw bottom-hand cards from left to right so right cards sit on top."""
-        for group in self.iter_groups_in_draw_order():
-            group.draw(screen)
+        """Draw debug overlays for this activity; groups are drawn by GameScreen."""
+        _ = screen
+
+    def iter_generated_groups(self):
+        """Return generated hand groups in draw order."""
+        return self.iter_groups_in_draw_order()
 
     def iter_groups_in_draw_order(self):
         return tuple(sorted(self.generated_groups, key=self.get_group_draw_x))

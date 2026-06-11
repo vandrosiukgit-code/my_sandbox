@@ -354,6 +354,23 @@ For changed Python files:
 & ".\.venv\Scripts\python.exe" -m py_compile <changed_file.py>
 ```
 
+If `py_compile` fails with `No Python at ...` or another sandbox-related access
+error, rerun the same command with elevated access. Do not report this as a
+broken `.venv`.
+
+Correct wording when the elevated retry passes:
+
+```text
+py_compile passed through the project .venv with elevated access.
+```
+
+Correct wording when the elevated retry is not approved or still fails:
+
+```text
+py_compile was not completed. Normal sandbox execution of .\.venv\Scripts\python.exe
+cannot access the venv base interpreter outside the workspace: <exact error>.
+```
+
 Architecture-sensitive verification:
 
 - `GameController` has no pygame dependency.
@@ -382,6 +399,7 @@ After refactoring, summarize:
 
 - command run
 - result
+- for Python commands, use the project wording above; do not call `.venv` broken
 
 ## Architecture notes
 

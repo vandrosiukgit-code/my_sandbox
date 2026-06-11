@@ -379,8 +379,9 @@ class BotHandActivity(Activity):
 
     def draw(self, screen):
         """Отрисовать generated visual-only Group, которыми владеет Activity."""
-        for group in self.generated_groups:
-            group.draw(screen)
+        self.draw_debug_overlay(screen)
+
+    def draw_debug_overlay(self, screen):
         if self.debug_fan_rect:
             self.draw_fan_rect(screen)
 

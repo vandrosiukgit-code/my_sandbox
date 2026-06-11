@@ -90,7 +90,6 @@ class TableScreen(GameScreen):
                 cards=(),
                 resource_manager=ResourceManager,
             ),
-            player_turn_activity=player_turn_activity,
             owns_hand_activity=True,
         )
 
@@ -133,7 +132,6 @@ class TableScreen(GameScreen):
             "play_area_frame": player_turn_activity,
             "cards_slot_frame": cards_slot_activity,
         }
-        self.hand_activities = {}
         for activity_id, activity in activity_map.items():
             self.register_named_activity(activity_id, activity)
             self.add_activity(activity)
@@ -157,6 +155,41 @@ class TableScreen(GameScreen):
             cards=(),
             resource_manager=ResourceManager,
         )
+
+    def ensure_play_area_slot_frame(self, frame_id, prototype_frame):
+        """Create or return a play-area slot frame owned by this screen."""
+        if frame_id == prototype_frame.id:
+            slot_frame = prototype_frame
+        elif self.has_screen_frame(frame_id):
+            slot_frame = self.get_screen_frame(frame_id)
+        else:
+            slot_frame = self.create_frame(
+                frame_id,
+                rect=prototype_frame.local_rect,
+                parent_frame_id="play_area_frame",
+            )
+        slot_frame.set_rect_visibility(False)
+        return slot_frame
+
+    def ensure_play_area_slot_activity(self, frame_id, slot_frame, index):
+        """Create or return a screen-owned slot activity for a play-area frame."""
+        activity = self.get_named_activity(frame_id)
+        if activity is not None:
+            return activity
+        activity = self.create_cards_slot_activity(slot_frame, index)
+        self.register_named_activity(frame_id, activity)
+        self.add_activity(activity)
+        return activity
+
+    def remove_play_area_slot_activity(self, frame_id, finish=True):
+        """Remove a screen-owned slot activity by frame ID."""
+        return self.unregister_named_activity(frame_id, finish=finish)
+
+    def remove_play_area_slot_frame(self, frame_id, prototype_frame_id="cards_slot_frame"):
+        """Remove a non-prototype play-area slot frame."""
+        if frame_id == prototype_frame_id:
+            return None
+        return self.remove_screen_frame(frame_id)
 
     def layout_play_area_frames(self):
         play_area_size = self.calculate_play_area_size()
@@ -297,8 +330,12 @@ class TableScreen(GameScreen):
         screen.fill(self.background_color)
         self.draw_group_if_active("table_group", screen)
 
-        for activity in self.active_activities:
-            if hasattr(activity, "draw"):
+        self.draw_activity_generated_groups(screen)
+
+        for activity in self.iter_active_activities():
+            if hasattr(activity, "draw_debug_overlay"):
+                activity.draw_debug_overlay(screen)
+            elif hasattr(activity, "draw"):
                 activity.draw(screen)
 
         for group_id in (
@@ -313,8 +350,41 @@ class TableScreen(GameScreen):
             frame.draw_debug_tree(screen)
 
     def draw_group_if_active(self, group_id, screen):
-        if group_id in self.active_group_ids:
+        if self.is_group_active(group_id):
             self.get_group(group_id).draw(screen)
+
+    def draw_activity_generated_groups(self, screen):
+        for group in self.iter_activity_generated_groups():
+            group.draw(screen)
+
+    def iter_activity_generated_groups(self):
+        seen_group_ids = set()
+        groups = []
+        for activity in self.iter_active_activities():
+            if not hasattr(activity, "iter_generated_groups"):
+                continue
+            for group in activity.iter_generated_groups():
+                if group.id in seen_group_ids:
+                    continue
+                seen_group_ids.add(group.id)
+                groups.append(group)
+        return tuple(groups)
+
+    def dispatch_visual_command(self, command):
+        """Handle table-specific visual commands after controller decisions."""
+        command_type = self.get_command_value(command, "type")
+        if command_type == "start_player_turn":
+            payload = self.get_command_value(command, "payload", {}) or {}
+            return self.start_player_turn_from_command(payload.get("turn_context", {}))
+        return super().dispatch_visual_command(command)
+
+    def start_player_turn_from_command(self, turn_context):
+        activity = self.get_named_activity("play_area_frame")
+        if activity is None:
+            return None
+        if hasattr(activity, "start_turn"):
+            return activity.start_turn(turn_context)
+        return activity.start()
 
     def reload_fixture_if_changed(self, force=False):
         """Hot reload dev fixture and apply it to screen activities."""
@@ -368,7 +438,7 @@ class TableScreen(GameScreen):
             self.apply_group_fixture(group_id, group_fixture)
 
         activities = fixture.get("activities", {})
-        for activity_id, activity in self.hand_activities.items():
+        for activity_id, activity in self.iter_named_activities():
             activity.apply_fixture(activities.get(activity_id, {}))
 
     def apply_card_counts_fixture(self, card_counts):

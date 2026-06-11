@@ -46,7 +46,19 @@ For protocols, bridges, or public API surfaces:
 & ".\.venv\Scripts\python.exe" -m code_map protocol-audit <path> [--symbol <ClassName>]
 ```
 
-If `code_map` fails, mention the failure and continue with direct inspection.
+If `code_map` fails with `No Python at ...` or another sandbox-related access
+error, rerun the same command with elevated access. Do not report this as a
+broken `.venv`.
+
+Correct wording:
+
+```text
+code_map was not available in normal sandbox execution because .\.venv\Scripts\python.exe
+cannot access the venv base interpreter outside the workspace. The command was rerun with elevated access.
+```
+
+If the elevated retry is not approved or still fails, mention the exact error
+and continue with direct inspection.
 
 ---
 

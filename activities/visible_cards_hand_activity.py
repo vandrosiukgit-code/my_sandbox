@@ -68,7 +68,13 @@ class VisibleCardsHandDecorator(Activity):
         self.hand_activity.update(dt)
 
     def draw(self, screen):
-        self.hand_activity.draw(screen)
+        self.draw_debug_overlay(screen)
+
+    def draw_debug_overlay(self, screen):
+        if hasattr(self.hand_activity, "draw_debug_overlay"):
+            self.hand_activity.draw_debug_overlay(screen)
+        elif hasattr(self.hand_activity, "draw"):
+            self.hand_activity.draw(screen)
 
     def apply_fixture(self, fixture):
         """Apply visible-card fixture fields and delegate geometry to the hand."""
@@ -112,6 +118,8 @@ class VisibleCardsHandDecorator(Activity):
 
     def iter_generated_groups(self):
         """Return generated visual groups owned by the wrapped hand activity."""
+        if hasattr(self.hand_activity, "iter_generated_groups"):
+            return tuple(self.hand_activity.iter_generated_groups())
         return tuple(getattr(self.hand_activity, "generated_groups", ()))
 
     def get_card_selection_context(self, group):
