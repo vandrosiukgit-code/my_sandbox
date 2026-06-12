@@ -89,6 +89,26 @@ class GameScreen(BaseGameScreen):
     def get_screen_frame(self, frame_id):
         return self.screen_frames[frame_id]
 
+    def get_frame_screen_rect(self, frame_id):
+        """Return stable screen-space rect for a registered Frame."""
+        return self.get_screen_frame(frame_id).rect.copy()
+
+    def get_frame_content_screen_rect(self, frame_id):
+        """Return stable screen-space content rect for a registered Frame."""
+        frame = self.get_screen_frame(frame_id)
+        content_rect = frame.content_rect
+        screen_pos = frame.to_screen(content_rect.topleft)
+        content_scale = frame.get_content_screen_scale()
+        screen_size = (
+            max(0, int(round(content_rect.width * content_scale))),
+            max(0, int(round(content_rect.height * content_scale))),
+        )
+        return pygame.Rect(screen_pos, screen_size)
+
+    def get_frame_screen_rects(self, frame_ids):
+        """Return stable screen-space rects for registered Frames."""
+        return tuple(self.get_frame_screen_rect(frame_id) for frame_id in frame_ids)
+
     def remove_screen_frame(self, frame_id):
         """Remove a registered frame and detach it from its parent frame."""
         frame = self.screen_frames.pop(frame_id, None)

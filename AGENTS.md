@@ -100,7 +100,9 @@ Read relevant docs before architecture-sensitive changes:
 docs/architectural_manifesto_v6.2.md
 docs/architecture.md
 docs/current_architecture_snapshot.md
+docs/dev_tests.md
 docs/gui_manifest.md
+docs/screen_layout_refactor_backlog.md
 docs/visual_input_flow.md
 ```
 

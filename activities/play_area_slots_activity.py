@@ -211,8 +211,8 @@ class PlayAreaSlotsActivity(Activity):
         return max(1, int(round(step)))
 
     def get_player_inner_horizontal_bounds(self):
-        left_rect = self.get_player_fan_or_frame_rect("left_player_hand", "left_player_frame")
-        right_rect = self.get_player_fan_or_frame_rect("right_player_hand", "right_player_frame")
+        left_rect = self.get_player_frame_screen_rect("left_player_frame")
+        right_rect = self.get_player_frame_screen_rect("right_player_frame")
         if left_rect is None or right_rect is None:
             return None
 
@@ -227,15 +227,11 @@ class PlayAreaSlotsActivity(Activity):
             min(content_rect.right, right_inner_x),
         )
 
-    def get_player_fan_or_frame_rect(self, activity_id, frame_id):
-        activity = self.screen.get_named_activity(activity_id)
-        if activity is not None and hasattr(activity, "calculate_fan_rect"):
-            fan_rect = activity.calculate_fan_rect()
-            if fan_rect is not None:
-                return fan_rect
-
+    def get_player_frame_screen_rect(self, frame_id):
         try:
-            return self.screen.get_screen_frame(frame_id).rect
+            if hasattr(self.screen, "get_frame_screen_rect"):
+                return self.screen.get_frame_screen_rect(frame_id)
+            return self.screen.get_screen_frame(frame_id).rect.copy()
         except KeyError:
             return None
 

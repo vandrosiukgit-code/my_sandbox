@@ -20,6 +20,8 @@ class CardsSlotActivityDecorator(VisibleCardsHandDecorator):
         self.slot_content_local_rect = pygame.Rect(0, 0, 0, 0)
         self.slot_content_scaled_local_rect = pygame.Rect(0, 0, 0, 0)
         self._last_slot_layout_signature = None
+        self.card_visual_states = {}
+        self.card_original_frames_by_group_id = {}
 
     @staticmethod
     def validate_slot_hand_activity(hand_activity):
@@ -37,7 +39,97 @@ class CardsSlotActivityDecorator(VisibleCardsHandDecorator):
 
     def set_cards(self, cards, force=False):
         super().set_cards(cards, force=force)
+        self.card_visual_states = {}
+        self.card_original_frames_by_group_id = {}
         self.normalize_slot_content(force=True)
+
+    def set_card_visual_state(self, card_index, state):
+        """Set one slot card visual state without changing slot geometry."""
+        group = self.get_generated_group(card_index)
+        state = self.normalize_card_visual_state(state)
+        self.card_visual_states[int(card_index)] = state
+        self.ensure_card_original_frames(group)
+        if state == "hidden":
+            self.apply_transparent_card_surface(group)
+        elif state == "visible":
+            self.restore_card_surface(group)
+        else:
+            raise ValueError(f"Unsupported card visual state: {state!r}")
+
+    def set_all_card_visual_states(self, state):
+        """Set the visual state for every generated card in this slot."""
+        for index, _group in enumerate(self.iter_generated_groups()):
+            self.set_card_visual_state(index, state)
+
+    def get_card_screen_state(self, card_index):
+        """Return the screen rect and original visible surface for a slot card."""
+        group = self.get_generated_group(card_index)
+        frames = self.ensure_card_original_frames(group)
+        surface = frames[0] if frames else None
+        if surface is not None:
+            surface = group.get_scaled_surface(surface).copy()
+        return self.get_group_primary_layer_screen_rect(group), surface
+
+    def get_card_screen_geometry(self, card_index):
+        """Return screen-space center/size/angle geometry for a slot card."""
+        group = self.get_generated_group(card_index)
+        getter = getattr(self.hand_activity, "get_group_card_screen_geometry", None)
+        if callable(getter):
+            return getter(group)
+        rect = self.get_group_primary_layer_screen_rect(group)
+        return {
+            "center": tuple(rect.center),
+            "size": tuple(rect.size),
+            "angle_degrees": 0.0,
+        }
+
+    def get_card_resource_key_for_index(self, card_index):
+        """Return the resource key used by one generated slot card."""
+        return self.get_card_resource_key(int(card_index))
+
+    def get_generated_group(self, card_index):
+        groups = tuple(self.iter_generated_groups())
+        index = int(card_index)
+        if index < 0 or index >= len(groups):
+            raise IndexError(f"Slot card index is out of range: {card_index!r}")
+        return groups[index]
+
+    def ensure_card_original_frames(self, group):
+        frames = self.card_original_frames_by_group_id.get(group.id)
+        if frames is None:
+            frames = tuple(frame.copy() for frame in group.get_primary_layer_frames())
+            self.card_original_frames_by_group_id[group.id] = frames
+        return frames
+
+    def apply_transparent_card_surface(self, group):
+        frames = self.ensure_card_original_frames(group)
+        if not frames:
+            return
+        width, height = frames[0].get_size()
+        transparent_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+        group.set_primary_layer_frames([transparent_surface], position=(0, 0))
+
+    def restore_card_surface(self, group):
+        frames = self.ensure_card_original_frames(group)
+        if frames:
+            group.set_primary_layer_frames([frame.copy() for frame in frames], position=(0, 0))
+
+    @staticmethod
+    def normalize_card_visual_state(state):
+        if isinstance(state, dict):
+            state = state.get("state", state.get("visibility", "visible"))
+        state = str(state).strip().lower()
+        aliases = {
+            "show": "visible",
+            "shown": "visible",
+            "visible": "visible",
+            "card": "visible",
+            "hide": "hidden",
+            "hidden": "hidden",
+            "empty": "hidden",
+            "transparent": "hidden",
+        }
+        return aliases.get(state, state)
 
     def get_slot_content_rect(self):
         """Return visible occupied card bounds in slot frame-local coordinates."""
@@ -136,3 +228,10 @@ class CardsSlotActivityDecorator(VisibleCardsHandDecorator):
         if hasattr(group, "get_scaled_local_rect"):
             return group.get_scaled_local_rect()
         return group.local_rect.copy()
+
+    @staticmethod
+    def get_group_primary_layer_screen_rect(group):
+        layer = group.get_primary_layer()
+        if hasattr(group, "get_layer_rect"):
+            return group.get_layer_rect(layer).copy()
+        return group.rect.copy()

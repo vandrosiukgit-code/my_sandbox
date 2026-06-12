@@ -51,6 +51,9 @@ GuiManifest    — public visual command/target language.
 - [ ] Dispatches `VisualCommand`.
 - [ ] Maps public manifest terms to concrete visual behavior.
 - [ ] Does not implement game rules.
+- [ ] Uses stable `Frame` geometry for screen layout.
+- [ ] Does not calculate unrelated layout from Activity-generated groups or
+      Action-transient group positions.
 
 ### Activity
 
@@ -161,6 +164,30 @@ Check:
 - [ ] The final screen position is resolved back into local rect relative to the current or new parent `Frame`.
 - [ ] Screen-space position is not stored as second durable state.
 - [ ] If parent frame changes, reparenting/local resolution is explicit.
+
+---
+
+## 5A. Screen Layout Dependency Checklist
+
+Screen layout may depend on:
+
+- [ ] `Frame.local_rect`;
+- [ ] `Frame.rect`;
+- [ ] `Frame.content_rect`;
+- [ ] screen size / render context;
+- [ ] static layout config.
+
+Screen layout must not depend on:
+
+- [ ] `Activity.iter_generated_groups()`;
+- [ ] `Activity.calculate_fan_rect()`;
+- [ ] generated `Group.rect`;
+- [ ] animated/transient `Group.rect` during an `Action`;
+- [ ] slot/card content bounds from another visual subsystem.
+
+The only acceptable exception is an explicit layout-requirement API designed
+for that dependency. Do not infer layout requirements by inspecting visual
+groups owned by an Activity.
 
 ---
 

@@ -44,6 +44,8 @@ Never fix a local bug by:
 - making `Activity` a screen orchestrator;
 - making `Group` active;
 - using screen-space geometry as durable state;
+- making screen layout depend on Activity-generated groups or Action-transient
+  group positions;
 - bypassing `GuiManifest` for public visual commands.
 
 ### Prefer existing patterns
@@ -313,6 +315,7 @@ Safe changes:
 - dispatch `VisualCommand`;
 - map public activity/action terms to concrete classes;
 - keep active group IDs and screen draw order.
+- calculate screen layout from stable `Frame` geometry.
 
 Unsafe changes:
 
@@ -320,6 +323,8 @@ Unsafe changes:
 - long complex visual scenario code directly in `GameScreen`;
 - bypassing `Activity`/`Action` for stable visual modes;
 - bypassing `GuiManifest` for public visual targets.
+- layout calculations based on generated groups owned by an Activity;
+- layout calculations based on transient positions while an Action is running.
 
 ---
 

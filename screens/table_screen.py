@@ -147,6 +147,7 @@ class TableScreen(GameScreen):
         self._fixture_mtimes = {}
         self._fixture_check_elapsed = 0.0
         self._fixture_check_interval = 0.2
+        self._bottom_player_hand_fan_area_signature = None
         self.reload_fixture_if_changed(force=True)
 
     def create_cards_slot_activity(self, frame, index=0):
@@ -404,9 +405,9 @@ class TableScreen(GameScreen):
         if side_slot_bounds is None:
             return hand_rect
 
-        left, _side_slot_bottom, right = side_slot_bounds
+        left, side_slot_bottom, right = side_slot_bounds
         central_slot_bottom = self.calculate_central_play_area_slots_bottom()
-        top = central_slot_bottom if central_slot_bottom is not None else _lower_slot_bottom
+        top = central_slot_bottom if central_slot_bottom is not None else side_slot_bottom
         width = max(0, right - left)
         center_x = self.get_screen_frame("bottom_player_portrait").rect.centerx
         return pygame.Rect(
@@ -428,12 +429,23 @@ class TableScreen(GameScreen):
         )
         if activity is None:
             return
+        signature = self.get_bottom_player_hand_fan_area_signature()
+        if signature == self._bottom_player_hand_fan_area_signature:
+            return
         screen_rect = self.calculate_bottom_player_hand_available_screen_rect()
         local_rect = self.screen_rect_to_frame_local_rect(
             screen_rect,
             self.get_screen_frame("bottom_player_hand"),
         )
         activity.set_fan_area_local_rect(local_rect)
+        self._bottom_player_hand_fan_area_signature = signature
+
+    def get_bottom_player_hand_fan_area_signature(self):
+        return (
+            tuple(self.get_frame_screen_rect("bottom_player_hand")),
+            tuple(self.get_frame_screen_rect("bottom_player_portrait")),
+            tuple(tuple(rect) for rect in self.get_play_area_slot_frame_screen_rects()),
+        )
 
     @staticmethod
     def find_nested_activity_with_method(activity, method_name):
@@ -453,7 +465,7 @@ class TableScreen(GameScreen):
         return self.calculate_side_play_area_slot_screen_bounds()
 
     def calculate_side_play_area_slot_screen_bounds(self):
-        slot_rects = self.get_play_area_slot_screen_rects()
+        slot_rects = self.get_play_area_slot_frame_screen_rects()
         if not slot_rects:
             return None
 
@@ -465,10 +477,14 @@ class TableScreen(GameScreen):
 
         left_boundary_slot = min(left_slots, key=lambda rect: rect.centerx)
         right_boundary_slot = max(right_slots, key=lambda rect: rect.centerx)
-        return left_boundary_slot.right, max(left_boundary_slot.bottom, right_boundary_slot.bottom), right_boundary_slot.left
+        return (
+            left_boundary_slot.right,
+            max(left_boundary_slot.bottom, right_boundary_slot.bottom),
+            right_boundary_slot.left,
+        )
 
     def calculate_central_play_area_slots_bottom(self):
-        slot_rects = self.get_play_area_slot_screen_rects()
+        slot_rects = self.get_play_area_slot_frame_screen_rects()
         if len(slot_rects) < 3:
             return None
 
@@ -480,17 +496,33 @@ class TableScreen(GameScreen):
         return max(rect.bottom for rect in central_slots)
 
     def calculate_play_area_slot_screen_bounds(self):
-        slot_rects = self.get_play_area_slot_screen_rects()
+        slot_rects = self.get_play_area_slot_frame_screen_rects()
         if not slot_rects:
             return None
         return slot_rects[0].unionall(slot_rects[1:])
 
     def get_play_area_slot_screen_rects(self):
+        """Compatibility alias for stable slot Frame rects."""
+        return self.get_play_area_slot_frame_screen_rects()
+
+    def get_play_area_slot_frame_screen_rects(self):
+        """Return stable screen-space rects for play-area slot Frames."""
         return [
-            self.get_screen_frame(activity_id).rect
+            self.get_frame_screen_rect(activity_id)
             for activity_id, _activity in self.iter_named_activities()
             if self.is_play_area_slot_frame_id(activity_id) and self.has_screen_frame(activity_id)
         ]
+
+    def get_play_area_slot_content_screen_rects(self):
+        """Return dynamic slot content rects for debug/inspection only."""
+        rects = []
+        for activity_id, activity in self.iter_named_activities():
+            if not self.is_play_area_slot_frame_id(activity_id):
+                continue
+            if not hasattr(activity, "get_slot_content_screen_rect"):
+                continue
+            rects.append(activity.get_slot_content_screen_rect())
+        return rects
 
     @staticmethod
     def is_play_area_slot_frame_id(frame_id):
@@ -503,6 +535,26 @@ class TableScreen(GameScreen):
             payload = self.get_command_value(command, "payload", {}) or {}
             return self.start_player_turn_from_command(payload.get("turn_context", {}))
         return super().dispatch_visual_command(command)
+
+    def get_play_area_slots_activity(self):
+        activity = self.get_named_activity("play_area_frame")
+        return getattr(activity, "play_area_slots_activity", activity)
+
+    def get_play_area_slot_ids_by_position(self):
+        slot_ids = [
+            activity_id
+            for activity_id, _activity in self.iter_named_activities()
+            if self.is_play_area_slot_frame_id(activity_id) and self.has_screen_frame(activity_id)
+        ]
+        return tuple(
+            sorted(
+                slot_ids,
+                key=lambda slot_id: (
+                    self.get_screen_frame(slot_id).rect.centery,
+                    self.get_screen_frame(slot_id).rect.centerx,
+                ),
+            )
+        )
 
     def start_player_turn_from_command(self, turn_context):
         activity = self.get_named_activity("play_area_frame")

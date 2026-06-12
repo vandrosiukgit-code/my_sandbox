@@ -4,5 +4,16 @@
     "right_player_hand": 9,
     "top_player_hand": 9,
     "bottom_player_hand": 18
+  },
+  "bot_actions": {
+    "attack": true,
+    "defense": true,
+    "clear_slots": true,
+    "duration": 0.5145,
+    "bot_hand_ids": [
+      "top_player_hand",
+      "left_player_hand",
+      "right_player_hand"
+    ]
   }
 }

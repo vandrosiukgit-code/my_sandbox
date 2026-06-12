@@ -135,6 +135,8 @@ Check:
 - `GameScreen` owns screen-level orchestration.
 - `GameScreen` owns frames, active group IDs, active activities, active actions, input routing, and visual command dispatch.
 - `Activity` does not mutate screen registries directly.
+- Screen layout uses stable `Frame` geometry, not Activity-generated group
+  bounds or Action-transient group positions.
 
 Red flags:
 
@@ -144,6 +146,10 @@ screen.active_activities.remove(...)
 screen.hand_activities[...] = ...
 Activity creates/removes Frame directly
 Activity registers another independent Activity directly
+screen layout reads activity.iter_generated_groups()
+screen layout reads activity.calculate_fan_rect()
+screen layout reads generated group.rect from another subsystem
+screen layout changes because an Action moved a Group
 ```
 
 ### Activity boundary

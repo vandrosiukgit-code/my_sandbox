@@ -386,6 +386,29 @@ class BotHandActivity(Activity):
             return self.card_resource_provider(index)
         return self.resource_key
 
+    def get_group_card_screen_geometry(self, group):
+        """Return screen-space center/size/angle geometry for a generated card."""
+        if group not in self.generated_groups:
+            raise ValueError(f"Group is not owned by this hand activity: {getattr(group, 'id', group)!r}")
+        index = self.group_hand_indices.get(group.id)
+        if index is None:
+            raise ValueError(f"Group has no hand index: {group.id}")
+
+        count = len(self.generated_groups)
+        occupied_angle, angle_step = self.calculate_fan_angles(count)
+        local_angle = self.calculate_card_angle(index, occupied_angle, angle_step)
+        angle = self.orientation_degrees + local_angle
+        base_surface = self.group_base_frames[group.id][0]
+        scale = group.get_effective_screen_scale() if hasattr(group, "get_effective_screen_scale") else 1.0
+        return {
+            "center": tuple(group.rect.center),
+            "size": (
+                max(1, int(round(base_surface.get_width() * scale))),
+                max(1, int(round(base_surface.get_height() * scale))),
+            ),
+            "angle_degrees": float(angle),
+        }
+
     def iter_generated_groups(self):
         """Return generated visual-only groups owned by this activity."""
         return tuple(self.generated_groups)
@@ -419,6 +442,22 @@ class BotHandActivity(Activity):
         self.group_resource_keys = {}
         self.group_base_frames = {}
         self._last_layout_signature = None
+
+    def remove_generated_group(self, group):
+        """Remove one generated visual-only Group from this hand activity."""
+        if group not in self.generated_groups:
+            return None
+        self.generated_groups.remove(group)
+        self.frame.remove_group(group.id)
+        self.group_hand_indices.pop(group.id, None)
+        self.group_card_ids.pop(group.id, None)
+        self.group_resource_keys.pop(group.id, None)
+        self.group_base_frames.pop(group.id, None)
+        self.card_count = max(0, self.card_count - 1)
+        self._last_layout_signature = None
+        if self.started:
+            self.apply_fan_layout()
+        return group
 
     def is_finished(self):
         """Рука бота - долгоживущий режим, сама по времени не завершается."""
