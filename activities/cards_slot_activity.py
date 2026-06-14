@@ -31,6 +31,9 @@ class CardsSlotActivityDecorator(VisibleCardsHandDecorator):
 
     def apply_fixture(self, fixture):
         super().apply_fixture(fixture)
+        card_visual_state = self.get_fixture_card_visual_state(fixture)
+        if card_visual_state is not None:
+            self.set_all_card_visual_states(card_visual_state)
         self.normalize_slot_content(force=True)
 
     def update(self, dt):
@@ -61,6 +64,43 @@ class CardsSlotActivityDecorator(VisibleCardsHandDecorator):
         for index, _group in enumerate(self.iter_generated_groups()):
             self.set_card_visual_state(index, state)
 
+    def place_player_card(self, card_data):
+        """Show a played player card in one existing slot card group."""
+        resource_key = self.get_card_data_resource_key(card_data)
+        card_index = self.get_card_data_slot_index(card_data)
+        self.set_all_card_visual_states("hidden")
+        self.set_card_resource(card_index, resource_key)
+        self.set_card_visual_state(card_index, "visible")
+        self.normalize_slot_content(force=True)
+
+    def set_card_resource(self, card_index, resource_key):
+        """Replace one slot card resource without removing its visual group."""
+        index = int(card_index)
+        group = self.get_generated_group(index)
+        frames = self.get_resource_frames(resource_key)
+        self.card_resource_keys = tuple(
+            resource_key if key_index == index else key
+            for key_index, key in enumerate(self.card_resource_keys)
+        )
+        self.card_original_frames_by_group_id[group.id] = tuple(frame.copy() for frame in frames)
+        if hasattr(self.hand_activity, "group_resource_keys"):
+            self.hand_activity.group_resource_keys[group.id] = resource_key
+        if hasattr(self.hand_activity, "group_card_ids"):
+            self.hand_activity.group_card_ids[group.id] = self.get_slot_card_id(index, resource_key)
+        if hasattr(self.hand_activity, "group_base_frames"):
+            self.hand_activity.group_base_frames[group.id] = tuple(frame.copy() for frame in frames)
+        group.set_primary_layer_frames([frame.copy() for frame in frames], position=(0, 0))
+
+    def get_resource_frames(self, resource_key):
+        if not resource_key:
+            raise ValueError("CardsSlotActivityDecorator requires card resource_key")
+        if self.resource_manager is None:
+            raise RuntimeError("CardsSlotActivityDecorator requires resource_manager")
+        frames = self.resource_manager.get_frames(resource_key)
+        if not frames:
+            raise KeyError(f"Card resource has no frames: {resource_key!r}")
+        return tuple(frame.copy() for frame in frames)
+
     def get_card_screen_state(self, card_index):
         """Return the screen rect and original visible surface for a slot card."""
         group = self.get_generated_group(card_index)
@@ -83,9 +123,41 @@ class CardsSlotActivityDecorator(VisibleCardsHandDecorator):
             "angle_degrees": 0.0,
         }
 
+    def get_player_turn_target_screen_geometry(self, _turn_context=None):
+        """Return the default screen-space landing geometry for player turn intent."""
+        groups = tuple(self.iter_generated_groups())
+        if groups:
+            return self.get_card_screen_geometry(0)
+
+        rect = self.get_slot_content_screen_rect()
+        if rect.width <= 0 or rect.height <= 0:
+            rect = self.hand_activity.frame.rect.copy()
+        return {
+            "center": tuple(rect.center),
+            "size": tuple(rect.size),
+            "angle_degrees": 0.0,
+        }
+
     def get_card_resource_key_for_index(self, card_index):
         """Return the resource key used by one generated slot card."""
         return self.get_card_resource_key(int(card_index))
+
+    @staticmethod
+    def get_card_data_resource_key(card_data):
+        data = card_data or {}
+        return data.get("resource_key") or data.get("card_id")
+
+    @staticmethod
+    def get_card_data_slot_index(card_data):
+        data = card_data or {}
+        for key in ("slot_card_index", "target_card_index", "card_index"):
+            if key in data:
+                return int(data[key])
+        return 0
+
+    @staticmethod
+    def get_slot_card_id(card_index, resource_key):
+        return f"slot.card.{int(card_index)}:{resource_key}"
 
     def get_generated_group(self, card_index):
         groups = tuple(self.iter_generated_groups())
@@ -130,6 +202,15 @@ class CardsSlotActivityDecorator(VisibleCardsHandDecorator):
             "transparent": "hidden",
         }
         return aliases.get(state, state)
+
+    @staticmethod
+    def get_fixture_card_visual_state(fixture):
+        if not fixture:
+            return None
+        for key in ("card_visual_state", "card_visibility"):
+            if key in fixture:
+                return fixture[key]
+        return None
 
     def get_slot_content_rect(self):
         """Return visible occupied card bounds in slot frame-local coordinates."""

@@ -18,6 +18,7 @@ class PlayAreaSlotsActivity(Activity):
             "cards.6_of_clubs",
             "cards.7_of_clubs",
         ),
+        "card_visual_state": "hidden",
         "scale_factor": 0.7,
         "radius": 80,
         "center_offset": (0, 0),

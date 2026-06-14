@@ -64,7 +64,7 @@ class GameController(BaseGameController):
             self.on_group_clicked(input_event.group_id)
 
         selected_card = (getattr(input_event, "payload", {}) or {}).get("selected_card")
-        if input_event.type == "double_click" and selected_card:
+        if input_event.type == "click" and selected_card:
             return (
                 VisualCommand(
                     type="start_player_turn",
@@ -100,4 +100,3 @@ class GameController(BaseGameController):
                 CardState("card_j_clubs", "j", "clubs", "bottom_hand"),
             ]
         )
-

@@ -7,6 +7,7 @@ import pygame
 from actions.base_action import Action
 from animations.base_animation import Animation
 from animations.easing import ease_out_quad, lerp_float
+from core.resource import ResourceManager
 from group.group import Group, Layer
 
 
@@ -43,21 +44,23 @@ class CardFlightGeometry:
 
 
 class PlayerCardPlayAction(Action):
-    """Finite visual step for a visual-only lower-player card flight rectangle."""
-
-    BROWN = (104, 55, 28, 255)
+    """Finite visual step for a player card flight without flip animation."""
 
     def __init__(
         self,
         from_geometry,
         to_geometry,
+        face_resource_key,
         duration=0.35,
         group_id="player_turn.flight_card",
         cleanup_group=None,
+        resource_manager=ResourceManager,
     ):
         self.from_geometry = CardFlightGeometry.from_value(from_geometry)
         self.to_geometry = CardFlightGeometry.from_value(to_geometry)
-        self.group = self.create_flight_group(group_id, self.from_geometry)
+        self.resource_manager = resource_manager
+        self.face_surface = self.get_resource_surface(face_resource_key)
+        self.group = self.create_flight_group(group_id, self.from_geometry, self.face_surface)
         self.cleanup_group = cleanup_group
         super().__init__(
             group_ids=(self.group.id,),
@@ -68,14 +71,18 @@ class PlayerCardPlayAction(Action):
                     to_geometry=self.to_geometry,
                     duration=duration,
                     on_finish=self.finish_player_card_move,
-                    color=self.BROWN,
+                    face_surface=self.face_surface,
                 ),
             ),
         )
 
     @classmethod
-    def create_flight_group(cls, group_id, geometry):
-        surface = cls.render_surface(geometry.size, geometry.angle_degrees, cls.BROWN)
+    def create_flight_group(cls, group_id, geometry, face_surface):
+        surface = cls.render_surface(
+            geometry.size,
+            geometry.angle_degrees,
+            face_surface,
+        )
         rect = surface.get_rect(center=geometry.center)
         return Group(
             group_id=group_id,
@@ -90,10 +97,18 @@ class PlayerCardPlayAction(Action):
         )
 
     @staticmethod
-    def render_surface(size, angle_degrees, color):
+    def render_surface(size, angle_degrees, texture_surface):
         base_surface = pygame.Surface(size, pygame.SRCALPHA)
-        base_surface.fill(color)
+        visible_surface = pygame.transform.smoothscale(texture_surface, size)
+        base_surface.fill((0, 0, 0, 0))
+        base_surface.blit(visible_surface, base_surface.get_rect())
         return pygame.transform.rotate(base_surface, -angle_degrees)
+
+    def get_resource_surface(self, resource_key):
+        frames = self.resource_manager.get_frames(resource_key)
+        if not frames:
+            raise KeyError(f"Card flight resource has no frames: {resource_key!r}")
+        return frames[0].copy()
 
     def finish_player_card_move(self, _animation):
         self.cleanup_flight_group()
@@ -104,7 +119,7 @@ class PlayerCardPlayAction(Action):
 
 
 class CardFlightGeometryAnimation(Animation):
-    """Animate a generated card rectangle through screen-space geometry."""
+    """Animate a generated card through screen-space geometry without flipping."""
 
     animated_properties = ("screen_geometry",)
     coordinate_space = "screen"
@@ -116,13 +131,13 @@ class CardFlightGeometryAnimation(Animation):
         to_geometry,
         duration=0.35,
         on_finish=None,
-        color=PlayerCardPlayAction.BROWN,
+        face_surface=None,
     ):
-        super().__init__(duration=duration, on_finish=on_finish)
+        super().__init__(duration=duration, on_finish=on_finish, max_frame_dt=1 / 120)
         self.group = group
         self.from_geometry = CardFlightGeometry.from_value(from_geometry)
         self.to_geometry = CardFlightGeometry.from_value(to_geometry)
-        self.color = color
+        self.face_surface = self.normalize_surface(face_surface, "face_surface")
 
     def start(self):
         super().start()
@@ -134,11 +149,17 @@ class CardFlightGeometryAnimation(Animation):
         surface = PlayerCardPlayAction.render_surface(
             geometry.size,
             geometry.angle_degrees,
-            self.color,
+            self.face_surface,
         )
         rect = surface.get_rect(center=geometry.center)
         self.group.set_rect(rect)
         self.group.set_primary_layer_frames([surface], position=(0, 0))
+
+    @staticmethod
+    def normalize_surface(surface, name):
+        if not isinstance(surface, pygame.Surface):
+            raise TypeError(f"{name} must be pygame.Surface: {surface!r}")
+        return surface.copy()
 
     def interpolate_geometry(self, progress):
         return CardFlightGeometry(

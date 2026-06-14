@@ -93,14 +93,48 @@ class CardSelectionActivity(Activity):
 
     def get_input_context(self, input_event):
         """Return controller-facing card context for selection input."""
-        if getattr(input_event, "type", None) != "double_click":
+        if getattr(input_event, "type", None) != "click":
             return {}
         if getattr(input_event, "button", None) != "left":
             return {}
-        clicked_group = self.find_selectable_card_at(getattr(input_event, "screen_pos", None))
-        if clicked_group is None:
+        if self.hovered_group is None:
             return {}
-        return {"selected_card": self.select_card_context(clicked_group)}
+        clicked_group = self.find_card_at(getattr(input_event, "screen_pos", None))
+        if clicked_group is not self.hovered_group:
+            return {}
+        return {"selected_card": self.build_selected_card_intent(clicked_group)}
+
+    def build_selected_card_intent(self, card_group):
+        context = dict(self.select_card_context(card_group) or {})
+        resource_key = context.get("resource_key") or context.get("card_id")
+        rank, suit = self.parse_card_resource_key(resource_key)
+        context.update(
+            {
+                "rank": rank,
+                "suit": suit,
+                "source_screen_geometry": self.get_card_screen_geometry(card_group),
+            }
+        )
+        return context
+
+    @staticmethod
+    def get_card_screen_geometry(group):
+        rect = group.rect.copy()
+        return {
+            "center": tuple(rect.center),
+            "size": tuple(rect.size),
+            "angle_degrees": 0.0,
+        }
+
+    @staticmethod
+    def parse_card_resource_key(resource_key):
+        if not isinstance(resource_key, str):
+            return None, None
+        card_name = resource_key.rsplit(".", 1)[-1]
+        if "_of_" not in card_name:
+            return None, None
+        rank, suit = card_name.split("_of_", 1)
+        return rank, suit
 
     def find_selectable_card_at(self, screen_pos):
         if self.hovered_group is not None:

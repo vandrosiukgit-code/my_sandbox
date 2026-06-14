@@ -57,19 +57,28 @@ launcher for dev tests.
 
 ## Quick Launch
 
-For the bot turn visual scenario:
+Use `bush.bat` as the animation CLI launcher:
 
 ```powershell
-.\bush.bat
+.\bush.bat help
+.\bush.bat list
+.\bush.bat run bot_turn
 ```
 
-Optional arguments are passed through to `tools.activity_sandbox bot_turn`:
+`bot_turn` can also be launched directly as a convenience command:
+
+```powershell
+.\bush.bat bot_turn --duration 0.2
+.\bush.bat bot_turn --no-clear-between-bots
+.\bush.bat bot_turn --bot-hand-id top_player_hand
+.\bush.bat bot_turn --target-slot-id cards_slot_frame
+```
+
+For backward-compatible quick testing, bot turn options without an explicit
+command still run `bot_turn`:
 
 ```powershell
 .\bush.bat --duration 0.2
-.\bush.bat --no-clear-between-bots
-.\bush.bat --bot-hand-id top_player_hand
-.\bush.bat --target-slot-id cards_slot_frame
 ```
 
 ## Bot Turn Dev Test
