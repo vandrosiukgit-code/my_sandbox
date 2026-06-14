@@ -1,53 +1,168 @@
-"""Cards slot decorator activity for the central play area."""
+"""Activity for cards placed on one central table slot."""
 
 import pygame
 
-from activities.visible_cards_hand_activity import VisibleCardsHandDecorator
+from activities.base_activity import Activity
 from game_screen import debug_overlay
+from group import Group
 
 
-class CardsSlotActivityDecorator(VisibleCardsHandDecorator):
-    """Temporary table slot decorator; Controller will provide real table cards."""
+class CardsSlotActivityDecorator(Activity):
+    """Own table-slot card groups without depending on hand fan activities."""
 
-    def __init__(self, hand_activity, cards=None, resource_manager=None, max_cards=2):
-        self.validate_slot_hand_activity(hand_activity)
-        super().__init__(
-            hand_activity,
-            cards=cards,
-            resource_manager=resource_manager,
-            max_cards=max_cards,
-        )
+    DEFAULT_MAX_CARDS = 2
+    DEFAULT_REFERENCE_CARD_COUNT = 9
+    DEFAULT_MAX_TOTAL_ANGLE = 160.0
+
+    def __init__(
+        self,
+        frame,
+        cards=None,
+        resource_manager=None,
+        max_cards=DEFAULT_MAX_CARDS,
+        group_id_prefix=None,
+        scale_factor=0.7,
+        spacing=(12, 0),
+        center_offset=(0, 0),
+        card_layer_name="card",
+        default_resource_key="cards.6_of_clubs",
+        default_slot_size=(146, 144),
+    ):
+        super().__init__(duration=0.0)
+        self.frame = self.resolve_frame(frame)
+        self.resource_manager = resource_manager
+        self.max_cards = self.normalize_max_cards(max_cards)
+        self.group_id_prefix = group_id_prefix or f"{self.frame.id}.cards"
+        self.scale_factor = self.normalize_scale_factor(scale_factor)
+        self.spacing = self.normalize_pair(spacing)
+        self.center_offset = self.normalize_pair(center_offset)
+        self.card_layer_name = card_layer_name
+        self.default_resource_key = default_resource_key
+        self.default_slot_size = self.normalize_pair(default_slot_size)
+        self.card_resource_keys = self.limit_cards(self.normalize_cards(cards or ()))
+        self.generated_groups = []
+        self.card_visual_states = {}
+        self.card_original_frames_by_group_id = {}
         self.slot_content_local_rect = pygame.Rect(0, 0, 0, 0)
         self.slot_content_scaled_local_rect = pygame.Rect(0, 0, 0, 0)
         self._last_slot_layout_signature = None
-        self.card_visual_states = {}
-        self.card_original_frames_by_group_id = {}
 
     @staticmethod
-    def validate_slot_hand_activity(hand_activity):
-        frame = getattr(hand_activity, "frame", None)
-        if frame is None or not callable(getattr(frame, "move_group_local", None)):
-            raise TypeError("CardsSlotActivityDecorator requires hand_activity.frame.move_group_local()")
+    def resolve_frame(frame):
+        if hasattr(frame, "content_rect") and callable(getattr(frame, "place_group_local", None)):
+            return frame
+        nested_frame = getattr(frame, "frame", None)
+        if nested_frame is not None:
+            return CardsSlotActivityDecorator.resolve_frame(nested_frame)
+        raise TypeError("CardsSlotActivityDecorator requires Frame-like object")
+
+    def start(self):
+        if self.started:
+            return
+        super().start()
+        self.sync_visual_groups()
+        self.apply_slot_layout(force=True)
+
+    def update(self, dt):
+        _ = dt
+        if not self.started:
+            self.start()
+            return
+        self.apply_slot_layout()
 
     def apply_fixture(self, fixture):
-        super().apply_fixture(fixture)
+        if not fixture:
+            return
+        if "scale_factor" in fixture:
+            self.scale_factor = self.normalize_scale_factor(fixture["scale_factor"])
+        elif "scale" in fixture:
+            self.scale_factor = self.normalize_scale_factor(fixture["scale"])
+        self.spacing = self.normalize_pair(fixture.get("spacing", self.spacing))
+        self.center_offset = self.normalize_pair(fixture.get("center_offset", self.center_offset))
+
+        cards = self.get_fixture_cards(fixture)
+        if cards is not None:
+            self.set_cards(cards, force=True)
+
         card_visual_state = self.get_fixture_card_visual_state(fixture)
         if card_visual_state is not None:
             self.set_all_card_visual_states(card_visual_state)
-        self.normalize_slot_content(force=True)
-
-    def update(self, dt):
-        super().update(dt)
-        self.normalize_slot_content()
+        self.apply_slot_layout(force=True)
 
     def set_cards(self, cards, force=False):
-        super().set_cards(cards, force=force)
+        next_keys = self.limit_cards(self.normalize_cards(cards))
+        if not force and next_keys == self.card_resource_keys:
+            return
+        self.card_resource_keys = next_keys
         self.card_visual_states = {}
-        self.card_original_frames_by_group_id = {}
-        self.normalize_slot_content(force=True)
+        self.sync_visual_groups()
+        self.apply_slot_layout(force=True)
+
+    def place_player_card(self, card_data):
+        """Append or replace a played player card in this table slot."""
+        resource_key = self.get_card_data_resource_key(card_data)
+        card_index = self.get_card_data_slot_index(card_data)
+        if card_index is None:
+            card_index = len(self.card_resource_keys)
+        if self.max_cards is not None:
+            card_index = min(card_index, max(0, self.max_cards - 1))
+        self.ensure_card_count(card_index + 1, fill_resource_key=resource_key)
+        self.set_card_resource(card_index, resource_key)
+        self.set_card_visual_state(card_index, "visible")
+        self.apply_slot_layout(force=True)
+
+    def ensure_card_count(self, card_count, fill_resource_key):
+        if self.max_cards is not None:
+            card_count = min(card_count, self.max_cards)
+        if card_count <= len(self.card_resource_keys):
+            return
+        cards = list(self.card_resource_keys)
+        cards.extend(fill_resource_key for _index in range(card_count - len(cards)))
+        self.set_cards(tuple(cards), force=True)
+
+    def sync_visual_groups(self):
+        while len(self.generated_groups) < len(self.card_resource_keys):
+            self.add_generated_group(len(self.generated_groups))
+        while len(self.generated_groups) > len(self.card_resource_keys):
+            group = self.generated_groups.pop()
+            self.frame.remove_group(group.id)
+            self.card_visual_states.pop(len(self.generated_groups), None)
+            self.card_original_frames_by_group_id.pop(group.id, None)
+
+        for index, resource_key in enumerate(self.card_resource_keys):
+            group = self.generated_groups[index]
+            if self.get_group_resource_key(group) != resource_key:
+                self.set_card_resource(index, resource_key)
+
+    def add_generated_group(self, index):
+        resource_key = self.card_resource_keys[index]
+        group = Group.create_group(
+            f"{self.group_id_prefix}.{index}",
+            ((self.card_layer_name, resource_key),),
+            resource_manager=self.resource_manager,
+        )
+        group.card_resource_key = resource_key
+        self.card_original_frames_by_group_id[group.id] = tuple(
+            frame.copy()
+            for frame in group.get_primary_layer_frames()
+        )
+        self.generated_groups.append(group)
+        self.frame.place_group_local(group, (0, 0))
+        return group
+
+    def set_card_resource(self, card_index, resource_key):
+        index = int(card_index)
+        group = self.get_generated_group(index)
+        frames = self.get_resource_frames(resource_key)
+        self.card_resource_keys = tuple(
+            resource_key if key_index == index else key
+            for key_index, key in enumerate(self.card_resource_keys)
+        )
+        group.card_resource_key = resource_key
+        self.card_original_frames_by_group_id[group.id] = tuple(frame.copy() for frame in frames)
+        group.set_primary_layer_frames([frame.copy() for frame in frames], position=(0, 0))
 
     def set_card_visual_state(self, card_index, state):
-        """Set one slot card visual state without changing slot geometry."""
         group = self.get_generated_group(card_index)
         state = self.normalize_card_visual_state(state)
         self.card_visual_states[int(card_index)] = state
@@ -60,36 +175,203 @@ class CardsSlotActivityDecorator(VisibleCardsHandDecorator):
             raise ValueError(f"Unsupported card visual state: {state!r}")
 
     def set_all_card_visual_states(self, state):
-        """Set the visual state for every generated card in this slot."""
         for index, _group in enumerate(self.iter_generated_groups()):
             self.set_card_visual_state(index, state)
 
-    def place_player_card(self, card_data):
-        """Show a played player card in one existing slot card group."""
-        resource_key = self.get_card_data_resource_key(card_data)
-        card_index = self.get_card_data_slot_index(card_data)
-        self.set_all_card_visual_states("hidden")
-        self.set_card_resource(card_index, resource_key)
-        self.set_card_visual_state(card_index, "visible")
-        self.normalize_slot_content(force=True)
+    def get_card_screen_state(self, card_index):
+        group = self.get_generated_group(card_index)
+        frames = self.ensure_card_original_frames(group)
+        surface = frames[0] if frames else None
+        if surface is not None:
+            surface = group.get_scaled_surface(surface).copy()
+        return self.get_group_primary_layer_screen_rect(group), surface
 
-    def set_card_resource(self, card_index, resource_key):
-        """Replace one slot card resource without removing its visual group."""
-        index = int(card_index)
-        group = self.get_generated_group(index)
-        frames = self.get_resource_frames(resource_key)
-        self.card_resource_keys = tuple(
-            resource_key if key_index == index else key
-            for key_index, key in enumerate(self.card_resource_keys)
+    def get_card_screen_geometry(self, card_index):
+        group = self.get_generated_group(card_index)
+        rect = self.get_group_primary_layer_screen_rect(group)
+        return {
+            "center": tuple(rect.center),
+            "size": tuple(rect.size),
+            "angle_degrees": self.get_card_angle_degrees(int(card_index)),
+        }
+
+    def get_player_turn_target_screen_geometry(self, turn_context=None):
+        card_index = self.get_card_data_slot_index(turn_context)
+        groups = tuple(self.iter_generated_groups())
+        if card_index is not None and 0 <= card_index < len(groups):
+            return self.get_card_screen_geometry(card_index)
+        return self.get_next_card_screen_geometry(turn_context)
+
+    def get_next_card_screen_geometry(self, turn_context=None):
+        _ = turn_context
+        index = len(self.generated_groups)
+        if self.max_cards is not None:
+            index = min(index, max(0, self.max_cards - 1))
+        layout_count = self.get_layout_card_count()
+        local_size = self.get_default_card_local_size()
+        angle_degrees = self.get_card_angle_degrees(index, layout_count)
+        rotated_size = self.get_rotated_size(local_size, angle_degrees)
+        local_rect = self.get_card_local_rect(index, rotated_size, count=layout_count)
+        screen_center = self.project_scaled_local_rect_center(local_rect)
+        return {
+            "center": tuple(screen_center),
+            "size": self.local_size_to_screen_size(rotated_size),
+            "angle_degrees": angle_degrees,
+        }
+
+    def screen_size_to_unscaled_local_size(self, size):
+        scale = self.get_effective_screen_scale()
+        if scale == 0:
+            return size
+        return (
+            max(1, int(round(size[0] / scale))),
+            max(1, int(round(size[1] / scale))),
         )
-        self.card_original_frames_by_group_id[group.id] = tuple(frame.copy() for frame in frames)
-        if hasattr(self.hand_activity, "group_resource_keys"):
-            self.hand_activity.group_resource_keys[group.id] = resource_key
-        if hasattr(self.hand_activity, "group_card_ids"):
-            self.hand_activity.group_card_ids[group.id] = self.get_slot_card_id(index, resource_key)
-        if hasattr(self.hand_activity, "group_base_frames"):
-            self.hand_activity.group_base_frames[group.id] = tuple(frame.copy() for frame in frames)
-        group.set_primary_layer_frames([frame.copy() for frame in frames], position=(0, 0))
+
+    def get_default_card_screen_size(self):
+        if self.generated_groups:
+            return self.generated_groups[0].rect.size
+        size = self.get_default_card_local_size()
+        scale = self.get_effective_screen_scale()
+        return (
+            max(1, int(round(size[0] * scale))),
+            max(1, int(round(size[1] * scale))),
+        )
+
+    def get_default_slot_size(self):
+        return self.default_slot_size
+
+    def get_default_card_local_size(self):
+        frames = self.resource_manager.get_frames(self.default_resource_key) if self.resource_manager is not None else ()
+        if frames:
+            return frames[0].get_size()
+        rect = self.frame.local_rect
+        return max(1, rect.width), max(1, rect.height)
+
+    def get_effective_screen_scale(self):
+        frame_scale = self.frame.get_content_screen_scale() if hasattr(self.frame, "get_content_screen_scale") else 1.0
+        group_scale = self.scale_factor or 1.0
+        return frame_scale * group_scale
+
+    def apply_slot_layout(self, force=False):
+        signature = self.get_slot_layout_signature()
+        if not force and signature == self._last_slot_layout_signature:
+            return
+        layout_count = self.get_layout_card_count()
+        for index, group in enumerate(self.generated_groups):
+            frames = self.ensure_card_original_frames(group)
+            if frames:
+                base_surface = frames[0]
+            else:
+                base_surface = group.get_primary_layer_frames()[0]
+            angle_degrees = self.get_card_angle_degrees(index, layout_count)
+            surface = self.render_card_surface(base_surface, angle_degrees)
+            group.set_primary_layer_frames([surface], position=(0, 0))
+            group.set_scale_factor(self.scale_factor)
+            local_rect = self.get_card_local_rect(index, surface.get_size(), count=layout_count)
+            group.set_local_rect(local_rect)
+            self.frame.set_group_origin(group.id, group.local_rect.topleft)
+        self.update_slot_content_rects()
+        self._last_slot_layout_signature = self.get_slot_layout_signature()
+
+    def get_card_local_rect(self, index, size, count=None):
+        width, height = int(size[0]), int(size[1])
+        count = max(1, len(self.generated_groups) if count is None else int(count))
+        step_x = self.spacing[0]
+        total_width = width + step_x * max(0, count - 1)
+        left = self.frame.content_rect.centerx - total_width // 2 + index * step_x + self.center_offset[0]
+        top = self.frame.content_rect.centery - height // 2 + self.center_offset[1]
+        return pygame.Rect(int(round(left)), int(round(top)), width, height)
+
+    def project_scaled_local_rect_center(self, local_rect):
+        scale = self.scale_factor or 1.0
+        local_center = (
+            local_rect.x + local_rect.width * scale / 2,
+            local_rect.y + local_rect.height * scale / 2,
+        )
+        return self.frame.to_screen(local_center)
+
+    def get_layout_card_count(self):
+        if self.max_cards is not None:
+            return max(1, self.max_cards)
+        return max(1, len(self.generated_groups))
+
+    def get_card_angle_degrees(self, index, count=None):
+        count = self.get_layout_card_count() if count is None else max(1, int(count))
+        if count <= 1:
+            return 0.0
+        occupied_angle = self.DEFAULT_MAX_TOTAL_ANGLE / self.DEFAULT_REFERENCE_CARD_COUNT * count
+        angle_step = occupied_angle / count
+        return -occupied_angle / 2 + angle_step / 2 + int(index) * angle_step
+
+    @staticmethod
+    def render_card_surface(surface, angle_degrees):
+        return pygame.transform.rotate(surface, -angle_degrees)
+
+    @staticmethod
+    def get_rotated_size(size, angle_degrees):
+        surface = pygame.Surface(size, pygame.SRCALPHA)
+        return pygame.transform.rotate(surface, -angle_degrees).get_size()
+
+    def local_size_to_screen_size(self, size):
+        scale = self.get_effective_screen_scale()
+        return (
+            max(1, int(round(size[0] * scale))),
+            max(1, int(round(size[1] * scale))),
+        )
+
+    def update_slot_content_rects(self):
+        local_bounds = self.calculate_generated_groups_local_bounds()
+        scaled_bounds = self.calculate_generated_groups_scaled_local_bounds()
+        self.slot_content_local_rect = local_bounds or pygame.Rect(0, 0, 0, 0)
+        self.slot_content_scaled_local_rect = scaled_bounds or pygame.Rect(0, 0, 0, 0)
+
+    def get_slot_content_rect(self):
+        return self.get_slot_content_scaled_local_rect()
+
+    def get_slot_content_unscaled_local_rect(self):
+        return self.slot_content_local_rect.copy()
+
+    def get_slot_content_scaled_local_rect(self):
+        return self.slot_content_scaled_local_rect.copy()
+
+    def get_slot_content_screen_rect(self):
+        bounds = self.calculate_generated_groups_screen_bounds()
+        if bounds is None:
+            return pygame.Rect(0, 0, 0, 0)
+        return bounds
+
+    def draw_debug_overlay(self, screen):
+        if not debug_overlay.should_draw_activity_rect():
+            return
+        rect = self.get_slot_content_screen_rect()
+        if rect.width > 0 and rect.height > 0:
+            pygame.draw.rect(screen, (255, 232, 64), rect, 2)
+
+    def iter_generated_groups(self):
+        return tuple(self.generated_groups)
+
+    def finish(self):
+        self.clear_generated_groups()
+        super().finish()
+
+    def clear_generated_groups(self):
+        for group in self.generated_groups:
+            self.frame.remove_group(group.id)
+        self.generated_groups = []
+        self.card_visual_states = {}
+        self.card_original_frames_by_group_id = {}
+        self._last_slot_layout_signature = None
+        self.update_slot_content_rects()
+
+    def get_card_resource_key_for_index(self, card_index):
+        return self.card_resource_keys[int(card_index)]
+
+    def get_generated_group(self, card_index):
+        index = int(card_index)
+        if index < 0 or index >= len(self.generated_groups):
+            raise IndexError(f"Slot card index is out of range: {card_index!r}")
+        return self.generated_groups[index]
 
     def get_resource_frames(self, resource_key):
         if not resource_key:
@@ -100,71 +382,6 @@ class CardsSlotActivityDecorator(VisibleCardsHandDecorator):
         if not frames:
             raise KeyError(f"Card resource has no frames: {resource_key!r}")
         return tuple(frame.copy() for frame in frames)
-
-    def get_card_screen_state(self, card_index):
-        """Return the screen rect and original visible surface for a slot card."""
-        group = self.get_generated_group(card_index)
-        frames = self.ensure_card_original_frames(group)
-        surface = frames[0] if frames else None
-        if surface is not None:
-            surface = group.get_scaled_surface(surface).copy()
-        return self.get_group_primary_layer_screen_rect(group), surface
-
-    def get_card_screen_geometry(self, card_index):
-        """Return screen-space center/size/angle geometry for a slot card."""
-        group = self.get_generated_group(card_index)
-        getter = getattr(self.hand_activity, "get_group_card_screen_geometry", None)
-        if callable(getter):
-            return getter(group)
-        rect = self.get_group_primary_layer_screen_rect(group)
-        return {
-            "center": tuple(rect.center),
-            "size": tuple(rect.size),
-            "angle_degrees": 0.0,
-        }
-
-    def get_player_turn_target_screen_geometry(self, _turn_context=None):
-        """Return the default screen-space landing geometry for player turn intent."""
-        groups = tuple(self.iter_generated_groups())
-        if groups:
-            return self.get_card_screen_geometry(0)
-
-        rect = self.get_slot_content_screen_rect()
-        if rect.width <= 0 or rect.height <= 0:
-            rect = self.hand_activity.frame.rect.copy()
-        return {
-            "center": tuple(rect.center),
-            "size": tuple(rect.size),
-            "angle_degrees": 0.0,
-        }
-
-    def get_card_resource_key_for_index(self, card_index):
-        """Return the resource key used by one generated slot card."""
-        return self.get_card_resource_key(int(card_index))
-
-    @staticmethod
-    def get_card_data_resource_key(card_data):
-        data = card_data or {}
-        return data.get("resource_key") or data.get("card_id")
-
-    @staticmethod
-    def get_card_data_slot_index(card_data):
-        data = card_data or {}
-        for key in ("slot_card_index", "target_card_index", "card_index"):
-            if key in data:
-                return int(data[key])
-        return 0
-
-    @staticmethod
-    def get_slot_card_id(card_index, resource_key):
-        return f"slot.card.{int(card_index)}:{resource_key}"
-
-    def get_generated_group(self, card_index):
-        groups = tuple(self.iter_generated_groups())
-        index = int(card_index)
-        if index < 0 or index >= len(groups):
-            raise IndexError(f"Slot card index is out of range: {card_index!r}")
-        return groups[index]
 
     def ensure_card_original_frames(self, group):
         frames = self.card_original_frames_by_group_id.get(group.id)
@@ -186,6 +403,86 @@ class CardsSlotActivityDecorator(VisibleCardsHandDecorator):
         if frames:
             group.set_primary_layer_frames([frame.copy() for frame in frames], position=(0, 0))
 
+    def calculate_generated_groups_local_bounds(self):
+        bounds = None
+        for group in self.iter_generated_groups():
+            rect = group.local_rect.copy()
+            bounds = rect.copy() if bounds is None else bounds.union(rect)
+        return bounds
+
+    def calculate_generated_groups_scaled_local_bounds(self):
+        bounds = None
+        for group in self.iter_generated_groups():
+            rect = group.get_scaled_local_rect() if hasattr(group, "get_scaled_local_rect") else group.local_rect
+            bounds = rect.copy() if bounds is None else bounds.union(rect)
+        return bounds
+
+    def calculate_generated_groups_screen_bounds(self):
+        bounds = None
+        for group in self.iter_generated_groups():
+            rect = group.rect
+            bounds = rect.copy() if bounds is None else bounds.union(rect)
+        return bounds
+
+    def get_slot_layout_signature(self):
+        return (
+            tuple(self.card_resource_keys),
+            tuple(sorted(self.card_visual_states.items())),
+            self.scale_factor,
+            self.spacing,
+            self.center_offset,
+            tuple(self.frame.local_rect),
+            self.max_cards,
+            tuple(
+                (
+                    group.id,
+                    tuple(group.local_rect),
+                    1.0 if group.scale_factor is None else group.scale_factor,
+                )
+                for group in self.generated_groups
+            ),
+        )
+
+    @staticmethod
+    def get_group_primary_layer_screen_rect(group):
+        layer = group.get_primary_layer()
+        if hasattr(group, "get_layer_rect"):
+            return group.get_layer_rect(layer).copy()
+        return group.rect.copy()
+
+    @staticmethod
+    def get_card_data_resource_key(card_data):
+        data = card_data or {}
+        return data.get("resource_key") or data.get("card_id")
+
+    @staticmethod
+    def get_card_data_slot_index(card_data):
+        data = card_data or {}
+        for key in ("slot_card_index", "target_card_index", "card_index"):
+            if key in data:
+                return int(data[key])
+        return None
+
+    @staticmethod
+    def get_group_resource_key(group):
+        return getattr(group, "card_resource_key", None)
+
+    @staticmethod
+    def get_fixture_cards(fixture):
+        for key in ("cards", "card_resource_keys", "resource_keys"):
+            if key in fixture:
+                return fixture[key]
+        return None
+
+    @staticmethod
+    def get_fixture_card_visual_state(fixture):
+        if not fixture:
+            return None
+        for key in ("card_visual_state", "card_visibility"):
+            if key in fixture:
+                return fixture[key]
+        return None
+
     @staticmethod
     def normalize_card_visual_state(state):
         if isinstance(state, dict):
@@ -204,115 +501,37 @@ class CardsSlotActivityDecorator(VisibleCardsHandDecorator):
         return aliases.get(state, state)
 
     @staticmethod
-    def get_fixture_card_visual_state(fixture):
-        if not fixture:
+    def normalize_cards(cards):
+        if cards is None:
+            return tuple()
+        if isinstance(cards, str):
+            return (cards,)
+        return tuple(str(card) for card in cards)
+
+    def limit_cards(self, cards):
+        if self.max_cards is None:
+            return tuple(cards)
+        return tuple(cards[: self.max_cards])
+
+    @staticmethod
+    def normalize_max_cards(max_cards):
+        if max_cards is None:
             return None
-        for key in ("card_visual_state", "card_visibility"):
-            if key in fixture:
-                return fixture[key]
-        return None
-
-    def get_slot_content_rect(self):
-        """Return visible occupied card bounds in slot frame-local coordinates."""
-        return self.get_slot_content_scaled_local_rect()
-
-    def get_slot_content_unscaled_local_rect(self):
-        """Return occupied card bounds before card scale is applied."""
-        return self.slot_content_local_rect.copy()
-
-    def get_slot_content_scaled_local_rect(self):
-        """Return occupied card bounds after card scale is applied."""
-        return self.slot_content_scaled_local_rect.copy()
-
-    def get_slot_content_screen_rect(self):
-        """Return occupied visible card bounds in screen coordinates."""
-        bounds = self.calculate_generated_groups_screen_bounds()
-        if bounds is None:
-            return pygame.Rect(0, 0, 0, 0)
-        return bounds
-
-    def draw_debug_overlay(self, screen):
-        if not debug_overlay.should_draw_activity_rect():
-            return
-        rect = self.get_slot_content_screen_rect()
-        if rect.width > 0 and rect.height > 0:
-            pygame.draw.rect(screen, (255, 232, 64), rect, 2)
-
-    def normalize_slot_content(self, force=False):
-        """Compatibility alias for older callers."""
-        signature = self.get_slot_layout_signature()
-        if not force and signature == self._last_slot_layout_signature:
-            return
-        self.move_generated_groups_to_slot_origin()
-        self._last_slot_layout_signature = self.get_slot_layout_signature()
-
-    def get_slot_layout_signature(self):
-        return tuple(
-            (
-                group.id,
-                tuple(group.local_rect),
-                1.0 if group.scale_factor is None else group.scale_factor,
-            )
-            for group in self.iter_generated_groups()
-        )
-
-    def move_generated_groups_to_slot_origin(self):
-        """Move generated groups so their local bounds start at the slot origin."""
-        bounds = self.calculate_generated_groups_local_bounds()
-        if bounds is None:
-            self.slot_content_local_rect = pygame.Rect(0, 0, 0, 0)
-            self.slot_content_scaled_local_rect = pygame.Rect(0, 0, 0, 0)
-            return
-
-        for group in self.iter_generated_groups():
-            rect = group.local_rect
-            self.hand_activity.frame.move_group_local(
-                group,
-                (rect.x - bounds.x, rect.y - bounds.y),
-            )
-
-        self.slot_content_local_rect = pygame.Rect(0, 0, bounds.width, bounds.height)
-        scaled_bounds = self.calculate_generated_groups_scaled_local_bounds()
-        self.slot_content_scaled_local_rect = (
-            scaled_bounds.copy()
-            if scaled_bounds is not None
-            else pygame.Rect(0, 0, 0, 0)
-        )
-
-    def calculate_generated_groups_local_bounds(self):
-        bounds = None
-        for group in self.iter_generated_groups():
-            rect = self.get_group_slot_local_rect(group)
-            bounds = rect.copy() if bounds is None else bounds.union(rect)
-        return bounds
-
-    def calculate_generated_groups_scaled_local_bounds(self):
-        bounds = None
-        for group in self.iter_generated_groups():
-            rect = self.get_group_slot_scaled_local_rect(group)
-            bounds = rect.copy() if bounds is None else bounds.union(rect)
-        return bounds
-
-    def calculate_generated_groups_screen_bounds(self):
-        bounds = None
-        for group in self.iter_generated_groups():
-            rect = group.rect
-            bounds = rect.copy() if bounds is None else bounds.union(rect)
-        return bounds
+        return max(0, int(max_cards))
 
     @staticmethod
-    def get_group_slot_local_rect(group):
-        return group.local_rect.copy()
+    def normalize_scale_factor(value):
+        if value is None:
+            return None
+        scale = float(value)
+        if scale <= 0:
+            raise ValueError(f"scale_factor must be positive: {value!r}")
+        return scale
 
     @staticmethod
-    def get_group_slot_scaled_local_rect(group):
-        if hasattr(group, "get_scaled_local_rect"):
-            return group.get_scaled_local_rect()
-        return group.local_rect.copy()
-
-    @staticmethod
-    def get_group_primary_layer_screen_rect(group):
-        layer = group.get_primary_layer()
-        if hasattr(group, "get_layer_rect"):
-            return group.get_layer_rect(layer).copy()
-        return group.rect.copy()
+    def normalize_pair(value):
+        if isinstance(value, dict):
+            value = (value.get("x", 0), value.get("y", 0))
+        if not isinstance(value, (tuple, list)) or len(value) < 2:
+            raise TypeError(f"Expected coordinate pair: {value!r}")
+        return int(round(float(value[0]))), int(round(float(value[1])))

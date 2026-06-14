@@ -153,16 +153,9 @@ class TableScreen(GameScreen):
     def create_cards_slot_activity(self, frame, index=0):
         _ = index
         return CardsSlotActivityDecorator(
-            BotHandActivity(
-                frame=frame,
-                resource_manager=ResourceManager,
-                card_count=0,
-                group_id_prefix=f"{frame.id}.cards",
-                orientation_degrees=0,
-                center_offset=(0, 0),
-            ),
-            cards=(),
+            frame,
             resource_manager=ResourceManager,
+            group_id_prefix=f"{frame.id}.cards",
         )
 
     def ensure_play_area_slot_frame(self, frame_id, prototype_frame):

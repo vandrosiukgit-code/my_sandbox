@@ -14,11 +14,6 @@ class PlayAreaSlotsActivity(Activity):
     DEFAULT_CENTER_ROW_RADIUS = 2
     DEFAULT_SIDE_ROW_RADIUS = 1
     DEFAULT_SLOT_ACTIVITY_FIXTURE = {
-        "cards": (
-            "cards.6_of_clubs",
-            "cards.7_of_clubs",
-        ),
-        "card_visual_state": "hidden",
         "scale_factor": 0.7,
         "radius": 80,
         "center_offset": (0, 0),
@@ -245,6 +240,11 @@ class PlayAreaSlotsActivity(Activity):
 
     def get_prototype_slot_size(self):
         if self.prototype_slot_activity is not None:
+            getter = getattr(self.prototype_slot_activity, "get_default_slot_size", None)
+            if callable(getter):
+                size = getter()
+                if size[0] > 0 and size[1] > 0:
+                    return size
             content_rect = self.prototype_slot_activity.get_slot_content_rect()
             if content_rect.width > 0 and content_rect.height > 0:
                 return content_rect.size
