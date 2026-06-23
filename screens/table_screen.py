@@ -11,6 +11,7 @@ from activities import (
     PlayerHandActivity,
     PlayerTurnActivity,
     PlayAreaSlotsActivity,
+    StartGameActivity,
     VisibleCardsHandDecorator,
 )
 from core.resource import ResourceManager
@@ -33,8 +34,8 @@ class TableScreen(GameScreen):
     SIDE_PLAYER_FRAME_SIZE = (260, 300)
     CENTER_PLAYER_FRAME_SIZE = (300, 260)
     PORTRAIT_FRAME_SIZE = (200, 200)
-    DECK_FRAME_SIZE = (103, 160)
-    DECK_RIGHT_GUTTER = 60
+    DECK_FRAME_SIZE = (160, 160)
+    DECK_FRAME_POSITION = (1021, PLAY_AREA_INSET)
     CARD_SLOT_FRAME_SIZE_RATIO = (0.72, 0.53)
     SIDE_HAND_SLOT_GUTTER = 80
     BOTTOM_PLAYER_HAND_PROBE_ENABLED = False
@@ -84,6 +85,7 @@ class TableScreen(GameScreen):
         deck_activity = DeckActivity(
             frame=self.get_screen_frame("deck_frame"),
             resource_manager=ResourceManager,
+            deal_cards_callback=self.apply_deck_deal_visual,
         )
         play_area_slots_activity = PlayAreaSlotsActivity(
             screen=self,
@@ -97,6 +99,13 @@ class TableScreen(GameScreen):
             freeze_slot_layout=self.freeze_play_area_slot_layout,
             release_slot_layout=self.release_play_area_slot_layout,
             remove_source_card=self.remove_bottom_player_hand_card,
+        )
+        start_game_activity = StartGameActivity(
+            source_geometry_provider=deck_activity.get_deal_source_screen_geometry,
+            target_geometry_provider=self.get_start_game_target_screen_geometry,
+            reset_recipients=self.reset_start_game_recipients,
+            land_card=self.land_start_game_card,
+            resource_manager=ResourceManager,
         )
         bottom_player_hand_activity = CardSelectionActivity(
             VisibleCardsHandDecorator(
@@ -155,6 +164,7 @@ class TableScreen(GameScreen):
             "play_area_frame": player_turn_activity,
             "cards_slot_frame": cards_slot_activity,
             "deck_frame": deck_activity,
+            "start_game": start_game_activity,
         }
         self._play_area_slot_layout_lock_depth = 0
         self._locked_play_area_slot_horizontal_local_bounds = None
@@ -226,12 +236,10 @@ class TableScreen(GameScreen):
         )
 
     def layout_deck_frame(self):
-        deck_width, _deck_height = self.DECK_FRAME_SIZE
-        right_player_left = self.SCREEN_SIZE[0] - self.SIDE_PLAYER_FRAME_SIZE[0]
         self.put_frame_in_frame(
             "deck_frame",
             "game_table",
-            position=(right_player_left - deck_width - self.DECK_RIGHT_GUTTER, self.PLAY_AREA_INSET),
+            position=self.DECK_FRAME_POSITION,
         )
 
     def calculate_play_area_size(self):
@@ -611,6 +619,41 @@ class TableScreen(GameScreen):
             payload = self.get_command_value(command, "payload", {}) or {}
             return self.start_player_turn_from_command(payload.get("turn_context", {}))
         return super().dispatch_visual_command(command)
+
+    def apply_deck_deal_visual(self, target_activity_id, card_resource_keys):
+        """Apply a fixture/controller deck deal through a recipient public API."""
+        recipient = self.find_nested_activity_with_method(
+            self.get_named_activity(target_activity_id),
+            "append_cards",
+        )
+        if recipient is None:
+            raise KeyError(f"Deck deal target does not accept cards: {target_activity_id}")
+        recipient.append_cards(card_resource_keys)
+
+    def get_start_game_target_screen_geometry(self, target_activity_id):
+        frame = self.get_screen_frame(target_activity_id)
+        deck_activity = self.get_named_activity("deck_frame")
+        source_geometry = deck_activity.get_deal_source_screen_geometry()
+        return {"center": frame.rect.center, "size": source_geometry["size"]}
+
+    def reset_start_game_recipients(self, recipient_ids):
+        for recipient_id in recipient_ids:
+            recipient = self.find_nested_activity_with_method(
+                self.get_named_activity(recipient_id),
+                "set_cards",
+            )
+            if recipient is not None:
+                recipient.set_cards((), force=True)
+                continue
+            recipient = self.find_nested_activity_with_method(
+                self.get_named_activity(recipient_id),
+                "set_card_count",
+            )
+            if recipient is not None:
+                recipient.set_card_count(0)
+
+    def land_start_game_card(self, recipient_id, resource_key):
+        self.apply_deck_deal_visual(recipient_id, (resource_key,))
 
     def get_play_area_slots_activity(self):
         activity = self.get_named_activity("play_area_frame")

@@ -92,6 +92,10 @@ class BotHandActivity(Activity):
         self.sync_visual_groups()
         self.apply_fan_layout()
 
+    def append_cards(self, card_resource_keys):
+        """Increase this face-down hand for a visual deck deal."""
+        self.set_card_count(self.card_count + len(tuple(card_resource_keys)))
+
     def configure_card_resources(self, provider=None, layer_name=None, card_count=None):
         """Configure the public resource contract used for generated cards."""
         should_sync = self.started or bool(self.generated_groups)

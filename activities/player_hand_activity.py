@@ -262,7 +262,7 @@ class PlayerHandActivity(BotHandActivity):
             -1.0 + 2.0 * slot_index / (count - 1)
             for slot_index in range(count)
         ]
-        center_out_slots = sorted(slots, key=lambda slot: (abs(slot), -slot))
+        center_out_slots = sorted(slots, key=lambda slot: (abs(slot), slot))
         return center_out_slots[index]
 
     @staticmethod

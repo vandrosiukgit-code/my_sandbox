@@ -174,6 +174,13 @@ def detect_geometry_issues(
             if first["key"] == second["key"] or pair in reported_pairs:
                 continue
             reported_pairs.add(pair)
+            if (
+                first.get("owner_frame_id") == second["id"]
+                or second.get("owner_frame_id") == first["id"]
+            ):
+                continue
+            if first.get("owner_activity_id") and first.get("owner_activity_id") == second.get("owner_activity_id"):
+                continue
             if first["key"] in ignored_keys or second["key"] in ignored_keys or pair in ignored_pairs:
                 continue
             intersection = first_rect.clip(to_rect(second["rect"]))
@@ -196,6 +203,8 @@ def default_collision_subject_keys(objects):
 
 
 def is_layout_subject(item):
+    if item["kind"] == "activity_group" and item["owner_activity_id"] == "deck_frame":
+        return True
     return item["kind"] == "frame" and (
         item["id"] == "deck_frame" or item["id"].startswith("cards_slot_frame")
     )
@@ -217,13 +226,34 @@ def to_rect(data):
     return pygame.Rect(data["x"], data["y"], data["width"], data["height"])
 
 
+def apply_candidate_rects(objects, candidate_rects):
+    """Return a snapshot with temporary screen-space candidate rects applied."""
+    candidates = candidate_rects or {}
+    available_keys = {item["key"] for item in objects}
+    unknown_keys = set(candidates) - available_keys
+    if unknown_keys:
+        raise ValueError(f"Unknown geometry candidate keys: {sorted(unknown_keys)}")
+
+    updated_objects = []
+    for item in objects:
+        updated_item = dict(item)
+        if item["key"] in candidates:
+            x, y, width, height = candidates[item["key"]]
+            candidate_rect = pygame.Rect(x, y, width, height)
+            updated_item["rect"] = rect_data(candidate_rect)
+            updated_item["hit_rect"] = rect_data(candidate_rect)
+        updated_objects.append(updated_item)
+    return updated_objects
+
+
 def build_report(
     screen,
     collision_subject_keys=None,
     ignored_collision_keys=(),
     ignored_collision_pairs=(),
+    candidate_rects=None,
 ):
-    objects = collect_objects(screen)
+    objects = apply_candidate_rects(collect_objects(screen), candidate_rects)
     outside_screen, overlaps = detect_geometry_issues(
         objects,
         TableScreen.SCREEN_SIZE,
@@ -235,6 +265,9 @@ def build_report(
         "screen": {"width": TableScreen.SCREEN_SIZE[0], "height": TableScreen.SCREEN_SIZE[1]},
         "objects": objects,
         "collision_subject_keys": collision_subject_keys or default_collision_subject_keys(objects),
+        "candidate_rects": {
+            key: rect_data(pygame.Rect(*rect)) for key, rect in (candidate_rects or {}).items()
+        },
         "ignored_collision_keys": list(ignored_collision_keys),
         "ignored_collision_pairs": [list(pair) for pair in ignored_collision_pairs],
         "outside_screen": outside_screen,
@@ -274,13 +307,26 @@ def main(argv=None):
         dest="ignored_collision_pairs",
         help="Ignore only this object pair for this invocation.",
     )
+    parser.add_argument(
+        "--candidate-rect",
+        action="append",
+        nargs=5,
+        default=[],
+        metavar=("OBJECT_KEY", "X", "Y", "WIDTH", "HEIGHT"),
+        help="Temporarily test this object rect without changing the GUI scene.",
+    )
     args = parser.parse_args(argv)
+    candidate_rects = {
+        key: tuple(int(value) for value in values)
+        for key, *values in args.candidate_rect
+    }
     try:
         report = build_report(
             build_screen(),
             collision_subject_keys=args.collision_subject_keys,
             ignored_collision_keys=args.ignored_collision_keys,
             ignored_collision_pairs=args.ignored_collision_pairs,
+            candidate_rects=candidate_rects,
         )
         payload = json.dumps(report, ensure_ascii=False, indent=2)
         if args.output:

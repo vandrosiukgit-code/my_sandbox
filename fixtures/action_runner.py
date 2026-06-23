@@ -258,6 +258,12 @@ def configure_bot_turn_parser(parser):
     parser.add_argument("--bot-card-resource-key")
 
 
+def configure_start_game_parser(parser):
+    parser.add_argument("--card-count", type=int, default=6)
+    parser.add_argument("--duration", type=float, default=0.18)
+    parser.add_argument("--recipient", action="append", dest="recipient_order")
+
+
 @action_run(
     "player_card_play",
     "Move one lower-player card into a play-area slot.",
@@ -337,6 +343,45 @@ def run_bot_turn(args):
     return 0
 
 
+@action_run(
+    "start_game",
+    "Deal opening hands from the deck to every player.",
+    (
+        "The deck sends one face-down card in counter-clockwise order to the "
+        "lower player and three bots until every hand has six cards."
+    ),
+    configure_start_game_parser,
+)
+def run_start_game(args):
+    from core import GameController
+    from core.render_engine import RenderEngine
+    from core.resource import ResourceManager
+    from group import GroupStore
+    from screens.table_screen import TableScreen
+
+    game_controller = GameController(GameController.create_fixture_state())
+    group_store = GroupStore(resource_manager=ResourceManager)
+
+    def screen_factory(_render_context=None):
+        ResourceManager.build_runtime_cache(ASSETS_DIR)
+        group_store.build()
+        screen = TableScreen(
+            group_store=group_store,
+            game_controller=game_controller,
+        )
+        prepare_isolated_screen(screen)
+        start_start_game(screen, args)
+        return screen
+
+    render_engine = RenderEngine(
+        screen_factory=screen_factory,
+        screen_size=(1280, 720),
+        title="The Fool's Reef - activity: start_game",
+    )
+    render_engine.run()
+    return 0
+
+
 def prepare_isolated_screen(screen):
     """Remove fixture-started transient actions before the requested action."""
     for frame in screen.screen_frames.values():
@@ -376,6 +421,18 @@ def start_bot_turn(screen, args, activity_class):
         release_slot_layout=screen.release_play_area_slot_layout,
     )
     screen.add_activity(bot_turn_activity)
+
+
+def start_start_game(screen, args):
+    activity = screen.get_named_activity("start_game")
+    if activity is None:
+        raise RuntimeError("Missing start_game activity")
+    activity.deal_duration = max(0.0, float(args.duration))
+    if not activity.start_scenario(
+        card_count=max(0, int(args.card_count)),
+        recipient_order=args.recipient_order,
+    ):
+        raise RuntimeError("start_game scenario is already active")
 
 
 def load_table_bot_actions_fixture():

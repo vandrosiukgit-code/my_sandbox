@@ -116,30 +116,30 @@
       "owner_frame_id": "game_table",
       "owner_activity_id": null,
       "rect": {
-        "x": 857,
+        "x": 1021,
         "y": 20,
-        "width": 103,
+        "width": 160,
         "height": 160,
-        "left": 857,
+        "left": 1021,
         "top": 20,
-        "right": 960,
+        "right": 1181,
         "bottom": 180,
         "center": [
-          908,
+          1101,
           100
         ]
       },
       "hit_rect": {
-        "x": 857,
+        "x": 1021,
         "y": 20,
-        "width": 103,
+        "width": 160,
         "height": 160,
-        "left": 857,
+        "left": 1021,
         "top": 20,
-        "right": 960,
+        "right": 1181,
         "bottom": 180,
         "center": [
-          908,
+          1101,
           100
         ]
       }
@@ -2840,9 +2840,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.17",
+      "key": "activity_group:bottom_player_hand.bot_hand.16",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.17",
+      "id": "bottom_player_hand.bot_hand.16",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -2875,9 +2875,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.15",
+      "key": "activity_group:bottom_player_hand.bot_hand.14",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.15",
+      "id": "bottom_player_hand.bot_hand.14",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -2910,9 +2910,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.13",
+      "key": "activity_group:bottom_player_hand.bot_hand.12",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.13",
+      "id": "bottom_player_hand.bot_hand.12",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -2945,9 +2945,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.11",
+      "key": "activity_group:bottom_player_hand.bot_hand.10",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.11",
+      "id": "bottom_player_hand.bot_hand.10",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -3085,9 +3085,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.3",
+      "key": "activity_group:bottom_player_hand.bot_hand.2",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.3",
+      "id": "bottom_player_hand.bot_hand.2",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -3116,41 +3116,6 @@
         "center": [
           600,
           525
-        ]
-      }
-    },
-    {
-      "key": "activity_group:bottom_player_hand.bot_hand.1",
-      "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.1",
-      "owner_frame_id": "bottom_player_hand",
-      "owner_activity_id": "bottom_player_hand",
-      "rect": {
-        "x": 570,
-        "y": 441,
-        "width": 113,
-        "height": 164,
-        "left": 570,
-        "top": 441,
-        "right": 683,
-        "bottom": 605,
-        "center": [
-          626,
-          523
-        ]
-      },
-      "hit_rect": {
-        "x": 570,
-        "y": 441,
-        "width": 113,
-        "height": 164,
-        "left": 570,
-        "top": 441,
-        "right": 683,
-        "bottom": 605,
-        "center": [
-          626,
-          523
         ]
       }
     },
@@ -3161,6 +3126,41 @@
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
+        "x": 570,
+        "y": 441,
+        "width": 113,
+        "height": 164,
+        "left": 570,
+        "top": 441,
+        "right": 683,
+        "bottom": 605,
+        "center": [
+          626,
+          523
+        ]
+      },
+      "hit_rect": {
+        "x": 570,
+        "y": 441,
+        "width": 113,
+        "height": 164,
+        "left": 570,
+        "top": 441,
+        "right": 683,
+        "bottom": 605,
+        "center": [
+          626,
+          523
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.1",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.1",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
         "x": 598,
         "y": 441,
         "width": 113,
@@ -3190,9 +3190,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.2",
+      "key": "activity_group:bottom_player_hand.bot_hand.3",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.2",
+      "id": "bottom_player_hand.bot_hand.3",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -3330,9 +3330,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.10",
+      "key": "activity_group:bottom_player_hand.bot_hand.11",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.10",
+      "id": "bottom_player_hand.bot_hand.11",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -3365,9 +3365,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.12",
+      "key": "activity_group:bottom_player_hand.bot_hand.13",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.12",
+      "id": "bottom_player_hand.bot_hand.13",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -3400,9 +3400,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.14",
+      "key": "activity_group:bottom_player_hand.bot_hand.15",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.14",
+      "id": "bottom_player_hand.bot_hand.15",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -3435,9 +3435,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.16",
+      "key": "activity_group:bottom_player_hand.bot_hand.17",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.16",
+      "id": "bottom_player_hand.bot_hand.17",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -3466,6 +3466,41 @@
         "center": [
           852,
           599
+        ]
+      }
+    },
+    {
+      "key": "activity_group:deck_frame.trump",
+      "kind": "activity_group",
+      "id": "deck_frame.trump",
+      "owner_frame_id": "deck_frame",
+      "owner_activity_id": "deck_frame",
+      "rect": {
+        "x": 992,
+        "y": 46,
+        "width": 160,
+        "height": 107,
+        "left": 992,
+        "top": 46,
+        "right": 1152,
+        "bottom": 153,
+        "center": [
+          1072,
+          99
+        ]
+      },
+      "hit_rect": {
+        "x": 992,
+        "y": 46,
+        "width": 160,
+        "height": 107,
+        "left": 992,
+        "top": 46,
+        "right": 1152,
+        "bottom": 153,
+        "center": [
+          1072,
+          99
         ]
       }
     },
@@ -3476,30 +3511,30 @@
       "owner_frame_id": "deck_frame",
       "owner_activity_id": "deck_frame",
       "rect": {
-        "x": 857,
+        "x": 1049,
         "y": 20,
         "width": 103,
         "height": 160,
-        "left": 857,
+        "left": 1049,
         "top": 20,
-        "right": 960,
+        "right": 1152,
         "bottom": 180,
         "center": [
-          908,
+          1100,
           100
         ]
       },
       "hit_rect": {
-        "x": 857,
+        "x": 1049,
         "y": 20,
         "width": 103,
         "height": 160,
-        "left": 857,
+        "left": 1049,
         "top": 20,
-        "right": 960,
+        "right": 1152,
         "bottom": 180,
         "center": [
-          908,
+          1100,
           100
         ]
       }
@@ -3618,53 +3653,14 @@
     "frame:cards_slot_frame_4",
     "frame:cards_slot_frame_5",
     "frame:cards_slot_frame_6",
-    "frame:cards_slot_frame_7"
+    "frame:cards_slot_frame_7",
+    "activity_group:deck_frame.trump",
+    "activity_group:deck_frame.card_back"
   ],
+  "candidate_rects": {},
   "ignored_collision_keys": [],
   "ignored_collision_pairs": [],
   "outside_screen": [],
-  "overlaps": [
-    {
-      "first_key": "frame:deck_frame",
-      "second_key": "frame:cards_slot_frame_7",
-      "intersection": {
-        "x": 857,
-        "y": 144,
-        "width": 103,
-        "height": 36,
-        "left": 857,
-        "top": 144,
-        "right": 960,
-        "bottom": 180,
-        "center": [
-          908,
-          162
-        ]
-      },
-      "area": 3708,
-      "severity": "P1"
-    }
-  ],
-  "violations": [
-    {
-      "first_key": "frame:deck_frame",
-      "second_key": "frame:cards_slot_frame_7",
-      "intersection": {
-        "x": 857,
-        "y": 144,
-        "width": 103,
-        "height": 36,
-        "left": 857,
-        "top": 144,
-        "right": 960,
-        "bottom": 180,
-        "center": [
-          908,
-          162
-        ]
-      },
-      "area": 3708,
-      "severity": "P1"
-    }
-  ]
+  "overlaps": [],
+  "violations": []
 }

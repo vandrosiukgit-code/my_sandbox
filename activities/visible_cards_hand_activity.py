@@ -103,6 +103,10 @@ class VisibleCardsHandDecorator(Activity):
             self.hand_activity.sync_visual_groups()
             self.hand_activity.apply_fan_layout()
 
+    def append_cards(self, cards):
+        """Append externally dealt visual cards without interpreting game rules."""
+        self.set_cards((*self.card_resource_keys, *self.normalize_cards(cards)))
+
     def remove_card_by_group_id(self, group_id):
         """Remove one visual card while preserving the wrapper card list order."""
         for group in self.hand_activity.iter_generated_groups():

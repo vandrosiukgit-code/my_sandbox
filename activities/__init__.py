@@ -13,6 +13,7 @@ from activities.deck_activity import DeckActivity
 from activities.player_hand_activity import PlayerHandActivity
 from activities.player_turn_activity import PlayerTurnActivity
 from activities.play_area_slots_activity import PlayAreaSlotsActivity
+from activities.start_game_activity import StartGameActivity
 from activities.visible_cards_hand_activity import VisibleCardsHandDecorator
 
 __all__ = [
@@ -25,5 +26,6 @@ __all__ = [
     "PlayerHandActivity",
     "PlayerTurnActivity",
     "PlayAreaSlotsActivity",
+    "StartGameActivity",
     "VisibleCardsHandDecorator",
 ]

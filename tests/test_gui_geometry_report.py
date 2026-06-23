@@ -2,7 +2,7 @@
 
 import unittest
 
-from tools.gui_geometry_report import detect_geometry_issues
+from tools.gui_geometry_report import apply_candidate_rects, detect_geometry_issues
 
 
 def make_object(key, x, y, width, height, kind="frame", object_id=None):
@@ -63,3 +63,41 @@ class GuiGeometryReportTests(unittest.TestCase):
 
         self.assertEqual(ignored_by_object, [])
         self.assertEqual(ignored_by_pair, [])
+
+    def test_candidate_rect_is_applied_without_mutating_original_snapshot(self):
+        candidate_objects = apply_candidate_rects(
+            [self.deck],
+            {self.deck["key"]: (10, 20, 30, 40)},
+        )
+
+        self.assertEqual(candidate_objects[0]["rect"]["x"], 10)
+        self.assertEqual(candidate_objects[0]["rect"]["width"], 30)
+        self.assertEqual(self.deck["rect"]["x"], 70)
+
+    def test_groups_from_one_activity_can_overlap(self):
+        deck_back = make_object("activity_group:deck_frame.card_back", 20, 20, 20, 20, kind="activity_group")
+        trump = make_object("activity_group:deck_frame.trump", 20, 20, 20, 20, kind="activity_group")
+        deck_back["owner_activity_id"] = "deck_frame"
+        trump["owner_activity_id"] = "deck_frame"
+
+        _, overlaps = detect_geometry_issues(
+            [deck_back, trump],
+            self.screen_size,
+            collision_subject_keys=(deck_back["key"], trump["key"]),
+        )
+
+        self.assertEqual(overlaps, [])
+
+    def test_frame_and_its_child_group_can_overlap(self):
+        frame = make_object("frame:deck_frame", 20, 20, 20, 20, object_id="deck_frame")
+        card_back = make_object("activity_group:deck_frame.card_back", 20, 20, 20, 20, kind="activity_group")
+        card_back["owner_frame_id"] = "deck_frame"
+        card_back["owner_activity_id"] = "deck_frame"
+
+        _, overlaps = detect_geometry_issues(
+            [frame, card_back],
+            self.screen_size,
+            collision_subject_keys=(frame["key"], card_back["key"]),
+        )
+
+        self.assertEqual(overlaps, [])
