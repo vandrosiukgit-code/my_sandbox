@@ -29,100 +29,92 @@ In QA terminology, these scenarios are closest to:
 They verify that a concrete visual scenario can be launched, observed, and
 completed in the actual runtime.
 
-## Activity Sandbox
+## Action Runner
 
-The universal entry point for activity dev tests is:
+The entry point for visual Action dev tests is:
 
 ```powershell
-& ".\.venv\Scripts\python.exe" -m tools.activity_sandbox <scenario>
+& ".\.venv\Scripts\python.exe" fixtures\action_runner.py <command>
 ```
 
-Current scenarios:
+Current actions:
 
 ```text
-bot_turn
+player_card_play
 ```
 
-The activity sandbox:
+The action runner:
 
-1. builds the normal application context;
-2. creates the normal `TableScreen`;
-3. creates the requested test Activity;
-4. injects GUI-side dependencies into the Activity;
-5. adds the Activity to the screen;
-6. runs the standard `RenderEngine`.
+1. builds a controlled visual scene without starting `main.py`;
+2. creates the requested test Action;
+3. injects GUI-side dependencies into the Action owner;
+4. runs the standard `RenderEngine`.
 
 `code_map` remains an inspection tool only. It must not become the runtime
 launcher for dev tests.
 
 ## Quick Launch
 
-Use `bush.bat` as the animation CLI launcher:
-
 ```powershell
-.\bush.bat help
-.\bush.bat list
-.\bush.bat run bot_turn
+& ".\.venv\Scripts\python.exe" fixtures\action_runner.py
 ```
 
-`bot_turn` can also be launched directly as a convenience command:
-
-```powershell
-.\bush.bat bot_turn --duration 0.2
-.\bush.bat bot_turn --no-clear-between-bots
-.\bush.bat bot_turn --bot-hand-id top_player_hand
-.\bush.bat bot_turn --target-slot-id cards_slot_frame
-```
-
-For backward-compatible quick testing, bot turn options without an explicit
-command still run `bot_turn`:
-
-```powershell
-.\bush.bat --duration 0.2
-```
-
-## Bot Turn Dev Test
-
-The `bot_turn` scenario validates the `BotTurnActivity` and
-`BotCardPlayAction` visual flow.
-
-Scenario order:
+The interactive prompt shows available actions and commands:
 
 ```text
-for bot_hand_id in bot_hand_ids:
-    for slot_card_position in ("first", "second"):
-        for target_slot_id in target_slot_ids:
-            move next card from bot_hand_id to target_slot_id / slot_card_position
+list
+help
+help player_card_play
+help 1
+run player_card_play
+run 1
+reload
+quit
 ```
+
+In interactive mode, `run ...` starts the Pygame action in a separate process
+and keeps the prompt available. `reload` stops the current action process and
+starts the last `run ...` command again. Use it after adjusting fixtures or
+code.
+
+Commands can still be run directly without entering the prompt:
+
+```powershell
+& ".\.venv\Scripts\python.exe" fixtures\action_runner.py run player_card_play
+```
+
+## Player Card Play Dev Test
+
+The `player_card_play` action validates the `PlayerCardPlayAction` visual
+flow.
 
 The test is designed to validate:
 
-- sequential `BotCardPlayAction` execution;
-- movement from bot hand frames to table slot frames;
-- removal of generated visual cards from bot hands;
-- commit of visual card resources into slot activities;
-- repeated writes into first and second slot positions;
-- behavior across multiple bot hands.
+```text
+bottom_player_hand generated card
+    -> PlayerCardPlayAction flight group
+    -> target slot
+    -> slot commit
+```
+
+- `PlayerCardPlayAction` execution;
+- movement from lower player hand geometry to target slot geometry;
+- cleanup of the temporary flight group;
+- commit of visual card resources into slot activities.
 
 ## Expected Result
 
 The GUI window opens and the scenario starts automatically.
 
-For each configured bot hand:
-
-1. table slots are cleared according to scenario options;
-2. first cards are moved into all target slots;
-3. second cards are moved into all target slots;
-4. the next bot hand is tested.
+The configured lower-player card moves into the target slot.
 
 The scenario passes as a manual smoke test if:
 
 - the window opens without runtime exceptions;
-- cards visibly move from bot hands to table slots;
-- actions run sequentially without overlapping incorrectly;
-- every target slot receives the expected first/second visual card;
-- source hand visuals shrink as cards are played;
-- no stale generated groups remain visible after an action commits.
+- the card visibly moves from the lower player hand to the target slot;
+- the action finishes;
+- the target slot receives the expected visual card;
+- no stale flight group remains visible after the action commits.
 
 ## Failure Evidence
 
@@ -164,6 +156,6 @@ Automated checks:
 - git diff --check passed; only LF/CRLF warnings.
 
 Dev test:
-- .\bush.bat launched bot_turn activity sandbox.
+- fixtures\action_runner.py launched player_card_play action sandbox.
 - Result: observed manually; issues recorded separately.
 ```

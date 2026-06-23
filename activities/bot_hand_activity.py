@@ -432,6 +432,10 @@ class BotHandActivity(Activity):
             bounds = group.rect.copy() if bounds is None else bounds.union(group.rect)
         return bounds
 
+    def get_fan_occupied_screen_rect(self):
+        """Return the current rendered fan bounds for an explicit screen layout consumer."""
+        return self.calculate_fan_rect()
+
     def clear_generated_groups(self):
         """Удалить все generated visual-only Group из frame и владения."""
         for group in self.generated_groups:

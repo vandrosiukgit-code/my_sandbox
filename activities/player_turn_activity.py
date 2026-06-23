@@ -13,7 +13,14 @@ class PlayerTurnActivity(Activity):
     screen own those details directly.
     """
 
-    def __init__(self, play_area_slots_activity, owns_play_area_slots_activity=False):
+    def __init__(
+        self,
+        play_area_slots_activity,
+        owns_play_area_slots_activity=False,
+        freeze_slot_layout=None,
+        release_slot_layout=None,
+        remove_source_card=None,
+    ):
         super().__init__(duration=0.0)
         self.validate_play_area_slots_activity(play_area_slots_activity)
         self.play_area_slots_activity = play_area_slots_activity
@@ -23,6 +30,11 @@ class PlayerTurnActivity(Activity):
         self.current_action = None
         self.flight_groups = []
         self.next_flight_group_index = 0
+        self.freeze_slot_layout = freeze_slot_layout
+        self.release_slot_layout = release_slot_layout
+        self.remove_source_card = remove_source_card
+        self.slot_layout_frozen = False
+        self.slot_layout_release_pending = False
 
     @staticmethod
     def validate_play_area_slots_activity(play_area_slots_activity):
@@ -41,16 +53,23 @@ class PlayerTurnActivity(Activity):
 
     def start_turn(self, turn_context):
         """Start one visual turn with controller-facing context."""
-        if self.turn_active:
+        if self.turn_active or self.slot_layout_release_pending:
             return False
         if not self.started:
             self.start()
-        self.turn_context = self.build_turn_context(turn_context)
-        self.current_action = self.create_player_card_action(self.turn_context)
-        if self.current_action is not None:
-            self.current_action.start()
-        self.turn_active = True
-        return True
+        if callable(self.freeze_slot_layout):
+            self.freeze_slot_layout()
+            self.slot_layout_frozen = True
+        try:
+            self.turn_context = self.build_turn_context(turn_context)
+            self.current_action = self.create_player_card_action(self.turn_context)
+            if self.current_action is not None:
+                self.current_action.start()
+            self.turn_active = True
+            return True
+        except Exception:
+            self.release_frozen_slot_layout()
+            raise
 
     def create_player_card_action(self, turn_context):
         source_geometry = turn_context.get("source_screen_geometry")
@@ -94,6 +113,8 @@ class PlayerTurnActivity(Activity):
         return None
 
     def resolve_target_slot_activity(self, turn_context):
+        if callable(getattr(self.play_area_slots_activity, "place_player_card", None)):
+            return self.play_area_slots_activity
         slot_id = turn_context.get("slot_id") or turn_context.get("target_slot_id")
         slot_activities = getattr(self.play_area_slots_activity, "slot_activities", {})
         if slot_id:
@@ -104,25 +125,33 @@ class PlayerTurnActivity(Activity):
 
     def finish_turn(self):
         """Finish the current visual turn without finishing the activity."""
-        self.place_turn_card_in_target_slot()
+        if self.place_turn_card_in_target_slot() and callable(self.remove_source_card):
+            self.remove_source_card(self.turn_context)
         self.current_action = None
         self.flight_groups = []
         self.turn_active = False
         self.turn_context = None
+        self.slot_layout_release_pending = self.has_pending_slot_transfers()
+        if not self.slot_layout_release_pending:
+            self.release_frozen_slot_layout()
 
     def place_turn_card_in_target_slot(self):
         if not self.turn_context:
-            return
+            return False
         slot_activity = self.resolve_target_slot_activity(self.turn_context)
         placer = getattr(slot_activity, "place_player_card", None)
         if callable(placer):
-            placer(self.turn_context)
+            return placer(self.turn_context) is not False
+        return False
 
     def update(self, dt):
         if not self.started:
             self.start()
             return
         self.play_area_slots_activity.update(dt)
+        if self.slot_layout_release_pending and not self.has_pending_slot_transfers():
+            self.slot_layout_release_pending = False
+            self.release_frozen_slot_layout()
         if self.current_action is None:
             return
         self.current_action.update(dt)
@@ -152,6 +181,15 @@ class PlayerTurnActivity(Activity):
             if flight_group is not group
         ]
 
+    def has_pending_slot_transfers(self):
+        checker = getattr(self.play_area_slots_activity, "has_pending_slot_transfers", None)
+        return bool(checker()) if callable(checker) else False
+
+    def release_frozen_slot_layout(self):
+        if self.slot_layout_frozen and callable(self.release_slot_layout):
+            self.release_slot_layout()
+        self.slot_layout_frozen = False
+
     def apply_fixture(self, fixture):
         if hasattr(self.play_area_slots_activity, "apply_fixture"):
             self.play_area_slots_activity.apply_fixture(fixture)
@@ -160,12 +198,16 @@ class PlayerTurnActivity(Activity):
         return self._finished
 
     def finish(self):
-        if self.owns_play_area_slots_activity:
-            is_finished = getattr(self.play_area_slots_activity, "is_finished", None)
-            if not callable(is_finished) or not is_finished():
-                self.play_area_slots_activity.finish()
-        self.turn_active = False
-        self.turn_context = None
-        self.current_action = None
-        self.flight_groups = []
-        super().finish()
+        try:
+            if self.owns_play_area_slots_activity:
+                is_finished = getattr(self.play_area_slots_activity, "is_finished", None)
+                if not callable(is_finished) or not is_finished():
+                    self.play_area_slots_activity.finish()
+            self.turn_active = False
+            self.turn_context = None
+            self.current_action = None
+            self.flight_groups = []
+            self.slot_layout_release_pending = False
+        finally:
+            self.release_frozen_slot_layout()
+            super().finish()

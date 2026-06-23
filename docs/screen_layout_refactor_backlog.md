@@ -172,18 +172,17 @@ Acceptance criteria:
 Files:
 
 - `docs/dev_tests.md`
-- `tools/activity_sandbox.py`
-- `bush.bat`
+- `fixtures/action_runner.py`
 
 Tasks:
 
 - Run:
 
 ```powershell
-.\bush.bat
+& ".\.venv\Scripts\python.exe" fixtures\action_runner.py run player_card_play
 ```
 
-- Observe `bot_turn` scenario.
+- Observe the `player_card_play` action run.
 - Record whether bottom player hand geometry remains stable.
 - Record any remaining failures separately as Activity, Action, slot commit,
   hand cleanup, layout, or rendering.
@@ -229,6 +228,6 @@ Recommended order:
 - Do not move layout decisions into `Activity`.
 - Do not make `Frame` aware of game meaning.
 - Do not hide the issue by disabling bottom-hand layout only in
-  `tools.activity_sandbox.py`.
+  `fixtures/action_runner.py`.
 - Do not use generated group bounds for screen layout unless an explicit
   layout-requirement contract is introduced.

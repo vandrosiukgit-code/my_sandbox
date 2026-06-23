@@ -1,0 +1,3670 @@
+{
+  "screen": {
+    "width": 1280,
+    "height": 720
+  },
+  "objects": [
+    {
+      "key": "frame:game_table",
+      "kind": "frame",
+      "id": "game_table",
+      "owner_frame_id": null,
+      "owner_activity_id": null,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 720,
+        "left": 0,
+        "top": 0,
+        "right": 1280,
+        "bottom": 720,
+        "center": [
+          640,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 720,
+        "left": 0,
+        "top": 0,
+        "right": 1280,
+        "bottom": 720,
+        "center": [
+          640,
+          360
+        ]
+      }
+    },
+    {
+      "key": "frame:play_area_frame",
+      "kind": "frame",
+      "id": "play_area_frame",
+      "owner_frame_id": "game_table",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 20,
+        "y": 20,
+        "width": 1240,
+        "height": 680,
+        "left": 20,
+        "top": 20,
+        "right": 1260,
+        "bottom": 700,
+        "center": [
+          640,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 20,
+        "y": 20,
+        "width": 1240,
+        "height": 680,
+        "left": 20,
+        "top": 20,
+        "right": 1260,
+        "bottom": 700,
+        "center": [
+          640,
+          360
+        ]
+      }
+    },
+    {
+      "key": "frame:cards_slot_frame",
+      "kind": "frame",
+      "id": "cards_slot_frame",
+      "owner_frame_id": "play_area_frame",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 567,
+        "y": 292,
+        "width": 138,
+        "height": 136,
+        "left": 567,
+        "top": 292,
+        "right": 705,
+        "bottom": 428,
+        "center": [
+          636,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 567,
+        "y": 292,
+        "width": 138,
+        "height": 136,
+        "left": 567,
+        "top": 292,
+        "right": 705,
+        "bottom": 428,
+        "center": [
+          636,
+          360
+        ]
+      }
+    },
+    {
+      "key": "frame:deck_frame",
+      "kind": "frame",
+      "id": "deck_frame",
+      "owner_frame_id": "game_table",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 857,
+        "y": 20,
+        "width": 103,
+        "height": 160,
+        "left": 857,
+        "top": 20,
+        "right": 960,
+        "bottom": 180,
+        "center": [
+          908,
+          100
+        ]
+      },
+      "hit_rect": {
+        "x": 857,
+        "y": 20,
+        "width": 103,
+        "height": 160,
+        "left": 857,
+        "top": 20,
+        "right": 960,
+        "bottom": 180,
+        "center": [
+          908,
+          100
+        ]
+      }
+    },
+    {
+      "key": "frame:left_player_frame",
+      "kind": "frame",
+      "id": "left_player_frame",
+      "owner_frame_id": "game_table",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 0,
+        "y": 210,
+        "width": 260,
+        "height": 300,
+        "left": 0,
+        "top": 210,
+        "right": 260,
+        "bottom": 510,
+        "center": [
+          130,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 0,
+        "y": 210,
+        "width": 260,
+        "height": 300,
+        "left": 0,
+        "top": 210,
+        "right": 260,
+        "bottom": 510,
+        "center": [
+          130,
+          360
+        ]
+      }
+    },
+    {
+      "key": "frame:left_player_portrait",
+      "kind": "frame",
+      "id": "left_player_portrait",
+      "owner_frame_id": "left_player_frame",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 20,
+        "y": 260,
+        "width": 200,
+        "height": 200,
+        "left": 20,
+        "top": 260,
+        "right": 220,
+        "bottom": 460,
+        "center": [
+          120,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 20,
+        "y": 260,
+        "width": 200,
+        "height": 200,
+        "left": 20,
+        "top": 260,
+        "right": 220,
+        "bottom": 460,
+        "center": [
+          120,
+          360
+        ]
+      }
+    },
+    {
+      "key": "frame:left_player_hand",
+      "kind": "frame",
+      "id": "left_player_hand",
+      "owner_frame_id": "left_player_frame",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 0,
+        "y": 210,
+        "width": 260,
+        "height": 300,
+        "left": 0,
+        "top": 210,
+        "right": 260,
+        "bottom": 510,
+        "center": [
+          130,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 0,
+        "y": 210,
+        "width": 260,
+        "height": 300,
+        "left": 0,
+        "top": 210,
+        "right": 260,
+        "bottom": 510,
+        "center": [
+          130,
+          360
+        ]
+      }
+    },
+    {
+      "key": "frame:right_player_frame",
+      "kind": "frame",
+      "id": "right_player_frame",
+      "owner_frame_id": "game_table",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 1020,
+        "y": 210,
+        "width": 260,
+        "height": 300,
+        "left": 1020,
+        "top": 210,
+        "right": 1280,
+        "bottom": 510,
+        "center": [
+          1150,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 1020,
+        "y": 210,
+        "width": 260,
+        "height": 300,
+        "left": 1020,
+        "top": 210,
+        "right": 1280,
+        "bottom": 510,
+        "center": [
+          1150,
+          360
+        ]
+      }
+    },
+    {
+      "key": "frame:right_player_portrait",
+      "kind": "frame",
+      "id": "right_player_portrait",
+      "owner_frame_id": "right_player_frame",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 1060,
+        "y": 260,
+        "width": 200,
+        "height": 200,
+        "left": 1060,
+        "top": 260,
+        "right": 1260,
+        "bottom": 460,
+        "center": [
+          1160,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 1060,
+        "y": 260,
+        "width": 200,
+        "height": 200,
+        "left": 1060,
+        "top": 260,
+        "right": 1260,
+        "bottom": 460,
+        "center": [
+          1160,
+          360
+        ]
+      }
+    },
+    {
+      "key": "frame:right_player_hand",
+      "kind": "frame",
+      "id": "right_player_hand",
+      "owner_frame_id": "right_player_frame",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 1020,
+        "y": 210,
+        "width": 260,
+        "height": 300,
+        "left": 1020,
+        "top": 210,
+        "right": 1280,
+        "bottom": 510,
+        "center": [
+          1150,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 1020,
+        "y": 210,
+        "width": 260,
+        "height": 300,
+        "left": 1020,
+        "top": 210,
+        "right": 1280,
+        "bottom": 510,
+        "center": [
+          1150,
+          360
+        ]
+      }
+    },
+    {
+      "key": "frame:top_player_frame",
+      "kind": "frame",
+      "id": "top_player_frame",
+      "owner_frame_id": "game_table",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 490,
+        "y": 0,
+        "width": 300,
+        "height": 260,
+        "left": 490,
+        "top": 0,
+        "right": 790,
+        "bottom": 260,
+        "center": [
+          640,
+          130
+        ]
+      },
+      "hit_rect": {
+        "x": 490,
+        "y": 0,
+        "width": 300,
+        "height": 260,
+        "left": 490,
+        "top": 0,
+        "right": 790,
+        "bottom": 260,
+        "center": [
+          640,
+          130
+        ]
+      }
+    },
+    {
+      "key": "frame:top_player_portrait",
+      "kind": "frame",
+      "id": "top_player_portrait",
+      "owner_frame_id": "top_player_frame",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 540,
+        "y": 20,
+        "width": 200,
+        "height": 200,
+        "left": 540,
+        "top": 20,
+        "right": 740,
+        "bottom": 220,
+        "center": [
+          640,
+          120
+        ]
+      },
+      "hit_rect": {
+        "x": 540,
+        "y": 20,
+        "width": 200,
+        "height": 200,
+        "left": 540,
+        "top": 20,
+        "right": 740,
+        "bottom": 220,
+        "center": [
+          640,
+          120
+        ]
+      }
+    },
+    {
+      "key": "frame:top_player_hand",
+      "kind": "frame",
+      "id": "top_player_hand",
+      "owner_frame_id": "top_player_frame",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 490,
+        "y": 0,
+        "width": 300,
+        "height": 260,
+        "left": 490,
+        "top": 0,
+        "right": 790,
+        "bottom": 260,
+        "center": [
+          640,
+          130
+        ]
+      },
+      "hit_rect": {
+        "x": 490,
+        "y": 0,
+        "width": 300,
+        "height": 260,
+        "left": 490,
+        "top": 0,
+        "right": 790,
+        "bottom": 260,
+        "center": [
+          640,
+          130
+        ]
+      }
+    },
+    {
+      "key": "frame:bottom_player_frame",
+      "kind": "frame",
+      "id": "bottom_player_frame",
+      "owner_frame_id": "game_table",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 490,
+        "y": 460,
+        "width": 300,
+        "height": 260,
+        "left": 490,
+        "top": 460,
+        "right": 790,
+        "bottom": 720,
+        "center": [
+          640,
+          590
+        ]
+      },
+      "hit_rect": {
+        "x": 490,
+        "y": 460,
+        "width": 300,
+        "height": 260,
+        "left": 490,
+        "top": 460,
+        "right": 790,
+        "bottom": 720,
+        "center": [
+          640,
+          590
+        ]
+      }
+    },
+    {
+      "key": "frame:bottom_player_portrait",
+      "kind": "frame",
+      "id": "bottom_player_portrait",
+      "owner_frame_id": "bottom_player_frame",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 540,
+        "y": 500,
+        "width": 200,
+        "height": 200,
+        "left": 540,
+        "top": 500,
+        "right": 740,
+        "bottom": 700,
+        "center": [
+          640,
+          600
+        ]
+      },
+      "hit_rect": {
+        "x": 540,
+        "y": 500,
+        "width": 200,
+        "height": 200,
+        "left": 540,
+        "top": 500,
+        "right": 740,
+        "bottom": 700,
+        "center": [
+          640,
+          600
+        ]
+      }
+    },
+    {
+      "key": "frame:bottom_player_hand",
+      "kind": "frame",
+      "id": "bottom_player_hand",
+      "owner_frame_id": "bottom_player_frame",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 490,
+        "y": 460,
+        "width": 300,
+        "height": 260,
+        "left": 490,
+        "top": 460,
+        "right": 790,
+        "bottom": 720,
+        "center": [
+          640,
+          590
+        ]
+      },
+      "hit_rect": {
+        "x": 490,
+        "y": 460,
+        "width": 300,
+        "height": 260,
+        "left": 490,
+        "top": 460,
+        "right": 790,
+        "bottom": 720,
+        "center": [
+          640,
+          590
+        ]
+      }
+    },
+    {
+      "key": "frame:cards_slot_frame_2",
+      "kind": "frame",
+      "id": "cards_slot_frame_2",
+      "owner_frame_id": "play_area_frame",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 424,
+        "y": 292,
+        "width": 138,
+        "height": 136,
+        "left": 424,
+        "top": 292,
+        "right": 562,
+        "bottom": 428,
+        "center": [
+          493,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 424,
+        "y": 292,
+        "width": 138,
+        "height": 136,
+        "left": 424,
+        "top": 292,
+        "right": 562,
+        "bottom": 428,
+        "center": [
+          493,
+          360
+        ]
+      }
+    },
+    {
+      "key": "frame:cards_slot_frame_3",
+      "kind": "frame",
+      "id": "cards_slot_frame_3",
+      "owner_frame_id": "play_area_frame",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 710,
+        "y": 292,
+        "width": 138,
+        "height": 136,
+        "left": 710,
+        "top": 292,
+        "right": 848,
+        "bottom": 428,
+        "center": [
+          779,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 710,
+        "y": 292,
+        "width": 138,
+        "height": 136,
+        "left": 710,
+        "top": 292,
+        "right": 848,
+        "bottom": 428,
+        "center": [
+          779,
+          360
+        ]
+      }
+    },
+    {
+      "key": "frame:cards_slot_frame_4",
+      "kind": "frame",
+      "id": "cards_slot_frame_4",
+      "owner_frame_id": "play_area_frame",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 281,
+        "y": 292,
+        "width": 138,
+        "height": 136,
+        "left": 281,
+        "top": 292,
+        "right": 419,
+        "bottom": 428,
+        "center": [
+          350,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 281,
+        "y": 292,
+        "width": 138,
+        "height": 136,
+        "left": 281,
+        "top": 292,
+        "right": 419,
+        "bottom": 428,
+        "center": [
+          350,
+          360
+        ]
+      }
+    },
+    {
+      "key": "frame:cards_slot_frame_5",
+      "kind": "frame",
+      "id": "cards_slot_frame_5",
+      "owner_frame_id": "play_area_frame",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 853,
+        "y": 292,
+        "width": 138,
+        "height": 136,
+        "left": 853,
+        "top": 292,
+        "right": 991,
+        "bottom": 428,
+        "center": [
+          922,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 853,
+        "y": 292,
+        "width": 138,
+        "height": 136,
+        "left": 853,
+        "top": 292,
+        "right": 991,
+        "bottom": 428,
+        "center": [
+          922,
+          360
+        ]
+      }
+    },
+    {
+      "key": "frame:cards_slot_frame_6",
+      "kind": "frame",
+      "id": "cards_slot_frame_6",
+      "owner_frame_id": "play_area_frame",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 281,
+        "y": 144,
+        "width": 138,
+        "height": 136,
+        "left": 281,
+        "top": 144,
+        "right": 419,
+        "bottom": 280,
+        "center": [
+          350,
+          212
+        ]
+      },
+      "hit_rect": {
+        "x": 281,
+        "y": 144,
+        "width": 138,
+        "height": 136,
+        "left": 281,
+        "top": 144,
+        "right": 419,
+        "bottom": 280,
+        "center": [
+          350,
+          212
+        ]
+      }
+    },
+    {
+      "key": "frame:cards_slot_frame_7",
+      "kind": "frame",
+      "id": "cards_slot_frame_7",
+      "owner_frame_id": "play_area_frame",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 853,
+        "y": 144,
+        "width": 138,
+        "height": 136,
+        "left": 853,
+        "top": 144,
+        "right": 991,
+        "bottom": 280,
+        "center": [
+          922,
+          212
+        ]
+      },
+      "hit_rect": {
+        "x": 853,
+        "y": 144,
+        "width": 138,
+        "height": 136,
+        "left": 853,
+        "top": 144,
+        "right": 991,
+        "bottom": 280,
+        "center": [
+          922,
+          212
+        ]
+      }
+    },
+    {
+      "key": "configured_group:table_group",
+      "kind": "configured_group",
+      "id": "table_group",
+      "owner_frame_id": "game_table",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 720,
+        "left": 0,
+        "top": 0,
+        "right": 1280,
+        "bottom": 720,
+        "center": [
+          640,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 0,
+        "y": 0,
+        "width": 1280,
+        "height": 720,
+        "left": 0,
+        "top": 0,
+        "right": 1280,
+        "bottom": 720,
+        "center": [
+          640,
+          360
+        ]
+      }
+    },
+    {
+      "key": "configured_group:left_player",
+      "kind": "configured_group",
+      "id": "left_player",
+      "owner_frame_id": "left_player_portrait",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 20,
+        "y": 260,
+        "width": 200,
+        "height": 200,
+        "left": 20,
+        "top": 260,
+        "right": 220,
+        "bottom": 460,
+        "center": [
+          120,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 20,
+        "y": 260,
+        "width": 200,
+        "height": 200,
+        "left": 20,
+        "top": 260,
+        "right": 220,
+        "bottom": 460,
+        "center": [
+          120,
+          360
+        ]
+      }
+    },
+    {
+      "key": "configured_group:right_player",
+      "kind": "configured_group",
+      "id": "right_player",
+      "owner_frame_id": "right_player_portrait",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 1060,
+        "y": 260,
+        "width": 200,
+        "height": 200,
+        "left": 1060,
+        "top": 260,
+        "right": 1260,
+        "bottom": 460,
+        "center": [
+          1160,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 1060,
+        "y": 260,
+        "width": 200,
+        "height": 200,
+        "left": 1060,
+        "top": 260,
+        "right": 1260,
+        "bottom": 460,
+        "center": [
+          1160,
+          360
+        ]
+      }
+    },
+    {
+      "key": "configured_group:top_player",
+      "kind": "configured_group",
+      "id": "top_player",
+      "owner_frame_id": "top_player_portrait",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 540,
+        "y": 20,
+        "width": 200,
+        "height": 200,
+        "left": 540,
+        "top": 20,
+        "right": 740,
+        "bottom": 220,
+        "center": [
+          640,
+          120
+        ]
+      },
+      "hit_rect": {
+        "x": 540,
+        "y": 20,
+        "width": 200,
+        "height": 200,
+        "left": 540,
+        "top": 20,
+        "right": 740,
+        "bottom": 220,
+        "center": [
+          640,
+          120
+        ]
+      }
+    },
+    {
+      "key": "configured_group:bottom_player",
+      "kind": "configured_group",
+      "id": "bottom_player",
+      "owner_frame_id": "bottom_player_portrait",
+      "owner_activity_id": null,
+      "rect": {
+        "x": 540,
+        "y": 500,
+        "width": 200,
+        "height": 200,
+        "left": 540,
+        "top": 500,
+        "right": 740,
+        "bottom": 700,
+        "center": [
+          640,
+          600
+        ]
+      },
+      "hit_rect": {
+        "x": 540,
+        "y": 500,
+        "width": 200,
+        "height": 200,
+        "left": 540,
+        "top": 500,
+        "right": 740,
+        "bottom": 700,
+        "center": [
+          640,
+          600
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.0",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.0",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 88,
+        "y": 189,
+        "width": 97,
+        "height": 126,
+        "left": 88,
+        "top": 189,
+        "right": 185,
+        "bottom": 315,
+        "center": [
+          136,
+          252
+        ]
+      },
+      "hit_rect": {
+        "x": 88,
+        "y": 189,
+        "width": 97,
+        "height": 126,
+        "left": 88,
+        "top": 189,
+        "right": 185,
+        "bottom": 315,
+        "center": [
+          136,
+          252
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.1",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.1",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 98,
+        "y": 192,
+        "width": 110,
+        "height": 131,
+        "left": 98,
+        "top": 192,
+        "right": 208,
+        "bottom": 323,
+        "center": [
+          153,
+          257
+        ]
+      },
+      "hit_rect": {
+        "x": 98,
+        "y": 192,
+        "width": 110,
+        "height": 131,
+        "left": 98,
+        "top": 192,
+        "right": 208,
+        "bottom": 323,
+        "center": [
+          153,
+          257
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.2",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.2",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 109,
+        "y": 199,
+        "width": 120,
+        "height": 133,
+        "left": 109,
+        "top": 199,
+        "right": 229,
+        "bottom": 332,
+        "center": [
+          169,
+          265
+        ]
+      },
+      "hit_rect": {
+        "x": 109,
+        "y": 199,
+        "width": 120,
+        "height": 133,
+        "left": 109,
+        "top": 199,
+        "right": 229,
+        "bottom": 332,
+        "center": [
+          169,
+          265
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.3",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.3",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 119,
+        "y": 210,
+        "width": 127,
+        "height": 132,
+        "left": 119,
+        "top": 210,
+        "right": 246,
+        "bottom": 342,
+        "center": [
+          182,
+          276
+        ]
+      },
+      "hit_rect": {
+        "x": 119,
+        "y": 210,
+        "width": 127,
+        "height": 132,
+        "left": 119,
+        "top": 210,
+        "right": 246,
+        "bottom": 342,
+        "center": [
+          182,
+          276
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.4",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.4",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 129,
+        "y": 225,
+        "width": 132,
+        "height": 127,
+        "left": 129,
+        "top": 225,
+        "right": 261,
+        "bottom": 352,
+        "center": [
+          195,
+          288
+        ]
+      },
+      "hit_rect": {
+        "x": 129,
+        "y": 225,
+        "width": 132,
+        "height": 127,
+        "left": 129,
+        "top": 225,
+        "right": 261,
+        "bottom": 352,
+        "center": [
+          195,
+          288
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.5",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.5",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 138,
+        "y": 243,
+        "width": 133,
+        "height": 119,
+        "left": 138,
+        "top": 243,
+        "right": 271,
+        "bottom": 362,
+        "center": [
+          204,
+          302
+        ]
+      },
+      "hit_rect": {
+        "x": 138,
+        "y": 243,
+        "width": 133,
+        "height": 119,
+        "left": 138,
+        "top": 243,
+        "right": 271,
+        "bottom": 362,
+        "center": [
+          204,
+          302
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.6",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.6",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 148,
+        "y": 263,
+        "width": 131,
+        "height": 108,
+        "left": 148,
+        "top": 263,
+        "right": 279,
+        "bottom": 371,
+        "center": [
+          213,
+          317
+        ]
+      },
+      "hit_rect": {
+        "x": 148,
+        "y": 263,
+        "width": 131,
+        "height": 108,
+        "left": 148,
+        "top": 263,
+        "right": 279,
+        "bottom": 371,
+        "center": [
+          213,
+          317
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.7",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.7",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 155,
+        "y": 286,
+        "width": 125,
+        "height": 96,
+        "left": 155,
+        "top": 286,
+        "right": 280,
+        "bottom": 382,
+        "center": [
+          217,
+          334
+        ]
+      },
+      "hit_rect": {
+        "x": 155,
+        "y": 286,
+        "width": 125,
+        "height": 96,
+        "left": 155,
+        "top": 286,
+        "right": 280,
+        "bottom": 382,
+        "center": [
+          217,
+          334
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.8",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.8",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 162,
+        "y": 311,
+        "width": 117,
+        "height": 80,
+        "left": 162,
+        "top": 311,
+        "right": 279,
+        "bottom": 391,
+        "center": [
+          220,
+          351
+        ]
+      },
+      "hit_rect": {
+        "x": 162,
+        "y": 311,
+        "width": 117,
+        "height": 80,
+        "left": 162,
+        "top": 311,
+        "right": 279,
+        "bottom": 391,
+        "center": [
+          220,
+          351
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.9",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.9",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 162,
+        "y": 328,
+        "width": 117,
+        "height": 80,
+        "left": 162,
+        "top": 328,
+        "right": 279,
+        "bottom": 408,
+        "center": [
+          220,
+          368
+        ]
+      },
+      "hit_rect": {
+        "x": 162,
+        "y": 328,
+        "width": 117,
+        "height": 80,
+        "left": 162,
+        "top": 328,
+        "right": 279,
+        "bottom": 408,
+        "center": [
+          220,
+          368
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.10",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.10",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 155,
+        "y": 338,
+        "width": 125,
+        "height": 96,
+        "left": 155,
+        "top": 338,
+        "right": 280,
+        "bottom": 434,
+        "center": [
+          217,
+          386
+        ]
+      },
+      "hit_rect": {
+        "x": 155,
+        "y": 338,
+        "width": 125,
+        "height": 96,
+        "left": 155,
+        "top": 338,
+        "right": 280,
+        "bottom": 434,
+        "center": [
+          217,
+          386
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.11",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.11",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 148,
+        "y": 348,
+        "width": 131,
+        "height": 108,
+        "left": 148,
+        "top": 348,
+        "right": 279,
+        "bottom": 456,
+        "center": [
+          213,
+          402
+        ]
+      },
+      "hit_rect": {
+        "x": 148,
+        "y": 348,
+        "width": 131,
+        "height": 108,
+        "left": 148,
+        "top": 348,
+        "right": 279,
+        "bottom": 456,
+        "center": [
+          213,
+          402
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.12",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.12",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 138,
+        "y": 358,
+        "width": 133,
+        "height": 119,
+        "left": 138,
+        "top": 358,
+        "right": 271,
+        "bottom": 477,
+        "center": [
+          204,
+          417
+        ]
+      },
+      "hit_rect": {
+        "x": 138,
+        "y": 358,
+        "width": 133,
+        "height": 119,
+        "left": 138,
+        "top": 358,
+        "right": 271,
+        "bottom": 477,
+        "center": [
+          204,
+          417
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.13",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.13",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 129,
+        "y": 369,
+        "width": 132,
+        "height": 127,
+        "left": 129,
+        "top": 369,
+        "right": 261,
+        "bottom": 496,
+        "center": [
+          195,
+          432
+        ]
+      },
+      "hit_rect": {
+        "x": 129,
+        "y": 369,
+        "width": 132,
+        "height": 127,
+        "left": 129,
+        "top": 369,
+        "right": 261,
+        "bottom": 496,
+        "center": [
+          195,
+          432
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.14",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.14",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 119,
+        "y": 378,
+        "width": 127,
+        "height": 132,
+        "left": 119,
+        "top": 378,
+        "right": 246,
+        "bottom": 510,
+        "center": [
+          182,
+          444
+        ]
+      },
+      "hit_rect": {
+        "x": 119,
+        "y": 378,
+        "width": 127,
+        "height": 132,
+        "left": 119,
+        "top": 378,
+        "right": 246,
+        "bottom": 510,
+        "center": [
+          182,
+          444
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.15",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.15",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 109,
+        "y": 388,
+        "width": 120,
+        "height": 133,
+        "left": 109,
+        "top": 388,
+        "right": 229,
+        "bottom": 521,
+        "center": [
+          169,
+          454
+        ]
+      },
+      "hit_rect": {
+        "x": 109,
+        "y": 388,
+        "width": 120,
+        "height": 133,
+        "left": 109,
+        "top": 388,
+        "right": 229,
+        "bottom": 521,
+        "center": [
+          169,
+          454
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.16",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.16",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 98,
+        "y": 397,
+        "width": 110,
+        "height": 131,
+        "left": 98,
+        "top": 397,
+        "right": 208,
+        "bottom": 528,
+        "center": [
+          153,
+          462
+        ]
+      },
+      "hit_rect": {
+        "x": 98,
+        "y": 397,
+        "width": 110,
+        "height": 131,
+        "left": 98,
+        "top": 397,
+        "right": 208,
+        "bottom": 528,
+        "center": [
+          153,
+          462
+        ]
+      }
+    },
+    {
+      "key": "activity_group:left_player_hand.bot_hand.17",
+      "kind": "activity_group",
+      "id": "left_player_hand.bot_hand.17",
+      "owner_frame_id": "left_player_hand",
+      "owner_activity_id": "left_player_hand",
+      "rect": {
+        "x": 88,
+        "y": 405,
+        "width": 97,
+        "height": 126,
+        "left": 88,
+        "top": 405,
+        "right": 185,
+        "bottom": 531,
+        "center": [
+          136,
+          468
+        ]
+      },
+      "hit_rect": {
+        "x": 88,
+        "y": 405,
+        "width": 97,
+        "height": 126,
+        "left": 88,
+        "top": 405,
+        "right": 185,
+        "bottom": 531,
+        "center": [
+          136,
+          468
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.0",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.0",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 1087,
+        "y": 405,
+        "width": 97,
+        "height": 126,
+        "left": 1087,
+        "top": 405,
+        "right": 1184,
+        "bottom": 531,
+        "center": [
+          1135,
+          468
+        ]
+      },
+      "hit_rect": {
+        "x": 1087,
+        "y": 405,
+        "width": 97,
+        "height": 126,
+        "left": 1087,
+        "top": 405,
+        "right": 1184,
+        "bottom": 531,
+        "center": [
+          1135,
+          468
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.1",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.1",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 1064,
+        "y": 397,
+        "width": 110,
+        "height": 131,
+        "left": 1064,
+        "top": 397,
+        "right": 1174,
+        "bottom": 528,
+        "center": [
+          1119,
+          462
+        ]
+      },
+      "hit_rect": {
+        "x": 1064,
+        "y": 397,
+        "width": 110,
+        "height": 131,
+        "left": 1064,
+        "top": 397,
+        "right": 1174,
+        "bottom": 528,
+        "center": [
+          1119,
+          462
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.2",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.2",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 1043,
+        "y": 388,
+        "width": 120,
+        "height": 133,
+        "left": 1043,
+        "top": 388,
+        "right": 1163,
+        "bottom": 521,
+        "center": [
+          1103,
+          454
+        ]
+      },
+      "hit_rect": {
+        "x": 1043,
+        "y": 388,
+        "width": 120,
+        "height": 133,
+        "left": 1043,
+        "top": 388,
+        "right": 1163,
+        "bottom": 521,
+        "center": [
+          1103,
+          454
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.3",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.3",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 1025,
+        "y": 378,
+        "width": 127,
+        "height": 132,
+        "left": 1025,
+        "top": 378,
+        "right": 1152,
+        "bottom": 510,
+        "center": [
+          1088,
+          444
+        ]
+      },
+      "hit_rect": {
+        "x": 1025,
+        "y": 378,
+        "width": 127,
+        "height": 132,
+        "left": 1025,
+        "top": 378,
+        "right": 1152,
+        "bottom": 510,
+        "center": [
+          1088,
+          444
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.4",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.4",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 1012,
+        "y": 369,
+        "width": 132,
+        "height": 127,
+        "left": 1012,
+        "top": 369,
+        "right": 1144,
+        "bottom": 496,
+        "center": [
+          1078,
+          432
+        ]
+      },
+      "hit_rect": {
+        "x": 1012,
+        "y": 369,
+        "width": 132,
+        "height": 127,
+        "left": 1012,
+        "top": 369,
+        "right": 1144,
+        "bottom": 496,
+        "center": [
+          1078,
+          432
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.5",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.5",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 1001,
+        "y": 358,
+        "width": 133,
+        "height": 119,
+        "left": 1001,
+        "top": 358,
+        "right": 1134,
+        "bottom": 477,
+        "center": [
+          1067,
+          417
+        ]
+      },
+      "hit_rect": {
+        "x": 1001,
+        "y": 358,
+        "width": 133,
+        "height": 119,
+        "left": 1001,
+        "top": 358,
+        "right": 1134,
+        "bottom": 477,
+        "center": [
+          1067,
+          417
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.6",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.6",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 993,
+        "y": 348,
+        "width": 131,
+        "height": 108,
+        "left": 993,
+        "top": 348,
+        "right": 1124,
+        "bottom": 456,
+        "center": [
+          1058,
+          402
+        ]
+      },
+      "hit_rect": {
+        "x": 993,
+        "y": 348,
+        "width": 131,
+        "height": 108,
+        "left": 993,
+        "top": 348,
+        "right": 1124,
+        "bottom": 456,
+        "center": [
+          1058,
+          402
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.7",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.7",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 992,
+        "y": 338,
+        "width": 125,
+        "height": 96,
+        "left": 992,
+        "top": 338,
+        "right": 1117,
+        "bottom": 434,
+        "center": [
+          1054,
+          386
+        ]
+      },
+      "hit_rect": {
+        "x": 992,
+        "y": 338,
+        "width": 125,
+        "height": 96,
+        "left": 992,
+        "top": 338,
+        "right": 1117,
+        "bottom": 434,
+        "center": [
+          1054,
+          386
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.8",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.8",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 993,
+        "y": 328,
+        "width": 117,
+        "height": 80,
+        "left": 993,
+        "top": 328,
+        "right": 1110,
+        "bottom": 408,
+        "center": [
+          1051,
+          368
+        ]
+      },
+      "hit_rect": {
+        "x": 993,
+        "y": 328,
+        "width": 117,
+        "height": 80,
+        "left": 993,
+        "top": 328,
+        "right": 1110,
+        "bottom": 408,
+        "center": [
+          1051,
+          368
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.9",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.9",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 993,
+        "y": 311,
+        "width": 117,
+        "height": 80,
+        "left": 993,
+        "top": 311,
+        "right": 1110,
+        "bottom": 391,
+        "center": [
+          1051,
+          351
+        ]
+      },
+      "hit_rect": {
+        "x": 993,
+        "y": 311,
+        "width": 117,
+        "height": 80,
+        "left": 993,
+        "top": 311,
+        "right": 1110,
+        "bottom": 391,
+        "center": [
+          1051,
+          351
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.10",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.10",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 992,
+        "y": 286,
+        "width": 125,
+        "height": 96,
+        "left": 992,
+        "top": 286,
+        "right": 1117,
+        "bottom": 382,
+        "center": [
+          1054,
+          334
+        ]
+      },
+      "hit_rect": {
+        "x": 992,
+        "y": 286,
+        "width": 125,
+        "height": 96,
+        "left": 992,
+        "top": 286,
+        "right": 1117,
+        "bottom": 382,
+        "center": [
+          1054,
+          334
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.11",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.11",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 993,
+        "y": 263,
+        "width": 131,
+        "height": 108,
+        "left": 993,
+        "top": 263,
+        "right": 1124,
+        "bottom": 371,
+        "center": [
+          1058,
+          317
+        ]
+      },
+      "hit_rect": {
+        "x": 993,
+        "y": 263,
+        "width": 131,
+        "height": 108,
+        "left": 993,
+        "top": 263,
+        "right": 1124,
+        "bottom": 371,
+        "center": [
+          1058,
+          317
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.12",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.12",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 1001,
+        "y": 243,
+        "width": 133,
+        "height": 119,
+        "left": 1001,
+        "top": 243,
+        "right": 1134,
+        "bottom": 362,
+        "center": [
+          1067,
+          302
+        ]
+      },
+      "hit_rect": {
+        "x": 1001,
+        "y": 243,
+        "width": 133,
+        "height": 119,
+        "left": 1001,
+        "top": 243,
+        "right": 1134,
+        "bottom": 362,
+        "center": [
+          1067,
+          302
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.13",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.13",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 1012,
+        "y": 225,
+        "width": 132,
+        "height": 127,
+        "left": 1012,
+        "top": 225,
+        "right": 1144,
+        "bottom": 352,
+        "center": [
+          1078,
+          288
+        ]
+      },
+      "hit_rect": {
+        "x": 1012,
+        "y": 225,
+        "width": 132,
+        "height": 127,
+        "left": 1012,
+        "top": 225,
+        "right": 1144,
+        "bottom": 352,
+        "center": [
+          1078,
+          288
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.14",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.14",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 1025,
+        "y": 210,
+        "width": 127,
+        "height": 132,
+        "left": 1025,
+        "top": 210,
+        "right": 1152,
+        "bottom": 342,
+        "center": [
+          1088,
+          276
+        ]
+      },
+      "hit_rect": {
+        "x": 1025,
+        "y": 210,
+        "width": 127,
+        "height": 132,
+        "left": 1025,
+        "top": 210,
+        "right": 1152,
+        "bottom": 342,
+        "center": [
+          1088,
+          276
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.15",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.15",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 1043,
+        "y": 199,
+        "width": 120,
+        "height": 133,
+        "left": 1043,
+        "top": 199,
+        "right": 1163,
+        "bottom": 332,
+        "center": [
+          1103,
+          265
+        ]
+      },
+      "hit_rect": {
+        "x": 1043,
+        "y": 199,
+        "width": 120,
+        "height": 133,
+        "left": 1043,
+        "top": 199,
+        "right": 1163,
+        "bottom": 332,
+        "center": [
+          1103,
+          265
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.16",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.16",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 1064,
+        "y": 192,
+        "width": 110,
+        "height": 131,
+        "left": 1064,
+        "top": 192,
+        "right": 1174,
+        "bottom": 323,
+        "center": [
+          1119,
+          257
+        ]
+      },
+      "hit_rect": {
+        "x": 1064,
+        "y": 192,
+        "width": 110,
+        "height": 131,
+        "left": 1064,
+        "top": 192,
+        "right": 1174,
+        "bottom": 323,
+        "center": [
+          1119,
+          257
+        ]
+      }
+    },
+    {
+      "key": "activity_group:right_player_hand.bot_hand.17",
+      "kind": "activity_group",
+      "id": "right_player_hand.bot_hand.17",
+      "owner_frame_id": "right_player_hand",
+      "owner_activity_id": "right_player_hand",
+      "rect": {
+        "x": 1087,
+        "y": 189,
+        "width": 97,
+        "height": 126,
+        "left": 1087,
+        "top": 189,
+        "right": 1184,
+        "bottom": 315,
+        "center": [
+          1135,
+          252
+        ]
+      },
+      "hit_rect": {
+        "x": 1087,
+        "y": 189,
+        "width": 97,
+        "height": 126,
+        "left": 1087,
+        "top": 189,
+        "right": 1184,
+        "bottom": 315,
+        "center": [
+          1135,
+          252
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.0",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.0",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 685,
+        "y": 88,
+        "width": 126,
+        "height": 97,
+        "left": 685,
+        "top": 88,
+        "right": 811,
+        "bottom": 185,
+        "center": [
+          748,
+          136
+        ]
+      },
+      "hit_rect": {
+        "x": 685,
+        "y": 88,
+        "width": 126,
+        "height": 97,
+        "left": 685,
+        "top": 88,
+        "right": 811,
+        "bottom": 185,
+        "center": [
+          748,
+          136
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.1",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.1",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 677,
+        "y": 98,
+        "width": 131,
+        "height": 110,
+        "left": 677,
+        "top": 98,
+        "right": 808,
+        "bottom": 208,
+        "center": [
+          742,
+          153
+        ]
+      },
+      "hit_rect": {
+        "x": 677,
+        "y": 98,
+        "width": 131,
+        "height": 110,
+        "left": 677,
+        "top": 98,
+        "right": 808,
+        "bottom": 208,
+        "center": [
+          742,
+          153
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.2",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.2",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 668,
+        "y": 109,
+        "width": 133,
+        "height": 120,
+        "left": 668,
+        "top": 109,
+        "right": 801,
+        "bottom": 229,
+        "center": [
+          734,
+          169
+        ]
+      },
+      "hit_rect": {
+        "x": 668,
+        "y": 109,
+        "width": 133,
+        "height": 120,
+        "left": 668,
+        "top": 109,
+        "right": 801,
+        "bottom": 229,
+        "center": [
+          734,
+          169
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.3",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.3",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 658,
+        "y": 119,
+        "width": 132,
+        "height": 127,
+        "left": 658,
+        "top": 119,
+        "right": 790,
+        "bottom": 246,
+        "center": [
+          724,
+          182
+        ]
+      },
+      "hit_rect": {
+        "x": 658,
+        "y": 119,
+        "width": 132,
+        "height": 127,
+        "left": 658,
+        "top": 119,
+        "right": 790,
+        "bottom": 246,
+        "center": [
+          724,
+          182
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.4",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.4",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 649,
+        "y": 129,
+        "width": 127,
+        "height": 132,
+        "left": 649,
+        "top": 129,
+        "right": 776,
+        "bottom": 261,
+        "center": [
+          712,
+          195
+        ]
+      },
+      "hit_rect": {
+        "x": 649,
+        "y": 129,
+        "width": 127,
+        "height": 132,
+        "left": 649,
+        "top": 129,
+        "right": 776,
+        "bottom": 261,
+        "center": [
+          712,
+          195
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.5",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.5",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 638,
+        "y": 138,
+        "width": 119,
+        "height": 133,
+        "left": 638,
+        "top": 138,
+        "right": 757,
+        "bottom": 271,
+        "center": [
+          697,
+          204
+        ]
+      },
+      "hit_rect": {
+        "x": 638,
+        "y": 138,
+        "width": 119,
+        "height": 133,
+        "left": 638,
+        "top": 138,
+        "right": 757,
+        "bottom": 271,
+        "center": [
+          697,
+          204
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.6",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.6",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 628,
+        "y": 148,
+        "width": 108,
+        "height": 131,
+        "left": 628,
+        "top": 148,
+        "right": 736,
+        "bottom": 279,
+        "center": [
+          682,
+          213
+        ]
+      },
+      "hit_rect": {
+        "x": 628,
+        "y": 148,
+        "width": 108,
+        "height": 131,
+        "left": 628,
+        "top": 148,
+        "right": 736,
+        "bottom": 279,
+        "center": [
+          682,
+          213
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.7",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.7",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 618,
+        "y": 155,
+        "width": 96,
+        "height": 125,
+        "left": 618,
+        "top": 155,
+        "right": 714,
+        "bottom": 280,
+        "center": [
+          666,
+          217
+        ]
+      },
+      "hit_rect": {
+        "x": 618,
+        "y": 155,
+        "width": 96,
+        "height": 125,
+        "left": 618,
+        "top": 155,
+        "right": 714,
+        "bottom": 280,
+        "center": [
+          666,
+          217
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.8",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.8",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 608,
+        "y": 162,
+        "width": 80,
+        "height": 117,
+        "left": 608,
+        "top": 162,
+        "right": 688,
+        "bottom": 279,
+        "center": [
+          648,
+          220
+        ]
+      },
+      "hit_rect": {
+        "x": 608,
+        "y": 162,
+        "width": 80,
+        "height": 117,
+        "left": 608,
+        "top": 162,
+        "right": 688,
+        "bottom": 279,
+        "center": [
+          648,
+          220
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.9",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.9",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 591,
+        "y": 162,
+        "width": 80,
+        "height": 117,
+        "left": 591,
+        "top": 162,
+        "right": 671,
+        "bottom": 279,
+        "center": [
+          631,
+          220
+        ]
+      },
+      "hit_rect": {
+        "x": 591,
+        "y": 162,
+        "width": 80,
+        "height": 117,
+        "left": 591,
+        "top": 162,
+        "right": 671,
+        "bottom": 279,
+        "center": [
+          631,
+          220
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.10",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.10",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 566,
+        "y": 155,
+        "width": 96,
+        "height": 125,
+        "left": 566,
+        "top": 155,
+        "right": 662,
+        "bottom": 280,
+        "center": [
+          614,
+          217
+        ]
+      },
+      "hit_rect": {
+        "x": 566,
+        "y": 155,
+        "width": 96,
+        "height": 125,
+        "left": 566,
+        "top": 155,
+        "right": 662,
+        "bottom": 280,
+        "center": [
+          614,
+          217
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.11",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.11",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 543,
+        "y": 148,
+        "width": 108,
+        "height": 131,
+        "left": 543,
+        "top": 148,
+        "right": 651,
+        "bottom": 279,
+        "center": [
+          597,
+          213
+        ]
+      },
+      "hit_rect": {
+        "x": 543,
+        "y": 148,
+        "width": 108,
+        "height": 131,
+        "left": 543,
+        "top": 148,
+        "right": 651,
+        "bottom": 279,
+        "center": [
+          597,
+          213
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.12",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.12",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 523,
+        "y": 138,
+        "width": 119,
+        "height": 133,
+        "left": 523,
+        "top": 138,
+        "right": 642,
+        "bottom": 271,
+        "center": [
+          582,
+          204
+        ]
+      },
+      "hit_rect": {
+        "x": 523,
+        "y": 138,
+        "width": 119,
+        "height": 133,
+        "left": 523,
+        "top": 138,
+        "right": 642,
+        "bottom": 271,
+        "center": [
+          582,
+          204
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.13",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.13",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 505,
+        "y": 129,
+        "width": 127,
+        "height": 132,
+        "left": 505,
+        "top": 129,
+        "right": 632,
+        "bottom": 261,
+        "center": [
+          568,
+          195
+        ]
+      },
+      "hit_rect": {
+        "x": 505,
+        "y": 129,
+        "width": 127,
+        "height": 132,
+        "left": 505,
+        "top": 129,
+        "right": 632,
+        "bottom": 261,
+        "center": [
+          568,
+          195
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.14",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.14",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 490,
+        "y": 119,
+        "width": 132,
+        "height": 127,
+        "left": 490,
+        "top": 119,
+        "right": 622,
+        "bottom": 246,
+        "center": [
+          556,
+          182
+        ]
+      },
+      "hit_rect": {
+        "x": 490,
+        "y": 119,
+        "width": 132,
+        "height": 127,
+        "left": 490,
+        "top": 119,
+        "right": 622,
+        "bottom": 246,
+        "center": [
+          556,
+          182
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.15",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.15",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 479,
+        "y": 109,
+        "width": 133,
+        "height": 120,
+        "left": 479,
+        "top": 109,
+        "right": 612,
+        "bottom": 229,
+        "center": [
+          545,
+          169
+        ]
+      },
+      "hit_rect": {
+        "x": 479,
+        "y": 109,
+        "width": 133,
+        "height": 120,
+        "left": 479,
+        "top": 109,
+        "right": 612,
+        "bottom": 229,
+        "center": [
+          545,
+          169
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.16",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.16",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 472,
+        "y": 98,
+        "width": 131,
+        "height": 110,
+        "left": 472,
+        "top": 98,
+        "right": 603,
+        "bottom": 208,
+        "center": [
+          537,
+          153
+        ]
+      },
+      "hit_rect": {
+        "x": 472,
+        "y": 98,
+        "width": 131,
+        "height": 110,
+        "left": 472,
+        "top": 98,
+        "right": 603,
+        "bottom": 208,
+        "center": [
+          537,
+          153
+        ]
+      }
+    },
+    {
+      "key": "activity_group:top_player_hand.bot_hand.17",
+      "kind": "activity_group",
+      "id": "top_player_hand.bot_hand.17",
+      "owner_frame_id": "top_player_hand",
+      "owner_activity_id": "top_player_hand",
+      "rect": {
+        "x": 469,
+        "y": 88,
+        "width": 126,
+        "height": 97,
+        "left": 469,
+        "top": 88,
+        "right": 595,
+        "bottom": 185,
+        "center": [
+          532,
+          136
+        ]
+      },
+      "hit_rect": {
+        "x": 469,
+        "y": 88,
+        "width": 126,
+        "height": 97,
+        "left": 469,
+        "top": 88,
+        "right": 595,
+        "bottom": 185,
+        "center": [
+          532,
+          136
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.17",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.17",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 336,
+        "y": 503,
+        "width": 184,
+        "height": 192,
+        "left": 336,
+        "top": 503,
+        "right": 520,
+        "bottom": 695,
+        "center": [
+          428,
+          599
+        ]
+      },
+      "hit_rect": {
+        "x": 336,
+        "y": 503,
+        "width": 184,
+        "height": 192,
+        "left": 336,
+        "top": 503,
+        "right": 520,
+        "bottom": 695,
+        "center": [
+          428,
+          599
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.15",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.15",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 360,
+        "y": 486,
+        "width": 179,
+        "height": 193,
+        "left": 360,
+        "top": 486,
+        "right": 539,
+        "bottom": 679,
+        "center": [
+          449,
+          582
+        ]
+      },
+      "hit_rect": {
+        "x": 360,
+        "y": 486,
+        "width": 179,
+        "height": 193,
+        "left": 360,
+        "top": 486,
+        "right": 539,
+        "bottom": 679,
+        "center": [
+          449,
+          582
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.13",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.13",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 386,
+        "y": 472,
+        "width": 173,
+        "height": 192,
+        "left": 386,
+        "top": 472,
+        "right": 559,
+        "bottom": 664,
+        "center": [
+          472,
+          568
+        ]
+      },
+      "hit_rect": {
+        "x": 386,
+        "y": 472,
+        "width": 173,
+        "height": 192,
+        "left": 386,
+        "top": 472,
+        "right": 559,
+        "bottom": 664,
+        "center": [
+          472,
+          568
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.11",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.11",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 414,
+        "y": 460,
+        "width": 165,
+        "height": 190,
+        "left": 414,
+        "top": 460,
+        "right": 579,
+        "bottom": 650,
+        "center": [
+          496,
+          555
+        ]
+      },
+      "hit_rect": {
+        "x": 414,
+        "y": 460,
+        "width": 165,
+        "height": 190,
+        "left": 414,
+        "top": 460,
+        "right": 579,
+        "bottom": 650,
+        "center": [
+          496,
+          555
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.9",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.9",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 443,
+        "y": 451,
+        "width": 156,
+        "height": 188,
+        "left": 443,
+        "top": 451,
+        "right": 599,
+        "bottom": 639,
+        "center": [
+          521,
+          545
+        ]
+      },
+      "hit_rect": {
+        "x": 443,
+        "y": 451,
+        "width": 156,
+        "height": 188,
+        "left": 443,
+        "top": 451,
+        "right": 599,
+        "bottom": 639,
+        "center": [
+          521,
+          545
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.6",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.6",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 474,
+        "y": 444,
+        "width": 147,
+        "height": 184,
+        "left": 474,
+        "top": 444,
+        "right": 621,
+        "bottom": 628,
+        "center": [
+          547,
+          536
+        ]
+      },
+      "hit_rect": {
+        "x": 474,
+        "y": 444,
+        "width": 147,
+        "height": 184,
+        "left": 474,
+        "top": 444,
+        "right": 621,
+        "bottom": 628,
+        "center": [
+          547,
+          536
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.4",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.4",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 504,
+        "y": 441,
+        "width": 137,
+        "height": 178,
+        "left": 504,
+        "top": 441,
+        "right": 641,
+        "bottom": 619,
+        "center": [
+          572,
+          530
+        ]
+      },
+      "hit_rect": {
+        "x": 504,
+        "y": 441,
+        "width": 137,
+        "height": 178,
+        "left": 504,
+        "top": 441,
+        "right": 641,
+        "bottom": 619,
+        "center": [
+          572,
+          530
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.3",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.3",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 538,
+        "y": 439,
+        "width": 125,
+        "height": 172,
+        "left": 538,
+        "top": 439,
+        "right": 663,
+        "bottom": 611,
+        "center": [
+          600,
+          525
+        ]
+      },
+      "hit_rect": {
+        "x": 538,
+        "y": 439,
+        "width": 125,
+        "height": 172,
+        "left": 538,
+        "top": 439,
+        "right": 663,
+        "bottom": 611,
+        "center": [
+          600,
+          525
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.1",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.1",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 570,
+        "y": 441,
+        "width": 113,
+        "height": 164,
+        "left": 570,
+        "top": 441,
+        "right": 683,
+        "bottom": 605,
+        "center": [
+          626,
+          523
+        ]
+      },
+      "hit_rect": {
+        "x": 570,
+        "y": 441,
+        "width": 113,
+        "height": 164,
+        "left": 570,
+        "top": 441,
+        "right": 683,
+        "bottom": 605,
+        "center": [
+          626,
+          523
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.0",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.0",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 598,
+        "y": 441,
+        "width": 113,
+        "height": 164,
+        "left": 598,
+        "top": 441,
+        "right": 711,
+        "bottom": 605,
+        "center": [
+          654,
+          523
+        ]
+      },
+      "hit_rect": {
+        "x": 598,
+        "y": 441,
+        "width": 113,
+        "height": 164,
+        "left": 598,
+        "top": 441,
+        "right": 711,
+        "bottom": 605,
+        "center": [
+          654,
+          523
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.2",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.2",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 618,
+        "y": 439,
+        "width": 125,
+        "height": 172,
+        "left": 618,
+        "top": 439,
+        "right": 743,
+        "bottom": 611,
+        "center": [
+          680,
+          525
+        ]
+      },
+      "hit_rect": {
+        "x": 618,
+        "y": 439,
+        "width": 125,
+        "height": 172,
+        "left": 618,
+        "top": 439,
+        "right": 743,
+        "bottom": 611,
+        "center": [
+          680,
+          525
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.5",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.5",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 638,
+        "y": 441,
+        "width": 137,
+        "height": 178,
+        "left": 638,
+        "top": 441,
+        "right": 775,
+        "bottom": 619,
+        "center": [
+          706,
+          530
+        ]
+      },
+      "hit_rect": {
+        "x": 638,
+        "y": 441,
+        "width": 137,
+        "height": 178,
+        "left": 638,
+        "top": 441,
+        "right": 775,
+        "bottom": 619,
+        "center": [
+          706,
+          530
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.7",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.7",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 660,
+        "y": 444,
+        "width": 147,
+        "height": 184,
+        "left": 660,
+        "top": 444,
+        "right": 807,
+        "bottom": 628,
+        "center": [
+          733,
+          536
+        ]
+      },
+      "hit_rect": {
+        "x": 660,
+        "y": 444,
+        "width": 147,
+        "height": 184,
+        "left": 660,
+        "top": 444,
+        "right": 807,
+        "bottom": 628,
+        "center": [
+          733,
+          536
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.8",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.8",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 681,
+        "y": 451,
+        "width": 156,
+        "height": 188,
+        "left": 681,
+        "top": 451,
+        "right": 837,
+        "bottom": 639,
+        "center": [
+          759,
+          545
+        ]
+      },
+      "hit_rect": {
+        "x": 681,
+        "y": 451,
+        "width": 156,
+        "height": 188,
+        "left": 681,
+        "top": 451,
+        "right": 837,
+        "bottom": 639,
+        "center": [
+          759,
+          545
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.10",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.10",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 702,
+        "y": 460,
+        "width": 165,
+        "height": 190,
+        "left": 702,
+        "top": 460,
+        "right": 867,
+        "bottom": 650,
+        "center": [
+          784,
+          555
+        ]
+      },
+      "hit_rect": {
+        "x": 702,
+        "y": 460,
+        "width": 165,
+        "height": 190,
+        "left": 702,
+        "top": 460,
+        "right": 867,
+        "bottom": 650,
+        "center": [
+          784,
+          555
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.12",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.12",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 722,
+        "y": 472,
+        "width": 173,
+        "height": 192,
+        "left": 722,
+        "top": 472,
+        "right": 895,
+        "bottom": 664,
+        "center": [
+          808,
+          568
+        ]
+      },
+      "hit_rect": {
+        "x": 722,
+        "y": 472,
+        "width": 173,
+        "height": 192,
+        "left": 722,
+        "top": 472,
+        "right": 895,
+        "bottom": 664,
+        "center": [
+          808,
+          568
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.14",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.14",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 742,
+        "y": 486,
+        "width": 179,
+        "height": 193,
+        "left": 742,
+        "top": 486,
+        "right": 921,
+        "bottom": 679,
+        "center": [
+          831,
+          582
+        ]
+      },
+      "hit_rect": {
+        "x": 742,
+        "y": 486,
+        "width": 179,
+        "height": 193,
+        "left": 742,
+        "top": 486,
+        "right": 921,
+        "bottom": 679,
+        "center": [
+          831,
+          582
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.16",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.16",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
+        "x": 760,
+        "y": 503,
+        "width": 184,
+        "height": 192,
+        "left": 760,
+        "top": 503,
+        "right": 944,
+        "bottom": 695,
+        "center": [
+          852,
+          599
+        ]
+      },
+      "hit_rect": {
+        "x": 760,
+        "y": 503,
+        "width": 184,
+        "height": 192,
+        "left": 760,
+        "top": 503,
+        "right": 944,
+        "bottom": 695,
+        "center": [
+          852,
+          599
+        ]
+      }
+    },
+    {
+      "key": "activity_group:deck_frame.card_back",
+      "kind": "activity_group",
+      "id": "deck_frame.card_back",
+      "owner_frame_id": "deck_frame",
+      "owner_activity_id": "deck_frame",
+      "rect": {
+        "x": 857,
+        "y": 20,
+        "width": 103,
+        "height": 160,
+        "left": 857,
+        "top": 20,
+        "right": 960,
+        "bottom": 180,
+        "center": [
+          908,
+          100
+        ]
+      },
+      "hit_rect": {
+        "x": 857,
+        "y": 20,
+        "width": 103,
+        "height": 160,
+        "left": 857,
+        "top": 20,
+        "right": 960,
+        "bottom": 180,
+        "center": [
+          908,
+          100
+        ]
+      }
+    },
+    {
+      "key": "fan_occupied:left_player_hand",
+      "kind": "fan_occupied",
+      "id": "left_player_hand",
+      "owner_frame_id": null,
+      "owner_activity_id": null,
+      "rect": {
+        "x": 88,
+        "y": 189,
+        "width": 192,
+        "height": 342,
+        "left": 88,
+        "top": 189,
+        "right": 280,
+        "bottom": 531,
+        "center": [
+          184,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 88,
+        "y": 189,
+        "width": 192,
+        "height": 342,
+        "left": 88,
+        "top": 189,
+        "right": 280,
+        "bottom": 531,
+        "center": [
+          184,
+          360
+        ]
+      }
+    },
+    {
+      "key": "fan_occupied:right_player_hand",
+      "kind": "fan_occupied",
+      "id": "right_player_hand",
+      "owner_frame_id": null,
+      "owner_activity_id": null,
+      "rect": {
+        "x": 992,
+        "y": 189,
+        "width": 192,
+        "height": 342,
+        "left": 992,
+        "top": 189,
+        "right": 1184,
+        "bottom": 531,
+        "center": [
+          1088,
+          360
+        ]
+      },
+      "hit_rect": {
+        "x": 992,
+        "y": 189,
+        "width": 192,
+        "height": 342,
+        "left": 992,
+        "top": 189,
+        "right": 1184,
+        "bottom": 531,
+        "center": [
+          1088,
+          360
+        ]
+      }
+    },
+    {
+      "key": "fan_occupied:top_player_hand",
+      "kind": "fan_occupied",
+      "id": "top_player_hand",
+      "owner_frame_id": null,
+      "owner_activity_id": null,
+      "rect": {
+        "x": 469,
+        "y": 88,
+        "width": 342,
+        "height": 192,
+        "left": 469,
+        "top": 88,
+        "right": 811,
+        "bottom": 280,
+        "center": [
+          640,
+          184
+        ]
+      },
+      "hit_rect": {
+        "x": 469,
+        "y": 88,
+        "width": 342,
+        "height": 192,
+        "left": 469,
+        "top": 88,
+        "right": 811,
+        "bottom": 280,
+        "center": [
+          640,
+          184
+        ]
+      }
+    }
+  ],
+  "collision_subject_keys": [
+    "frame:cards_slot_frame",
+    "frame:deck_frame",
+    "frame:cards_slot_frame_2",
+    "frame:cards_slot_frame_3",
+    "frame:cards_slot_frame_4",
+    "frame:cards_slot_frame_5",
+    "frame:cards_slot_frame_6",
+    "frame:cards_slot_frame_7"
+  ],
+  "ignored_collision_keys": [],
+  "ignored_collision_pairs": [],
+  "outside_screen": [],
+  "overlaps": [
+    {
+      "first_key": "frame:deck_frame",
+      "second_key": "frame:cards_slot_frame_7",
+      "intersection": {
+        "x": 857,
+        "y": 144,
+        "width": 103,
+        "height": 36,
+        "left": 857,
+        "top": 144,
+        "right": 960,
+        "bottom": 180,
+        "center": [
+          908,
+          162
+        ]
+      },
+      "area": 3708,
+      "severity": "P1"
+    }
+  ],
+  "violations": [
+    {
+      "first_key": "frame:deck_frame",
+      "second_key": "frame:cards_slot_frame_7",
+      "intersection": {
+        "x": 857,
+        "y": 144,
+        "width": 103,
+        "height": 36,
+        "left": 857,
+        "top": 144,
+        "right": 960,
+        "bottom": 180,
+        "center": [
+          908,
+          162
+        ]
+      },
+      "area": 3708,
+      "severity": "P1"
+    }
+  ]
+}

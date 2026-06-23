@@ -103,6 +103,21 @@ class VisibleCardsHandDecorator(Activity):
             self.hand_activity.sync_visual_groups()
             self.hand_activity.apply_fan_layout()
 
+    def remove_card_by_group_id(self, group_id):
+        """Remove one visual card while preserving the wrapper card list order."""
+        for group in self.hand_activity.iter_generated_groups():
+            if group.id != group_id:
+                continue
+            context = self.hand_activity.get_card_selection_context(group)
+            index = context.get("hand_index") if context is not None else None
+            if index is None or not 0 <= index < len(self.card_resource_keys):
+                return False
+            cards = list(self.card_resource_keys)
+            cards.pop(index)
+            self.set_cards(cards, force=True)
+            return True
+        return False
+
     def get_card_resource_key(self, index):
         if index < 0 or index >= len(self.card_resource_keys):
             raise RuntimeError("VisibleCardsHandDecorator card index is out of range")

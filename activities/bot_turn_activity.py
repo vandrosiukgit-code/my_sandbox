@@ -28,6 +28,9 @@ class BotTurnActivity(Activity):
         clear_between_bots=True,
         slot_card_positions=None,
         hand_action_types=None,
+        bot_card_resource_key=None,
+        freeze_slot_layout=None,
+        release_slot_layout=None,
     ):
         super().__init__(duration=0.0)
         self.bot_hand_ids = tuple(bot_hand_ids or ())
@@ -39,6 +42,10 @@ class BotTurnActivity(Activity):
         self.clear_between_bots = bool(clear_between_bots)
         self.slot_card_positions = tuple(slot_card_positions or self.SLOT_CARD_POSITIONS)
         self.hand_action_types = dict(hand_action_types or {})
+        self.bot_card_resource_key = bot_card_resource_key
+        self.freeze_slot_layout = freeze_slot_layout
+        self.release_slot_layout = release_slot_layout
+        self.slot_layout_frozen = False
         self.pending_steps = []
         self.current_action = None
         self.current_step = None
@@ -49,14 +56,21 @@ class BotTurnActivity(Activity):
 
     def start(self):
         super().start()
-        self.pending_steps = self.build_steps()
-        self.current_action = None
-        self.current_step = None
-        self.current_phase = None
-        self.flight_groups = []
-        self.pending_source_removals = []
-        self.next_flight_group_index = 0
-        self.start_next_step()
+        if callable(self.freeze_slot_layout):
+            self.freeze_slot_layout()
+            self.slot_layout_frozen = True
+        try:
+            self.pending_steps = self.build_steps()
+            self.current_action = None
+            self.current_step = None
+            self.current_phase = None
+            self.flight_groups = []
+            self.pending_source_removals = []
+            self.next_flight_group_index = 0
+            self.start_next_step()
+        except Exception:
+            self.finish()
+            raise
 
     def update(self, dt):
         if self._finished:
@@ -136,6 +150,10 @@ class BotTurnActivity(Activity):
         return None
 
     def reset_table_overlay(self):
+        play_area_slots_activity = self.resolve_play_area_slots_activity()
+        if play_area_slots_activity is not None and hasattr(play_area_slots_activity, "clear_slot_cards"):
+            play_area_slots_activity.clear_slot_cards()
+            return
         self.hide_table_slot_cards()
 
     def create_selection_action_for_step(self, step):
@@ -181,16 +199,17 @@ class BotTurnActivity(Activity):
             )
         source_geometry = self.get_group_card_screen_geometry(hand_activity, source_group)
         slot_card_index = self.get_slot_card_position_index(step["slot_card_position"])
-        target_geometry = self.resolve_slot_card_screen_geometry(
-            step["target_slot_id"],
-            step["slot_card_position"],
-            fallback_geometry=source_geometry,
-        )
         back_resource_key, face_resource_key = self.resolve_card_flight_resource_keys(
             hand_activity,
             source_group,
             step["target_slot_id"],
             slot_card_index,
+        )
+        target_geometry = self.resolve_slot_card_screen_geometry(
+            step["target_slot_id"],
+            step["slot_card_position"],
+            fallback_geometry=source_geometry,
+            resource_key=face_resource_key,
         )
         group_id = self.get_next_flight_group_id()
         action_class = self.get_card_play_action_class(step["bot_hand_id"])
@@ -205,6 +224,7 @@ class BotTurnActivity(Activity):
                 source_group,
                 step["target_slot_id"],
                 slot_card_index,
+                face_resource_key,
             ),
         )
         if action_class is BotCardPlayAction:
@@ -290,6 +310,10 @@ class BotTurnActivity(Activity):
             return None
         return self.get_frame(frame_id)
 
+    def resolve_play_area_slots_activity(self):
+        activity = self.resolve_activity("play_area_frame")
+        return getattr(activity, "play_area_slots_activity", activity)
+
     def get_next_flight_group_id(self):
         self.next_flight_group_index += 1
         return f"bot_turn.flight_card.{self.next_flight_group_index}"
@@ -308,7 +332,7 @@ class BotTurnActivity(Activity):
 
     def resolve_card_flight_resource_keys(self, hand_activity, source_group, slot_id, slot_card_index):
         back_resource_key = self.resolve_group_resource_key(hand_activity, source_group)
-        face_resource_key = self.resolve_slot_card_resource_key(slot_id, slot_card_index)
+        face_resource_key = self.bot_card_resource_key or self.resolve_slot_card_resource_key(slot_id, slot_card_index)
         return back_resource_key, face_resource_key or back_resource_key
 
     def resolve_slot_card_resource_key(self, slot_id, slot_card_index):
@@ -346,9 +370,18 @@ class BotTurnActivity(Activity):
             if slot_activity is not None and hasattr(slot_activity, "set_all_card_visual_states"):
                 slot_activity.set_all_card_visual_states("hidden")
 
-    def land_flight_group(self, group, bot_hand_id, source_group, slot_id, slot_card_index):
+    def land_flight_group(self, group, bot_hand_id, source_group, slot_id, slot_card_index, resource_key):
         self.remove_flight_group(group)
         self.pending_source_removals.append((bot_hand_id, source_group))
+        play_area_slots_activity = self.resolve_play_area_slots_activity()
+        if play_area_slots_activity is not None and hasattr(play_area_slots_activity, "place_player_card"):
+            play_area_slots_activity.place_player_card(
+                {
+                    "resource_key": resource_key,
+                    "target_slot_id": slot_id,
+                }
+            )
+            return
         slot_activity = self.resolve_activity(slot_id)
         if slot_activity is not None and hasattr(slot_activity, "set_card_visual_state"):
             slot_activity.set_card_visual_state(slot_card_index, "visible")
@@ -372,23 +405,40 @@ class BotTurnActivity(Activity):
         return tuple(self.flight_groups)
 
     def finish(self):
-        if self.current_action is not None and not self._is_finished(self.current_action):
-            if hasattr(self.current_action, "cancel"):
-                self.current_action.cancel()
-        self.current_action = None
-        self.current_step = None
-        self.current_phase = None
-        self.pending_steps = []
-        self.flight_groups = []
-        self.pending_source_removals = []
-        super().finish()
+        try:
+            if self.current_action is not None and not self._is_finished(self.current_action):
+                if hasattr(self.current_action, "cancel"):
+                    self.current_action.cancel()
+            self.current_action = None
+            self.current_step = None
+            self.current_phase = None
+            self.pending_steps = []
+            self.flight_groups = []
+            self.pending_source_removals = []
+        finally:
+            if self.slot_layout_frozen and callable(self.release_slot_layout):
+                self.release_slot_layout()
+            self.slot_layout_frozen = False
+            super().finish()
 
     def resolve_slot_card_screen_geometry(
         self,
         slot_id,
         slot_card_position,
         fallback_geometry=None,
+        resource_key=None,
     ):
+        play_area_slots_activity = self.resolve_play_area_slots_activity()
+        if play_area_slots_activity is not None and hasattr(play_area_slots_activity, "get_player_turn_target_screen_geometry"):
+            geometry = play_area_slots_activity.get_player_turn_target_screen_geometry(
+                {
+                    "resource_key": resource_key,
+                    "target_slot_id": slot_id,
+                }
+            )
+            if geometry is not None:
+                return geometry
+
         slot_activity = self.resolve_activity(slot_id)
         index = self.get_slot_card_position_index(slot_card_position)
         if slot_activity is not None and hasattr(slot_activity, "get_card_screen_geometry"):

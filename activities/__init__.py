@@ -9,6 +9,7 @@ from activities.bot_hand_activity import BotHandActivity
 from activities.bot_turn_activity import BotTurnActivity
 from activities.card_selection_activity import CardSelectionActivity
 from activities.cards_slot_activity import CardsSlotActivityDecorator
+from activities.deck_activity import DeckActivity
 from activities.player_hand_activity import PlayerHandActivity
 from activities.player_turn_activity import PlayerTurnActivity
 from activities.play_area_slots_activity import PlayAreaSlotsActivity
@@ -20,6 +21,7 @@ __all__ = [
     "BotTurnActivity",
     "CardSelectionActivity",
     "CardsSlotActivityDecorator",
+    "DeckActivity",
     "PlayerHandActivity",
     "PlayerTurnActivity",
     "PlayAreaSlotsActivity",

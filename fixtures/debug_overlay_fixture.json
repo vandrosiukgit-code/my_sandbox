@@ -3,7 +3,7 @@
     "enabled": true,
     "frames": true,
     "groups": false,
-    "activities": false,
+    "activities": true,
     "frame_depths": [2],
     "frame_id_prefixes": ["cards_slot_frame"]
   }

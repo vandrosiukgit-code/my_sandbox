@@ -202,6 +202,10 @@ class GameScreen(BaseGameScreen):
         """Yield stable screen-local activity IDs with their activities."""
         return tuple(self.hand_activities.items())
 
+    def iter_screen_frames(self):
+        """Yield screen-owned Frames without exposing their registry for mutation."""
+        return tuple(self.screen_frames.values())
+
     def handle_event(self, event):
         """Normalize pygame input and forward it to GameController."""
         input_event = self.build_input_event(event)

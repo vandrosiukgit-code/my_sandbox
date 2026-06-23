@@ -7,6 +7,7 @@ from activities import (
     BotHandActivity,
     CardSelectionActivity,
     CardsSlotActivityDecorator,
+    DeckActivity,
     PlayerHandActivity,
     PlayerTurnActivity,
     PlayAreaSlotsActivity,
@@ -32,7 +33,10 @@ class TableScreen(GameScreen):
     SIDE_PLAYER_FRAME_SIZE = (260, 300)
     CENTER_PLAYER_FRAME_SIZE = (300, 260)
     PORTRAIT_FRAME_SIZE = (200, 200)
+    DECK_FRAME_SIZE = (103, 160)
+    DECK_RIGHT_GUTTER = 60
     CARD_SLOT_FRAME_SIZE_RATIO = (0.72, 0.53)
+    SIDE_HAND_SLOT_GUTTER = 80
     BOTTOM_PLAYER_HAND_PROBE_ENABLED = False
     BOTTOM_PLAYER_HAND_PROBE_COLOR = (255, 0, 0)
     BOTTOM_PLAYER_HAND_PROBE_BOTTOM_OFFSET = 50
@@ -47,6 +51,7 @@ class TableScreen(GameScreen):
         self.create_frame("game_table", rect=(0, 0, 1280, 720))
         self.create_frame("play_area_frame", rect=self.rect_from_size(self.calculate_play_area_size())).set_rect_visibility(False)
         self.create_frame("cards_slot_frame", rect=self.rect_from_size(self.calculate_card_slot_frame_size())).set_rect_visibility(False)
+        self.create_frame("deck_frame", rect=self.rect_from_size(self.DECK_FRAME_SIZE)).set_rect_visibility(False)
 
         self.create_frame("left_player_frame", rect=self.rect_from_size(self.SIDE_PLAYER_FRAME_SIZE))
         self.create_frame("left_player_portrait", rect=self.rect_from_size(self.PORTRAIT_FRAME_SIZE))
@@ -67,6 +72,7 @@ class TableScreen(GameScreen):
         self.layout_play_area_frames()
 
         self.layout_player_frames()
+        self.layout_deck_frame()
 
         self.put_configured_group("table_group", "game_table", position=(0, 0))
         self.put_configured_group("left_player", "left_player_portrait", position=(0, 0))
@@ -75,6 +81,10 @@ class TableScreen(GameScreen):
         self.put_configured_group("bottom_player", "bottom_player_portrait", position=(0, 0))
 
         cards_slot_activity = self.create_cards_slot_activity(self.get_screen_frame("cards_slot_frame"))
+        deck_activity = DeckActivity(
+            frame=self.get_screen_frame("deck_frame"),
+            resource_manager=ResourceManager,
+        )
         play_area_slots_activity = PlayAreaSlotsActivity(
             screen=self,
             play_area_frame=self.get_screen_frame("play_area_frame"),
@@ -82,7 +92,12 @@ class TableScreen(GameScreen):
             prototype_slot_activity=cards_slot_activity,
             slot_activity_factory=self.create_cards_slot_activity,
         )
-        player_turn_activity = PlayerTurnActivity(play_area_slots_activity)
+        player_turn_activity = PlayerTurnActivity(
+            play_area_slots_activity,
+            freeze_slot_layout=self.freeze_play_area_slot_layout,
+            release_slot_layout=self.release_play_area_slot_layout,
+            remove_source_card=self.remove_bottom_player_hand_card,
+        )
         bottom_player_hand_activity = CardSelectionActivity(
             VisibleCardsHandDecorator(
                 PlayerHandActivity(
@@ -139,7 +154,10 @@ class TableScreen(GameScreen):
             "bottom_player_hand": bottom_player_hand_activity,
             "play_area_frame": player_turn_activity,
             "cards_slot_frame": cards_slot_activity,
+            "deck_frame": deck_activity,
         }
+        self._play_area_slot_layout_lock_depth = 0
+        self._locked_play_area_slot_horizontal_local_bounds = None
         for activity_id, activity in activity_map.items():
             self.register_named_activity(activity_id, activity)
             self.add_activity(activity)
@@ -205,6 +223,15 @@ class TableScreen(GameScreen):
             "cards_slot_frame",
             "play_area_frame",
             position=self.center_child(play_area_size, card_slot_size),
+        )
+
+    def layout_deck_frame(self):
+        deck_width, _deck_height = self.DECK_FRAME_SIZE
+        right_player_left = self.SCREEN_SIZE[0] - self.SIDE_PLAYER_FRAME_SIZE[0]
+        self.put_frame_in_frame(
+            "deck_frame",
+            "game_table",
+            position=(right_player_left - deck_width - self.DECK_RIGHT_GUTTER, self.PLAY_AREA_INSET),
         )
 
     def calculate_play_area_size(self):
@@ -291,6 +318,62 @@ class TableScreen(GameScreen):
         left = self.PLAY_AREA_INSET
         top = self.PLAY_AREA_INSET
         return left, top, left + play_area_width, top + play_area_height
+
+    def get_play_area_slot_horizontal_local_bounds(self, play_area_frame):
+        """Return frame-local horizontal bounds reserved for table card slots."""
+        if self._locked_play_area_slot_horizontal_local_bounds is not None:
+            return self._locked_play_area_slot_horizontal_local_bounds
+
+        return self.calculate_play_area_slot_horizontal_local_bounds(play_area_frame)
+
+    def freeze_play_area_slot_layout(self):
+        """Keep slot geometry stable while a visual turn changes hand occupancy."""
+        if self._play_area_slot_layout_lock_depth == 0:
+            play_area_frame = self.get_screen_frame("play_area_frame")
+            self._locked_play_area_slot_horizontal_local_bounds = (
+                self.calculate_play_area_slot_horizontal_local_bounds(play_area_frame)
+            )
+        self._play_area_slot_layout_lock_depth += 1
+
+    def release_play_area_slot_layout(self):
+        """Allow slot geometry to reflect the settled visual hand layout."""
+        if self._play_area_slot_layout_lock_depth <= 0:
+            return
+        self._play_area_slot_layout_lock_depth -= 1
+        if self._play_area_slot_layout_lock_depth == 0:
+            self._locked_play_area_slot_horizontal_local_bounds = None
+
+    def calculate_play_area_slot_horizontal_local_bounds(self, play_area_frame):
+        """Calculate current frame-local slot bounds from visual occupancy."""
+        left_fan_rect = self.get_hand_fan_occupied_screen_rect("left_player_hand")
+        right_fan_rect = self.get_hand_fan_occupied_screen_rect("right_player_hand")
+        if left_fan_rect is not None and right_fan_rect is not None:
+            left_screen_x = left_fan_rect.right
+            right_screen_x = right_fan_rect.left
+        else:
+            left_frame_rect = self.get_frame_screen_rect("left_player_frame")
+            right_frame_rect = self.get_frame_screen_rect("right_player_frame")
+            left_screen_x = left_frame_rect.right + self.SIDE_HAND_SLOT_GUTTER
+            right_screen_x = right_frame_rect.left - self.SIDE_HAND_SLOT_GUTTER
+        left_local_x = play_area_frame.to_local((left_screen_x, 0))[0]
+        right_local_x = play_area_frame.to_local((right_screen_x, 0))[0]
+        content_rect = play_area_frame.content_rect
+        if left_local_x >= right_local_x:
+            return None
+        return (
+            max(content_rect.left, left_local_x),
+            min(content_rect.right, right_local_x),
+        )
+
+    def get_hand_fan_occupied_screen_rect(self, activity_id):
+        """Return an explicit hand-fan occupancy rect for slot layout."""
+        activity = self.find_nested_activity_with_method(
+            self.get_named_activity(activity_id),
+            "get_fan_occupied_screen_rect",
+        )
+        if activity is None:
+            return None
+        return activity.get_fan_occupied_screen_rect()
 
     @staticmethod
     def center_child(parent_size, child_size):
@@ -507,14 +590,14 @@ class TableScreen(GameScreen):
         ]
 
     def get_play_area_slot_content_screen_rects(self):
-        """Return dynamic slot content rects for debug/inspection only."""
+        """Return dynamic card bounds inside play-area slots for debug/inspection only."""
         rects = []
         for activity_id, activity in self.iter_named_activities():
             if not self.is_play_area_slot_frame_id(activity_id):
                 continue
-            if not hasattr(activity, "get_slot_content_screen_rect"):
+            if not hasattr(activity, "get_cards_content_screen_rect"):
                 continue
-            rects.append(activity.get_slot_content_screen_rect())
+            rects.append(activity.get_cards_content_screen_rect())
         return rects
 
     @staticmethod
@@ -532,6 +615,21 @@ class TableScreen(GameScreen):
     def get_play_area_slots_activity(self):
         activity = self.get_named_activity("play_area_frame")
         return getattr(activity, "play_area_slots_activity", activity)
+
+    def remove_bottom_player_hand_card(self, turn_context):
+        """Remove the landed card from the lower hand's visual-only groups."""
+        group_id = (turn_context or {}).get("group_id")
+        if not group_id:
+            return False
+        hand_activity = self.get_named_activity("bottom_player_hand")
+        remover = getattr(hand_activity, "remove_card_by_group_id", None)
+        return bool(remover(group_id)) if callable(remover) else False
+
+    def clear_play_area_slot_cards(self):
+        activity = self.get_play_area_slots_activity()
+        clearer = getattr(activity, "clear_slot_cards", None)
+        if callable(clearer):
+            clearer()
 
     def get_play_area_slot_ids_by_position(self):
         slot_ids = [

@@ -43,8 +43,9 @@ class CardsSlotActivityDecorator(Activity):
         self.generated_groups = []
         self.card_visual_states = {}
         self.card_original_frames_by_group_id = {}
-        self.slot_content_local_rect = pygame.Rect(0, 0, 0, 0)
-        self.slot_content_scaled_local_rect = pygame.Rect(0, 0, 0, 0)
+        self.card_source_sizes_by_resource_key = {}
+        self.cards_content_local_rect = pygame.Rect(0, 0, 0, 0)
+        self.cards_content_scaled_local_rect = pygame.Rect(0, 0, 0, 0)
         self._last_slot_layout_signature = None
 
     @staticmethod
@@ -203,19 +204,22 @@ class CardsSlotActivityDecorator(Activity):
         return self.get_next_card_screen_geometry(turn_context)
 
     def get_next_card_screen_geometry(self, turn_context=None):
-        _ = turn_context
-        index = len(self.generated_groups)
+        index = self.get_card_data_slot_index(turn_context)
+        if index is None:
+            index = len(self.generated_groups)
         if self.max_cards is not None:
             index = min(index, max(0, self.max_cards - 1))
         layout_count = self.get_layout_card_count()
-        local_size = self.get_default_card_local_size()
+        resource_key = self.get_card_data_resource_key(turn_context) if turn_context else self.default_resource_key
+        local_size = self.get_card_source_size(resource_key)
         angle_degrees = self.get_card_angle_degrees(index, layout_count)
         rotated_size = self.get_rotated_size(local_size, angle_degrees)
-        local_rect = self.get_card_local_rect(index, rotated_size, count=layout_count)
-        screen_center = self.project_scaled_local_rect_center(local_rect)
+        group_scale = self.get_card_group_scale_factor(rotated_size, layout_count)
+        local_rect = self.get_card_local_rect(index, rotated_size, count=layout_count, scale=group_scale)
+        screen_center = self.project_scaled_local_rect_center(local_rect, scale=group_scale)
         return {
             "center": tuple(screen_center),
-            "size": self.local_size_to_screen_size(rotated_size),
+            "size": self.local_size_to_screen_size(rotated_size, scale=group_scale),
             "angle_degrees": angle_degrees,
         }
 
@@ -242,11 +246,20 @@ class CardsSlotActivityDecorator(Activity):
         return self.default_slot_size
 
     def get_default_card_local_size(self):
-        frames = self.resource_manager.get_frames(self.default_resource_key) if self.resource_manager is not None else ()
+        return self.get_card_source_size(self.default_resource_key)
+
+    def get_card_source_size(self, resource_key):
+        if resource_key in self.card_source_sizes_by_resource_key:
+            return self.card_source_sizes_by_resource_key[resource_key]
+        frames = self.get_resource_frames(resource_key) if self.resource_manager is not None else ()
         if frames:
-            return frames[0].get_size()
+            size = frames[0].get_size()
+            self.card_source_sizes_by_resource_key[resource_key] = size
+            return size
         rect = self.frame.local_rect
-        return max(1, rect.width), max(1, rect.height)
+        size = max(1, rect.width), max(1, rect.height)
+        self.card_source_sizes_by_resource_key[resource_key] = size
+        return size
 
     def get_effective_screen_scale(self):
         frame_scale = self.frame.get_content_screen_scale() if hasattr(self.frame, "get_content_screen_scale") else 1.0
@@ -265,31 +278,56 @@ class CardsSlotActivityDecorator(Activity):
             else:
                 base_surface = group.get_primary_layer_frames()[0]
             angle_degrees = self.get_card_angle_degrees(index, layout_count)
+            resource_key = self.get_card_resource_key_for_index(index)
+            base_size = self.get_card_source_size(resource_key)
+            rotated_size = self.get_rotated_size(base_size, angle_degrees)
+            group_scale = self.get_card_group_scale_factor(rotated_size, layout_count)
             surface = self.render_card_surface(base_surface, angle_degrees)
             group.set_primary_layer_frames([surface], position=(0, 0))
-            group.set_scale_factor(self.scale_factor)
-            local_rect = self.get_card_local_rect(index, surface.get_size(), count=layout_count)
+            group.set_scale_factor(group_scale)
+            local_rect = self.get_card_local_rect(index, rotated_size, count=layout_count, scale=group_scale)
             group.set_local_rect(local_rect)
             self.frame.set_group_origin(group.id, group.local_rect.topleft)
-        self.update_slot_content_rects()
+        self.update_cards_content_rects()
         self._last_slot_layout_signature = self.get_slot_layout_signature()
 
-    def get_card_local_rect(self, index, size, count=None):
+    def get_card_local_rect(self, index, size, count=None, scale=None):
         width, height = int(size[0]), int(size[1])
         count = max(1, len(self.generated_groups) if count is None else int(count))
+        scale = self.scale_factor if scale is None else scale
+        scale = scale or 1.0
+        scaled_width = width * scale
+        scaled_height = height * scale
         step_x = self.spacing[0]
-        total_width = width + step_x * max(0, count - 1)
-        left = self.frame.content_rect.centerx - total_width // 2 + index * step_x + self.center_offset[0]
-        top = self.frame.content_rect.centery - height // 2 + self.center_offset[1]
+        total_width = scaled_width + step_x * max(0, count - 1)
+        left = self.frame.content_rect.centerx - total_width / 2 + index * step_x + self.center_offset[0]
+        left += self.get_card_slot_axis_offset(index, count)
+        top = self.frame.content_rect.centery - scaled_height / 2 + self.center_offset[1]
         return pygame.Rect(int(round(left)), int(round(top)), width, height)
 
-    def project_scaled_local_rect_center(self, local_rect):
-        scale = self.scale_factor or 1.0
+    def project_scaled_local_rect_center(self, local_rect, scale=None):
+        scale = self.scale_factor if scale is None else scale
+        scale = scale or 1.0
         local_center = (
             local_rect.x + local_rect.width * scale / 2,
             local_rect.y + local_rect.height * scale / 2,
         )
         return self.frame.to_screen(local_center)
+
+    def get_card_group_scale_factor(self, rotated_size, count=None):
+        configured_scale = self.scale_factor or 1.0
+        count = self.get_layout_card_count() if count is None else max(1, int(count))
+        width, height = max(1, int(rotated_size[0])), max(1, int(rotated_size[1]))
+        available_width = max(1, self.frame.content_rect.width - self.spacing[0] * max(0, count - 1))
+        available_height = max(1, self.frame.content_rect.height)
+        fit_scale = min(available_width / width, available_height / height)
+        return min(configured_scale, fit_scale)
+
+    @staticmethod
+    def get_card_slot_axis_offset(index, count):
+        if count != 2:
+            return 0
+        return -10 if int(index) == 0 else 10
 
     def get_layout_card_count(self):
         if self.max_cards is not None:
@@ -313,29 +351,62 @@ class CardsSlotActivityDecorator(Activity):
         surface = pygame.Surface(size, pygame.SRCALPHA)
         return pygame.transform.rotate(surface, -angle_degrees).get_size()
 
-    def local_size_to_screen_size(self, size):
-        scale = self.get_effective_screen_scale()
+    def local_size_to_screen_size(self, size, scale=None):
+        if scale is None:
+            scale = self.get_effective_screen_scale()
+        else:
+            frame_scale = self.frame.get_content_screen_scale() if hasattr(self.frame, "get_content_screen_scale") else 1.0
+            scale *= frame_scale
         return (
             max(1, int(round(size[0] * scale))),
             max(1, int(round(size[1] * scale))),
         )
 
-    def update_slot_content_rects(self):
+    def update_cards_content_rects(self):
         local_bounds = self.calculate_generated_groups_local_bounds()
         scaled_bounds = self.calculate_generated_groups_scaled_local_bounds()
-        self.slot_content_local_rect = local_bounds or pygame.Rect(0, 0, 0, 0)
-        self.slot_content_scaled_local_rect = scaled_bounds or pygame.Rect(0, 0, 0, 0)
+        self.cards_content_local_rect = local_bounds or pygame.Rect(0, 0, 0, 0)
+        self.cards_content_scaled_local_rect = scaled_bounds or pygame.Rect(0, 0, 0, 0)
 
     def get_slot_content_rect(self):
-        return self.get_slot_content_scaled_local_rect()
+        return self.get_slot_content_unscaled_local_rect()
 
     def get_slot_content_unscaled_local_rect(self):
-        return self.slot_content_local_rect.copy()
+        return self.frame.content_rect.copy()
 
     def get_slot_content_scaled_local_rect(self):
-        return self.slot_content_scaled_local_rect.copy()
+        scale = self.frame.get_content_screen_scale() if hasattr(self.frame, "get_content_screen_scale") else 1.0
+        rect = self.frame.content_rect
+        return pygame.Rect(
+            rect.topleft,
+            (
+                max(0, int(round(rect.width * scale))),
+                max(0, int(round(rect.height * scale))),
+            ),
+        )
 
     def get_slot_content_screen_rect(self):
+        return self.get_slot_screen_rect()
+
+    def get_slot_screen_rect(self):
+        rect = self.frame.content_rect
+        screen_pos = self.frame.to_screen(rect.topleft)
+        scale = self.frame.get_content_screen_scale() if hasattr(self.frame, "get_content_screen_scale") else 1.0
+        return pygame.Rect(
+            screen_pos,
+            (
+                max(0, int(round(rect.width * scale))),
+                max(0, int(round(rect.height * scale))),
+            ),
+        )
+
+    def get_cards_content_unscaled_local_rect(self):
+        return self.cards_content_local_rect.copy()
+
+    def get_cards_content_scaled_local_rect(self):
+        return self.cards_content_scaled_local_rect.copy()
+
+    def get_cards_content_screen_rect(self):
         bounds = self.calculate_generated_groups_screen_bounds()
         if bounds is None:
             return pygame.Rect(0, 0, 0, 0)
@@ -344,7 +415,7 @@ class CardsSlotActivityDecorator(Activity):
     def draw_debug_overlay(self, screen):
         if not debug_overlay.should_draw_activity_rect():
             return
-        rect = self.get_slot_content_screen_rect()
+        rect = self.get_slot_screen_rect()
         if rect.width > 0 and rect.height > 0:
             pygame.draw.rect(screen, (255, 232, 64), rect, 2)
 
@@ -362,7 +433,7 @@ class CardsSlotActivityDecorator(Activity):
         self.card_visual_states = {}
         self.card_original_frames_by_group_id = {}
         self._last_slot_layout_signature = None
-        self.update_slot_content_rects()
+        self.update_cards_content_rects()
 
     def get_card_resource_key_for_index(self, card_index):
         return self.card_resource_keys[int(card_index)]
