@@ -2840,9 +2840,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.16",
+      "key": "activity_group:bottom_player_hand.bot_hand.17",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.16",
+      "id": "bottom_player_hand.bot_hand.17",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -2875,9 +2875,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.14",
+      "key": "activity_group:bottom_player_hand.bot_hand.15",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.14",
+      "id": "bottom_player_hand.bot_hand.15",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -2910,9 +2910,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.12",
+      "key": "activity_group:bottom_player_hand.bot_hand.13",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.12",
+      "id": "bottom_player_hand.bot_hand.13",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -2945,9 +2945,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.10",
+      "key": "activity_group:bottom_player_hand.bot_hand.11",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.10",
+      "id": "bottom_player_hand.bot_hand.11",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -3085,9 +3085,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.2",
+      "key": "activity_group:bottom_player_hand.bot_hand.3",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.2",
+      "id": "bottom_player_hand.bot_hand.3",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -3116,41 +3116,6 @@
         "center": [
           600,
           525
-        ]
-      }
-    },
-    {
-      "key": "activity_group:bottom_player_hand.bot_hand.0",
-      "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.0",
-      "owner_frame_id": "bottom_player_hand",
-      "owner_activity_id": "bottom_player_hand",
-      "rect": {
-        "x": 570,
-        "y": 441,
-        "width": 113,
-        "height": 164,
-        "left": 570,
-        "top": 441,
-        "right": 683,
-        "bottom": 605,
-        "center": [
-          626,
-          523
-        ]
-      },
-      "hit_rect": {
-        "x": 570,
-        "y": 441,
-        "width": 113,
-        "height": 164,
-        "left": 570,
-        "top": 441,
-        "right": 683,
-        "bottom": 605,
-        "center": [
-          626,
-          523
         ]
       }
     },
@@ -3161,6 +3126,41 @@
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
+        "x": 570,
+        "y": 441,
+        "width": 113,
+        "height": 164,
+        "left": 570,
+        "top": 441,
+        "right": 683,
+        "bottom": 605,
+        "center": [
+          626,
+          523
+        ]
+      },
+      "hit_rect": {
+        "x": 570,
+        "y": 441,
+        "width": 113,
+        "height": 164,
+        "left": 570,
+        "top": 441,
+        "right": 683,
+        "bottom": 605,
+        "center": [
+          626,
+          523
+        ]
+      }
+    },
+    {
+      "key": "activity_group:bottom_player_hand.bot_hand.0",
+      "kind": "activity_group",
+      "id": "bottom_player_hand.bot_hand.0",
+      "owner_frame_id": "bottom_player_hand",
+      "owner_activity_id": "bottom_player_hand",
+      "rect": {
         "x": 598,
         "y": 441,
         "width": 113,
@@ -3190,9 +3190,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.3",
+      "key": "activity_group:bottom_player_hand.bot_hand.2",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.3",
+      "id": "bottom_player_hand.bot_hand.2",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -3330,9 +3330,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.11",
+      "key": "activity_group:bottom_player_hand.bot_hand.10",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.11",
+      "id": "bottom_player_hand.bot_hand.10",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -3365,9 +3365,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.13",
+      "key": "activity_group:bottom_player_hand.bot_hand.12",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.13",
+      "id": "bottom_player_hand.bot_hand.12",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -3400,9 +3400,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.15",
+      "key": "activity_group:bottom_player_hand.bot_hand.14",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.15",
+      "id": "bottom_player_hand.bot_hand.14",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {
@@ -3435,9 +3435,9 @@
       }
     },
     {
-      "key": "activity_group:bottom_player_hand.bot_hand.17",
+      "key": "activity_group:bottom_player_hand.bot_hand.16",
       "kind": "activity_group",
-      "id": "bottom_player_hand.bot_hand.17",
+      "id": "bottom_player_hand.bot_hand.16",
       "owner_frame_id": "bottom_player_hand",
       "owner_activity_id": "bottom_player_hand",
       "rect": {

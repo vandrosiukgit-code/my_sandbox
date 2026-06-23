@@ -260,8 +260,18 @@ def configure_bot_turn_parser(parser):
 
 def configure_start_game_parser(parser):
     parser.add_argument("--card-count", type=int, default=6)
-    parser.add_argument("--duration", type=float, default=0.18)
+    parser.add_argument("--duration", type=float, default=0.26)
     parser.add_argument("--recipient", action="append", dest="recipient_order")
+
+
+def configure_deal_cards_parser(parser):
+    parser.add_argument("--duration", type=float, default=0.26)
+    parser.add_argument(
+        "--deal",
+        action="append",
+        dest="deals",
+        help="One deal as target_activity_id:cards.resource_key; repeat as needed.",
+    )
 
 
 @action_run(
@@ -382,6 +392,39 @@ def run_start_game(args):
     return 0
 
 
+@action_run(
+    "table_deal_cards",
+    "Deal selected cards from the deck to visual hands.",
+    "Each selected card flies face-down from the deck and then lands in its target hand.",
+    configure_deal_cards_parser,
+)
+def run_deal_cards(args):
+    from core import GameController
+    from core.render_engine import RenderEngine
+    from core.resource import ResourceManager
+    from group import GroupStore
+    from screens.table_screen import TableScreen
+
+    game_controller = GameController(GameController.create_fixture_state())
+    group_store = GroupStore(resource_manager=ResourceManager)
+
+    def screen_factory(_render_context=None):
+        ResourceManager.build_runtime_cache(ASSETS_DIR)
+        group_store.build()
+        screen = TableScreen(group_store=group_store, game_controller=game_controller)
+        prepare_isolated_screen(screen)
+        start_deal_cards(screen, args)
+        return screen
+
+    render_engine = RenderEngine(
+        screen_factory=screen_factory,
+        screen_size=(1280, 720),
+        title="The Fool's Reef - activity: deal_cards",
+    )
+    render_engine.run()
+    return 0
+
+
 def prepare_isolated_screen(screen):
     """Remove fixture-started transient actions before the requested action."""
     for frame in screen.screen_frames.values():
@@ -424,15 +467,32 @@ def start_bot_turn(screen, args, activity_class):
 
 
 def start_start_game(screen, args):
-    activity = screen.get_named_activity("start_game")
-    if activity is None:
-        raise RuntimeError("Missing start_game activity")
-    activity.deal_duration = max(0.0, float(args.duration))
-    if not activity.start_scenario(
-        card_count=max(0, int(args.card_count)),
-        recipient_order=args.recipient_order,
-    ):
-        raise RuntimeError("start_game scenario is already active")
+    start_card_deal_fixture(screen, "start_game_deal_fixture.json", args.duration)
+
+
+def start_deal_cards(screen, args):
+    start_card_deal_fixture(screen, "mid_game_deal_fixture.json", args.duration)
+
+
+def start_card_deal_fixture(screen, fixture_name, duration):
+    with open(os.path.join(PROJECT_DIR, "fixtures", fixture_name), encoding="utf-8") as fixture_file:
+        snapshot = json.load(fixture_file)
+    snapshot["duration"] = duration
+    activity = screen.get_named_activity("card_deal_sequence")
+    if activity is None or not activity.start_deal(snapshot):
+        raise RuntimeError("card_deal_sequence was not started")
+
+
+def parse_deal_cards_args(values):
+    deals = []
+    for value in values:
+        target_activity_id, separator, resource_key = value.partition(":")
+        if not separator or not target_activity_id or not resource_key:
+            raise ValueError(f"Invalid --deal value: {value!r}; expected target_activity_id:cards.resource_key")
+        deals.append({"target_activity_id": target_activity_id, "card_resource_keys": [resource_key]})
+    return deals
+
+
 
 
 def load_table_bot_actions_fixture():

@@ -1,5 +1,7 @@
 """Visible-card decorator for player hand fan activities."""
 
+import pygame
+
 from activities.base_activity import Activity
 
 
@@ -28,6 +30,7 @@ class VisibleCardsHandDecorator(Activity):
         self.strict_max_cards = bool(strict_max_cards)
         self.owns_hand_activity = bool(owns_hand_activity)
         self.card_resource_keys = self.limit_cards(self.normalize_cards(cards or ()))
+        self.revealed_card_indices = set(range(len(self.card_resource_keys)))
         self.configure_hand_activity()
 
     @staticmethod
@@ -98,6 +101,7 @@ class VisibleCardsHandDecorator(Activity):
 
         self.hand_activity.clear_generated_groups()
         self.card_resource_keys = next_keys
+        self.revealed_card_indices = set(range(len(self.card_resource_keys)))
         self.configure_hand_activity()
         if getattr(self.hand_activity, "started", False):
             self.hand_activity.sync_visual_groups()
@@ -106,6 +110,43 @@ class VisibleCardsHandDecorator(Activity):
     def append_cards(self, cards):
         """Append externally dealt visual cards without interpreting game rules."""
         self.set_cards((*self.card_resource_keys, *self.normalize_cards(cards)))
+
+    def prepare_cards(self, cards, revealed_count=0):
+        """Build the complete fan once, then conceal panels until they are dealt."""
+        self.set_cards(cards, force=True)
+        self.revealed_card_indices = set(range(max(0, int(revealed_count))))
+        for hand_index, resource_key in enumerate(self.card_resource_keys):
+            self.hand_activity.set_card_base_frames(
+                hand_index,
+                [self.create_transparent_card_surface(resource_key)],
+                apply_layout=False,
+            )
+        self.hand_activity.apply_fan_layout()
+        for hand_index in tuple(self.revealed_card_indices):
+            self.reveal_card(hand_index)
+
+    def reveal_card(self, hand_index):
+        """Reveal one already-positioned card without rebuilding the fan."""
+        if hand_index in self.revealed_card_indices:
+            return False
+        resource_key = self.card_resource_keys[hand_index]
+        self.hand_activity.set_card_base_frames(
+            hand_index,
+            self.resource_manager.get_frames(resource_key),
+            apply_layout=True,
+        )
+        self.revealed_card_indices.add(hand_index)
+        return True
+
+    def get_prepared_card_screen_geometry(self, hand_index):
+        """Expose one prepared visual slot as an Action target."""
+        return self.hand_activity.get_prepared_card_screen_geometry(hand_index)
+
+    def create_transparent_card_surface(self, resource_key):
+        frames = self.resource_manager.get_frames(resource_key)
+        if not frames:
+            raise KeyError(f"Card resource has no frames: {resource_key!r}")
+        return pygame.Surface(frames[0].get_size(), pygame.SRCALPHA)
 
     def remove_card_by_group_id(self, group_id):
         """Remove one visual card while preserving the wrapper card list order."""

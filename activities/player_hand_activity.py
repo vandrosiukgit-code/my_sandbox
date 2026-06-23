@@ -200,6 +200,22 @@ class PlayerHandActivity(BotHandActivity):
         group.set_local_rect((0, 0, rotated_surface.get_width(), rotated_surface.get_height()))
         self.frame.place_group_center_local(group, center_position)
 
+    def get_prepared_card_screen_geometry(self, hand_index):
+        """Return the final screen geometry of one prepared hand-card slot."""
+        group = self.generated_groups[hand_index]
+        geometry = self.calculate_fan_geometry()
+        local_angle = self.calculate_slot_position(hand_index, len(self.generated_groups)) * geometry.max_angle
+        base_surface = self.group_base_frames[group.id][0]
+        scale = group.get_effective_screen_scale()
+        return {
+            "center": tuple(group.rect.center),
+            "size": (
+                max(1, int(round(base_surface.get_width() * scale))),
+                max(1, int(round(base_surface.get_height() * scale))),
+            ),
+            "angle_degrees": float(self.orientation_degrees + local_angle),
+        }
+
     @staticmethod
     def rotate_card_surface(surface, angle_degrees):
         return pygame.transform.rotate(surface, -angle_degrees)
@@ -255,6 +271,17 @@ class PlayerHandActivity(BotHandActivity):
             return 0.0
         return self.calculate_dense_slot_position(index, count)
 
+    def set_card_base_frames(self, hand_index, frames, apply_layout=True):
+        """Replace one card panel while keeping existing fan geometry intact."""
+        group = self.generated_groups[hand_index]
+        next_frames = list(frames)
+        if not next_frames:
+            raise ValueError("card panel requires at least one frame")
+        self.group_base_frames[group.id] = next_frames
+        group.set_primary_layer_frames(next_frames, position=(0, 0))
+        if apply_layout:
+            self.apply_fan_layout()
+
     @staticmethod
     def calculate_dense_slot_position(index, count):
         """Return one of count evenly spaced sector rays, assigned center-out."""
@@ -262,7 +289,7 @@ class PlayerHandActivity(BotHandActivity):
             -1.0 + 2.0 * slot_index / (count - 1)
             for slot_index in range(count)
         ]
-        center_out_slots = sorted(slots, key=lambda slot: (abs(slot), slot))
+        center_out_slots = sorted(slots, key=lambda slot: (abs(slot), -slot))
         return center_out_slots[index]
 
     @staticmethod

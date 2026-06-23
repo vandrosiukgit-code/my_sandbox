@@ -7,11 +7,11 @@ from activities import (
     BotHandActivity,
     CardSelectionActivity,
     CardsSlotActivityDecorator,
+    CardDealSequenceActivity,
     DeckActivity,
     PlayerHandActivity,
     PlayerTurnActivity,
     PlayAreaSlotsActivity,
-    StartGameActivity,
     VisibleCardsHandDecorator,
 )
 from core.resource import ResourceManager
@@ -100,11 +100,11 @@ class TableScreen(GameScreen):
             release_slot_layout=self.release_play_area_slot_layout,
             remove_source_card=self.remove_bottom_player_hand_card,
         )
-        start_game_activity = StartGameActivity(
+        card_deal_sequence_activity = CardDealSequenceActivity(
             source_geometry_provider=deck_activity.get_deal_source_screen_geometry,
             target_geometry_provider=self.get_start_game_target_screen_geometry,
-            reset_recipients=self.reset_start_game_recipients,
-            land_card=self.land_start_game_card,
+            prepare_hands=self.prepare_card_deal_hands,
+            reveal_card=self.reveal_card_deal,
             resource_manager=ResourceManager,
         )
         bottom_player_hand_activity = CardSelectionActivity(
@@ -164,7 +164,7 @@ class TableScreen(GameScreen):
             "play_area_frame": player_turn_activity,
             "cards_slot_frame": cards_slot_activity,
             "deck_frame": deck_activity,
-            "start_game": start_game_activity,
+            "card_deal_sequence": card_deal_sequence_activity,
         }
         self._play_area_slot_layout_lock_depth = 0
         self._locked_play_area_slot_horizontal_local_bounds = None
@@ -622,6 +622,10 @@ class TableScreen(GameScreen):
 
     def apply_deck_deal_visual(self, target_activity_id, card_resource_keys):
         """Apply a fixture/controller deck deal through a recipient public API."""
+        if isinstance(card_resource_keys, str):
+            card_resource_keys = (card_resource_keys,)
+        else:
+            card_resource_keys = tuple(card_resource_keys)
         recipient = self.find_nested_activity_with_method(
             self.get_named_activity(target_activity_id),
             "append_cards",
@@ -630,30 +634,33 @@ class TableScreen(GameScreen):
             raise KeyError(f"Deck deal target does not accept cards: {target_activity_id}")
         recipient.append_cards(card_resource_keys)
 
-    def get_start_game_target_screen_geometry(self, target_activity_id):
+    def get_start_game_target_screen_geometry(self, target_activity_id, hand_index=None):
+        if target_activity_id == "bottom_player_hand" and hand_index is not None:
+            hand = self.find_nested_activity_with_method(
+                self.get_named_activity(target_activity_id),
+                "get_prepared_card_screen_geometry",
+            )
+            if hand is not None:
+                return hand.get_prepared_card_screen_geometry(hand_index)
         frame = self.get_screen_frame(target_activity_id)
         deck_activity = self.get_named_activity("deck_frame")
         source_geometry = deck_activity.get_deal_source_screen_geometry()
         return {"center": frame.rect.center, "size": source_geometry["size"]}
 
-    def reset_start_game_recipients(self, recipient_ids):
-        for recipient_id in recipient_ids:
-            recipient = self.find_nested_activity_with_method(
-                self.get_named_activity(recipient_id),
-                "set_cards",
-            )
-            if recipient is not None:
-                recipient.set_cards((), force=True)
-                continue
-            recipient = self.find_nested_activity_with_method(
-                self.get_named_activity(recipient_id),
-                "set_card_count",
-            )
-            if recipient is not None:
-                recipient.set_card_count(0)
+    def prepare_card_deal_hands(self, hands_before_deal, cards_to_deal):
+        for player_id in set(hands_before_deal) | set(cards_to_deal):
+            before = tuple(hands_before_deal.get(player_id, ()))
+            incoming = tuple(cards_to_deal.get(player_id, ()))
+            hand = self.find_nested_activity_with_method(self.get_named_activity(player_id), "prepare_cards")
+            if hand is None:
+                raise RuntimeError(f"{player_id} does not support prepared cards")
+            hand.prepare_cards((*before, *incoming), revealed_count=len(before))
 
-    def land_start_game_card(self, recipient_id, resource_key):
-        self.apply_deck_deal_visual(recipient_id, (resource_key,))
+    def reveal_card_deal(self, player_id, _resource_key, hand_index):
+        hand = self.find_nested_activity_with_method(self.get_named_activity(player_id), "reveal_card")
+        if hand is None:
+            raise RuntimeError(f"{player_id} does not support card reveal")
+        hand.reveal_card(hand_index)
 
     def get_play_area_slots_activity(self):
         activity = self.get_named_activity("play_area_frame")

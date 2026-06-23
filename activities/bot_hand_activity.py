@@ -92,6 +92,34 @@ class BotHandActivity(Activity):
         self.sync_visual_groups()
         self.apply_fan_layout()
 
+    def prepare_cards(self, card_resource_keys, revealed_count=0):
+        """Build final fan slots and conceal cards that have not landed yet."""
+        keys = tuple(card_resource_keys)
+        self.configure_card_resources(
+            provider=lambda index: keys[index],
+            layer_name=self.card_layer_name,
+            card_count=len(keys),
+        )
+        for index, resource_key in enumerate(keys):
+            if index < revealed_count:
+                continue
+            surface = self.resource_manager.get_frames(resource_key)[0]
+            self.set_card_base_frames(index, [pygame.Surface(surface.get_size(), pygame.SRCALPHA)], apply_layout=False)
+        self.apply_fan_layout()
+
+    def reveal_card(self, hand_index):
+        resource_key = self.get_card_resource_key(hand_index)
+        self.set_card_base_frames(hand_index, self.resource_manager.get_frames(resource_key))
+
+    def set_card_base_frames(self, hand_index, frames, apply_layout=True):
+        group = self.generated_groups[hand_index]
+        self.group_base_frames[group.id] = list(frames)
+        if apply_layout:
+            self.apply_fan_layout()
+
+    def get_prepared_card_screen_geometry(self, hand_index):
+        return self.get_group_card_screen_geometry(self.generated_groups[hand_index])
+
     def append_cards(self, card_resource_keys):
         """Increase this face-down hand for a visual deck deal."""
         self.set_card_count(self.card_count + len(tuple(card_resource_keys)))

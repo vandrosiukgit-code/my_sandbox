@@ -39,6 +39,10 @@
         "cards.10_of_clubs",
         "cards.j_of_diamonds"
       ]
+    },
+    "deal_cards": {
+      "enabled": false,
+      "deals": []
     }
   }
 }

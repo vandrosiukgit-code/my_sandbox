@@ -23,10 +23,10 @@ class StartGameActivityTests(unittest.TestCase):
         self.assertEqual(
             sequence,
             (
-                ("bottom_player_hand", "cards.6_of_clubs"),
-                ("right_player_hand", "cards.card_back"),
-                ("bottom_player_hand", "cards.7_of_diamonds"),
-                ("right_player_hand", "cards.card_back"),
+                ("bottom_player_hand", "cards.6_of_clubs", 0),
+                ("right_player_hand", "cards.card_back", None),
+                ("bottom_player_hand", "cards.7_of_diamonds", 1),
+                ("right_player_hand", "cards.card_back", None),
             ),
         )
 
@@ -36,4 +36,19 @@ class StartGameActivityTests(unittest.TestCase):
         self.assertAlmostEqual(positions[0], -positions[1])
         self.assertAlmostEqual(positions[2], -positions[3])
         self.assertAlmostEqual(positions[4], -positions[5])
-        self.assertLess(positions[0], 0)
+        self.assertGreater(positions[0], 0)
+
+    def test_six_card_hand_has_no_gaps_between_center_and_edges(self):
+        positions = sorted(
+            PlayerHandActivity.calculate_dense_slot_position(index, 6)
+            for index in range(6)
+        )
+        gaps = [right - left for left, right in zip(positions, positions[1:])]
+
+        for gap in gaps:
+            self.assertAlmostEqual(gap, 2 / 5)
+
+    def test_first_two_cards_form_a_right_left_v(self):
+        two_card_slots = tuple(PlayerHandActivity.calculate_dense_slot_position(index, 2) for index in range(2))
+
+        self.assertEqual(two_card_slots, (1.0, -1.0))
