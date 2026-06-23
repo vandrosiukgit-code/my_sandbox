@@ -1,6 +1,6 @@
 """Single visual executor for initial and mid-game card dealing snapshots."""
 
-from actions import PlayerCardPlayAction
+from actions import BotCardPlayAction
 from activities.base_activity import Activity
 
 
@@ -75,11 +75,13 @@ class CardDealSequenceActivity(Activity):
             self.sequence_active = False
             return
         self.current_step = self.pending_steps.pop(0)
-        player_id, _resource_key, hand_index = self.current_step
-        action = PlayerCardPlayAction(
+        player_id, resource_key, hand_index = self.current_step
+        action = BotCardPlayAction(
             self.source_geometry_provider(), self.target_geometry_provider(player_id, hand_index),
-            "cards.card_back", duration=self.deal_duration, group_id=self.get_next_flight_group_id(),
+            back_resource_key="cards.card_back", face_resource_key=resource_key,
+            duration=self.deal_duration, group_id=self.get_next_flight_group_id(),
             cleanup_group=self.remove_flight_group, resource_manager=self.resource_manager,
+            flip_enabled=player_id == "bottom_player_hand",
         )
         self.current_action = action
         self.flight_groups.append(action.group)

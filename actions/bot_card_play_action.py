@@ -59,6 +59,7 @@ class BotCardPlayAction(Action):
         group_id="bot_turn.flight_card",
         cleanup_group=None,
         resource_manager=ResourceManager,
+        flip_enabled=True,
     ):
         self.from_geometry = CardFlightGeometry.from_value(from_geometry)
         self.to_geometry = CardFlightGeometry.from_value(to_geometry)
@@ -80,6 +81,7 @@ class BotCardPlayAction(Action):
                     face_surface=self.face_surface,
                     min_flip_width_ratio=self.MIN_FLIP_WIDTH_RATIO,
                     flip_phase_ratio=self.FLIP_PHASE_RATIO,
+                    flip_enabled=flip_enabled,
                 ),
             ),
         )
@@ -145,6 +147,7 @@ class CardFlightGeometryAnimation(Animation):
         face_surface=None,
         min_flip_width_ratio=BotCardPlayAction.MIN_FLIP_WIDTH_RATIO,
         flip_phase_ratio=BotCardPlayAction.FLIP_PHASE_RATIO,
+        flip_enabled=True,
     ):
         super().__init__(duration=duration, on_finish=on_finish, max_frame_dt=1 / 120)
         self.group = group
@@ -154,6 +157,7 @@ class CardFlightGeometryAnimation(Animation):
         self.face_surface = self.normalize_surface(face_surface, "face_surface")
         self.min_flip_width_ratio = float(min_flip_width_ratio)
         self.flip_phase_ratio = max(0.01, min(0.99, float(flip_phase_ratio)))
+        self.flip_enabled = bool(flip_enabled)
 
     def start(self):
         super().start()
@@ -161,13 +165,13 @@ class CardFlightGeometryAnimation(Animation):
 
     def apply(self, progress):
         move_progress = ease_out_quad(progress)
-        flip_progress = ease_out_quad(self.get_flip_progress(progress))
+        flip_progress = ease_out_quad(self.get_flip_progress(progress)) if self.flip_enabled else 0.0
         geometry = self.interpolate_geometry(move_progress)
         surface = BotCardPlayAction.render_surface(
             geometry.size,
             geometry.angle_degrees,
             self.get_card_side_surface(flip_progress),
-            self.get_flip_width_ratio(flip_progress),
+            self.get_flip_width_ratio(flip_progress) if self.flip_enabled else 1.0,
         )
         rect = surface.get_rect(center=geometry.center)
         self.group.set_rect(rect)
