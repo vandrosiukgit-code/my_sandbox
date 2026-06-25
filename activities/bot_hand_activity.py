@@ -120,10 +120,6 @@ class BotHandActivity(Activity):
     def get_prepared_card_screen_geometry(self, hand_index):
         return self.get_group_card_screen_geometry(self.generated_groups[hand_index])
 
-    def append_cards(self, card_resource_keys):
-        """Increase this face-down hand for a visual deck deal."""
-        self.set_card_count(self.card_count + len(tuple(card_resource_keys)))
-
     def configure_card_resources(self, provider=None, layer_name=None, card_count=None):
         """Configure the public resource contract used for generated cards."""
         should_sync = self.started or bool(self.generated_groups)
@@ -222,18 +218,34 @@ class BotHandActivity(Activity):
         occupied_angle, angle_step = self.calculate_fan_angles(count)
 
         for index, group in enumerate(self.generated_groups):
-            local_angle = self.calculate_card_angle(index, occupied_angle, angle_step)
+            local_angle = self.calculate_card_angle(index, count, occupied_angle, angle_step)
             angle = self.orientation_degrees + local_angle
             pivot_x, pivot_y = self.calculate_pivot_position(center_x, center_y, angle)
             self.apply_card_transform(group, angle, (pivot_x, pivot_y))
         self._last_layout_signature = self.get_layout_signature()
 
-    @staticmethod
-    def calculate_card_angle(index, occupied_angle, angle_step):
-        """Return card angle inside a sector using card-slot centers."""
+    def calculate_card_angle(self, index, count, occupied_angle, angle_step):
+        """Return card angle inside the old bot sector, assigned center-out like the player hand."""
         if angle_step == 0.0:
             return 0.0
-        return -occupied_angle / 2 + angle_step / 2 + index * angle_step
+        max_slot_angle = max(0.0, (occupied_angle - angle_step) / 2)
+        return self.calculate_slot_position(index, count) * max_slot_angle
+
+    def calculate_slot_position(self, index, count):
+        """Return one of count evenly spaced sector rays, assigned center-out."""
+        if count <= 1:
+            return 0.0
+        return self.calculate_dense_slot_position(index, count)
+
+    @staticmethod
+    def calculate_dense_slot_position(index, count):
+        """Return one of count evenly spaced sector rays, assigned center-out."""
+        slots = [
+            -1.0 + 2.0 * slot_index / (count - 1)
+            for slot_index in range(count)
+        ]
+        center_out_slots = sorted(slots, key=lambda slot: (abs(slot), -slot))
+        return center_out_slots[index]
 
     def calculate_fan_angles(self, count):
         """Return total occupied angle and step for count cards.
@@ -428,7 +440,7 @@ class BotHandActivity(Activity):
 
         count = len(self.generated_groups)
         occupied_angle, angle_step = self.calculate_fan_angles(count)
-        local_angle = self.calculate_card_angle(index, occupied_angle, angle_step)
+        local_angle = self.calculate_card_angle(index, count, occupied_angle, angle_step)
         angle = self.orientation_degrees + local_angle
         base_surface = self.group_base_frames[group.id][0]
         scale = group.get_effective_screen_scale() if hasattr(group, "get_effective_screen_scale") else 1.0
@@ -442,8 +454,18 @@ class BotHandActivity(Activity):
         }
 
     def iter_generated_groups(self):
-        """Return generated visual-only groups owned by this activity."""
-        return tuple(self.generated_groups)
+        """Return generated visual-only groups in draw order."""
+        return self.iter_groups_in_draw_order()
+
+    def iter_groups_in_draw_order(self):
+        count = len(self.generated_groups)
+        return tuple(sorted(self.generated_groups, key=lambda group: self.get_group_draw_slot(group, count)))
+
+    def get_group_draw_slot(self, group, count):
+        index = self.group_hand_indices.get(group.id)
+        if index is None:
+            return 0.0
+        return self.calculate_slot_position(index, count)
 
     def draw(self, screen):
         """Отрисовать generated visual-only Group, которыми владеет Activity."""

@@ -107,14 +107,10 @@ class VisibleCardsHandDecorator(Activity):
             self.hand_activity.sync_visual_groups()
             self.hand_activity.apply_fan_layout()
 
-    def append_cards(self, cards):
-        """Append externally dealt visual cards without interpreting game rules."""
-        self.set_cards((*self.card_resource_keys, *self.normalize_cards(cards)))
-
     def prepare_cards(self, cards, revealed_count=0):
         """Build the complete fan once, then conceal panels until they are dealt."""
         self.set_cards(cards, force=True)
-        self.revealed_card_indices = set(range(max(0, int(revealed_count))))
+        self.revealed_card_indices = set()
         for hand_index, resource_key in enumerate(self.card_resource_keys):
             self.hand_activity.set_card_base_frames(
                 hand_index,
@@ -122,7 +118,7 @@ class VisibleCardsHandDecorator(Activity):
                 apply_layout=False,
             )
         self.hand_activity.apply_fan_layout()
-        for hand_index in tuple(self.revealed_card_indices):
+        for hand_index in range(min(len(self.card_resource_keys), max(0, int(revealed_count)))):
             self.reveal_card(hand_index)
 
     def reveal_card(self, hand_index):

@@ -11,6 +11,8 @@ from activities.card_selection_activity import CardSelectionActivity
 from activities.cards_slot_activity import CardsSlotActivityDecorator
 from activities.deck_activity import DeckActivity
 from activities.card_deal_sequence_activity import CardDealSequenceActivity
+from activities.discard_table_activity import DiscardTableActivity
+from activities.take_table_activity import TakeTableActivity
 from activities.player_hand_activity import PlayerHandActivity
 from activities.player_turn_activity import PlayerTurnActivity
 from activities.play_area_slots_activity import PlayAreaSlotsActivity
@@ -25,6 +27,8 @@ __all__ = [
     "CardsSlotActivityDecorator",
     "DeckActivity",
     "CardDealSequenceActivity",
+    "DiscardTableActivity",
+    "TakeTableActivity",
     "PlayerHandActivity",
     "PlayerTurnActivity",
     "PlayAreaSlotsActivity",

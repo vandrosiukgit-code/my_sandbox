@@ -19,8 +19,7 @@
   },
   "activities": {
     "deck_frame": {
-      "trump_resource_key": "cards.a_of_spades",
-      "deals": []
+      "trump_resource_key": "cards.a_of_spades"
     },
     "start_game": {
       "enabled": false,

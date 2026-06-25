@@ -2,8 +2,16 @@
 
 import unittest
 
+import pygame
+
 from activities.start_game_activity import StartGameActivity
 from activities.player_hand_activity import PlayerHandActivity
+
+
+class FakeResourceManager:
+    @staticmethod
+    def get_frames(_resource_key):
+        return [pygame.Surface((10, 14), pygame.SRCALPHA)]
 
 
 class StartGameActivityTests(unittest.TestCase):
@@ -29,6 +37,30 @@ class StartGameActivityTests(unittest.TestCase):
                 ("right_player_hand", "cards.card_back", None),
             ),
         )
+
+    def test_start_scenario_runs_prebuilt_sequence(self):
+        reset_calls = []
+        target_calls = []
+
+        activity = StartGameActivity(
+            source_geometry_provider=lambda: {"center": (0, 0), "size": (1, 1)},
+            target_geometry_provider=lambda player_id, hand_index: target_calls.append((player_id, hand_index))
+            or {"center": (1, 1), "size": (1, 1)},
+            reset_recipients=lambda order: reset_calls.append(tuple(order)),
+            prepare_bottom_hand=lambda _before, _incoming: None,
+            land_card=lambda *_args: None,
+            resource_manager=FakeResourceManager,
+            card_count=1,
+        )
+
+        self.assertTrue(
+            activity.start_scenario(
+                recipient_order=("bottom_player_hand",),
+                bottom_player_card_resource_keys=("cards.6_of_clubs",),
+            )
+        )
+        self.assertEqual(reset_calls, [("bottom_player_hand",)])
+        self.assertEqual(target_calls, [("bottom_player_hand", 0)])
 
     def test_six_card_hand_is_symmetric_about_its_center_axis(self):
         positions = tuple(PlayerHandActivity.calculate_dense_slot_position(index, 6) for index in range(6))

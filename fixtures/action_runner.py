@@ -31,6 +31,14 @@ class ActionRun:
 
 
 ACTION_RUNS = {}
+ACTION_ORDER = (
+    "bot_turn",
+    "player_card_play",
+    "start_game",
+    "table_deal_cards",
+    "take_table",
+    "discard_table",
+)
 
 
 def action_run(name, description, expected_result, configure_parser):
@@ -223,7 +231,10 @@ def handle_run(args):
 
 
 def iter_actions():
-    return tuple(ACTION_RUNS[name] for name in sorted(ACTION_RUNS))
+    ordered = [ACTION_RUNS[name] for name in ACTION_ORDER if name in ACTION_RUNS]
+    ordered_names = set(ACTION_ORDER)
+    ordered.extend(ACTION_RUNS[name] for name in sorted(ACTION_RUNS) if name not in ordered_names)
+    return tuple(ordered)
 
 
 def resolve_action(action_id):
@@ -272,6 +283,15 @@ def configure_deal_cards_parser(parser):
         dest="deals",
         help="One deal as target_activity_id:cards.resource_key; repeat as needed.",
     )
+
+
+def configure_take_table_parser(parser):
+    parser.add_argument("--duration", type=float, default=0.26)
+
+
+def configure_discard_table_parser(parser):
+    parser.add_argument("--duration", type=float, default=0.5)
+    parser.add_argument("--rise-distance", type=float, default=45)
 
 
 @action_run(
@@ -422,6 +442,124 @@ def run_deal_cards(args):
         title="The Fool's Reef - activity: deal_cards",
     )
     render_engine.run()
+    return 0
+
+
+@action_run("take_table", "Move all table cards into the defender hand.", "Cards fly from table slots into the defender fan, then the table clears.", configure_take_table_parser)
+def run_take_table(args):
+    from activities import TakeTableActivity
+    from core import GameController
+    from core.render_engine import RenderEngine
+    from core.resource import ResourceManager
+    from group import GroupStore
+    from screens.table_screen import TableScreen
+    group_store = GroupStore(resource_manager=ResourceManager)
+    controller = GameController(GameController.create_fixture_state())
+    def screen_factory(_context=None):
+        ResourceManager.build_runtime_cache(ASSETS_DIR); group_store.build()
+        screen = TableScreen(group_store, controller); prepare_isolated_screen(screen)
+        with open(os.path.join(PROJECT_DIR, "fixtures", "take_table_fixture.json"), encoding="utf-8") as file:
+            fixture = json.load(file)
+        slots = screen.get_play_area_slots_activity().slot_activities
+        takes = tuple(fixture.get("takes", ()))
+        def get_table_cards():
+            result = []
+            for slot_id, slot in slots.items():
+                for index, key in enumerate(slot.card_resource_keys):
+                    result.append({
+                        "slot_id": slot_id,
+                        "resource_key": key,
+                        "geometry": slot.get_card_screen_geometry(index),
+                    })
+            return result
+        def set_table_cards(table_slots):
+            screen.clear_play_area_slot_cards()
+            for slot_id, cards in table_slots.items():
+                slots[slot_id].set_cards(cards, force=True)
+        def remove_table_card(card):
+            slot = slots[card["slot_id"]]
+            cards = list(slot.card_resource_keys)
+            cards.remove(card["resource_key"])
+            slot.set_cards(cards, force=True)
+        activity = TakeTableActivity(
+            get_table_cards,
+            set_table_cards,
+            remove_table_card,
+            screen.prepare_card_deal_hands,
+            screen.get_start_game_target_screen_geometry,
+            screen.reveal_card_deal,
+            screen.clear_play_area_slot_cards,
+            ResourceManager,
+            args.duration,
+        )
+        screen.add_activity(activity)
+        activity.start_take_plan(takes, fixture.get("initial_delay_seconds", 0))
+        return screen
+    RenderEngine(screen_factory, screen_size=(1280, 720), title="The Fool's Reef - activity: take_table").run()
+    return 0
+
+
+@action_run("discard_table", "Fade all table cards into discard.", "Cards rise above the table and fade out over half a second.", configure_discard_table_parser)
+def run_discard_table(args):
+    from activities import DiscardTableActivity
+    from core import GameController
+    from core.render_engine import RenderEngine
+    from core.resource import ResourceManager
+    from group import GroupStore
+    from screens.table_screen import TableScreen
+
+    group_store = GroupStore(resource_manager=ResourceManager)
+    controller = GameController(GameController.create_fixture_state())
+
+    def screen_factory(_context=None):
+        ResourceManager.build_runtime_cache(ASSETS_DIR)
+        group_store.build()
+        screen = TableScreen(group_store, controller)
+        prepare_isolated_screen(screen)
+        with open(os.path.join(PROJECT_DIR, "fixtures", "discard_table_fixture.json"), encoding="utf-8") as file:
+            fixture = json.load(file)
+
+        slots = screen.get_play_area_slots_activity().slot_activities
+
+        def get_table_cards():
+            result = []
+            for slot_id, slot in slots.items():
+                for index, key in enumerate(slot.card_resource_keys):
+                    result.append({
+                        "slot_id": slot_id,
+                        "resource_key": key,
+                        "geometry": slot.get_card_screen_geometry(index),
+                    })
+            return result
+
+        def set_table_cards(table_slots):
+            screen.clear_play_area_slot_cards()
+            for slot_id, cards in table_slots.items():
+                slots[slot_id].set_cards(cards, force=True)
+
+        def remove_table_card(card):
+            slot = slots[card["slot_id"]]
+            cards = list(slot.card_resource_keys)
+            cards.remove(card["resource_key"])
+            slot.set_cards(cards, force=True)
+
+        activity = DiscardTableActivity(
+            get_table_cards,
+            set_table_cards,
+            remove_table_card,
+            screen.clear_play_area_slot_cards,
+            ResourceManager,
+            args.duration,
+            args.rise_distance,
+        )
+        screen.add_activity(activity)
+        activity.start_discard(
+            fixture.get("table_slots", {}),
+            fixture.get("initial_delay_seconds", 0),
+        )
+        return screen
+
+    RenderEngine(screen_factory, screen_size=(1280, 720), title="The Fool's Reef - activity: discard_table").run()
     return 0
 
 

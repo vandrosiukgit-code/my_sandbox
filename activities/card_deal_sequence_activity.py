@@ -25,8 +25,9 @@ class CardDealSequenceActivity(Activity):
     def start_deal(self, snapshot):
         if self.sequence_active:
             return False
-        before, incoming, order, duration = self.normalize_snapshot(snapshot)
-        self.prepare_hands(before, incoming)
+        before, incoming, order, duration, hands_prepared = self.normalize_snapshot(snapshot)
+        if not hands_prepared:
+            self.prepare_hand_fans(before, incoming)
         self.pending_steps = list(self.build_steps(before, incoming, order))
         self.deal_duration = duration
         self.sequence_active = True
@@ -35,6 +36,26 @@ class CardDealSequenceActivity(Activity):
         self.start_next_step()
         return True
 
+    def start_sequence(self, steps, duration=None):
+        """Start a prebuilt deal sequence of ``(player_id, resource_key, hand_index)`` steps."""
+        if self.sequence_active:
+            return False
+        self.pending_steps = list(self.normalize_steps(steps))
+        self.deal_duration = (
+            self.DEFAULT_DURATION
+            if duration is None
+            else max(0.0, float(duration))
+        )
+        self.sequence_active = True
+        if not self.started:
+            self.start()
+        self.start_next_step()
+        return True
+
+    def prepare_hand_fans(self, hands_before_deal, cards_to_deal):
+        """Build hand fans through the one screen-provided preparation contract."""
+        self.prepare_hands(hands_before_deal, cards_to_deal)
+
     def normalize_snapshot(self, snapshot):
         if not isinstance(snapshot, dict):
             raise TypeError("deal snapshot must be a dictionary")
@@ -42,7 +63,8 @@ class CardDealSequenceActivity(Activity):
         incoming = self.normalize_cards_by_player(snapshot.get("cards_to_deal", {}))
         order = tuple(snapshot.get("deal_order", self.DEFAULT_ORDER))
         duration = max(0.0, float(snapshot.get("duration", self.DEFAULT_DURATION)))
-        return before, incoming, order, duration
+        hands_prepared = bool(snapshot.get("hands_prepared", False))
+        return before, incoming, order, duration, hands_prepared
 
     @staticmethod
     def normalize_cards_by_player(value):
@@ -54,6 +76,24 @@ class CardDealSequenceActivity(Activity):
                 raise ValueError("each player requires a list of resource keys")
             result[player_id] = tuple(keys)
         return result
+
+    @staticmethod
+    def normalize_steps(steps):
+        if not isinstance(steps, (list, tuple)):
+            raise TypeError("deal steps must be a list of descriptors")
+        normalized = []
+        for step in steps:
+            if not isinstance(step, (list, tuple)) or len(step) != 3:
+                raise ValueError("each deal step must be (player_id, resource_key, hand_index)")
+            player_id, resource_key, hand_index = step
+            if not isinstance(player_id, str) or not player_id:
+                raise ValueError("deal step requires player_id")
+            if not isinstance(resource_key, str) or not resource_key:
+                raise ValueError("deal step requires resource_key")
+            if hand_index is not None:
+                hand_index = int(hand_index)
+            normalized.append((player_id, resource_key, hand_index))
+        return tuple(normalized)
 
     @staticmethod
     def build_steps(before, incoming, order):
@@ -72,19 +112,27 @@ class CardDealSequenceActivity(Activity):
 
     def start_next_step(self):
         if not self.pending_steps:
-            self.sequence_active = False
+            self.finish_sequence()
             return
         self.current_step = self.pending_steps.pop(0)
         player_id, resource_key, hand_index = self.current_step
+        back_resource_key, face_resource_key, flip_enabled = self.get_step_flight_visuals(
+            player_id,
+            resource_key,
+            hand_index,
+        )
         action = BotCardPlayAction(
-            self.source_geometry_provider(), self.target_geometry_provider(player_id, hand_index),
-            back_resource_key="cards.card_back", face_resource_key=resource_key,
+            self.get_step_source_screen_geometry(player_id, resource_key, hand_index),
+            self.target_geometry_provider(player_id, hand_index),
+            back_resource_key=back_resource_key,
+            face_resource_key=face_resource_key,
             duration=self.deal_duration, group_id=self.get_next_flight_group_id(),
             cleanup_group=self.remove_flight_group, resource_manager=self.resource_manager,
-            flip_enabled=player_id == "bottom_player_hand",
+            flip_enabled=flip_enabled,
         )
         self.current_action = action
         self.flight_groups.append(action.group)
+        self.on_step_started(player_id, resource_key, hand_index)
         action.start()
 
     def update(self, dt):
@@ -96,6 +144,21 @@ class CardDealSequenceActivity(Activity):
             self.current_action = None
             self.current_step = None
             self.start_next_step()
+
+    def get_step_source_screen_geometry(self, _player_id, _resource_key, _hand_index):
+        """Return the transient screen-space source geometry for one dealt card."""
+        return self.source_geometry_provider()
+
+    def get_step_flight_visuals(self, player_id, resource_key, _hand_index):
+        """Describe the source/face resources and flip rule for one deck card."""
+        return "cards.card_back", resource_key, player_id == "bottom_player_hand"
+
+    def on_step_started(self, _player_id, _resource_key, _hand_index):
+        """Allow source-specific sequences to hide a card when its flight begins."""
+
+    def finish_sequence(self):
+        """Finish one supplied dealing snapshot without ending this screen activity."""
+        self.sequence_active = False
 
     def get_next_flight_group_id(self):
         self.flight_index += 1

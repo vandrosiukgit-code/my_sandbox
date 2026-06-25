@@ -85,7 +85,6 @@ class TableScreen(GameScreen):
         deck_activity = DeckActivity(
             frame=self.get_screen_frame("deck_frame"),
             resource_manager=ResourceManager,
-            deal_cards_callback=self.apply_deck_deal_visual,
         )
         play_area_slots_activity = PlayAreaSlotsActivity(
             screen=self,
@@ -620,22 +619,8 @@ class TableScreen(GameScreen):
             return self.start_player_turn_from_command(payload.get("turn_context", {}))
         return super().dispatch_visual_command(command)
 
-    def apply_deck_deal_visual(self, target_activity_id, card_resource_keys):
-        """Apply a fixture/controller deck deal through a recipient public API."""
-        if isinstance(card_resource_keys, str):
-            card_resource_keys = (card_resource_keys,)
-        else:
-            card_resource_keys = tuple(card_resource_keys)
-        recipient = self.find_nested_activity_with_method(
-            self.get_named_activity(target_activity_id),
-            "append_cards",
-        )
-        if recipient is None:
-            raise KeyError(f"Deck deal target does not accept cards: {target_activity_id}")
-        recipient.append_cards(card_resource_keys)
-
     def get_start_game_target_screen_geometry(self, target_activity_id, hand_index=None):
-        if target_activity_id == "bottom_player_hand" and hand_index is not None:
+        if hand_index is not None:
             hand = self.find_nested_activity_with_method(
                 self.get_named_activity(target_activity_id),
                 "get_prepared_card_screen_geometry",

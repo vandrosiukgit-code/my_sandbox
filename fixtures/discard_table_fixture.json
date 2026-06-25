@@ -1,0 +1,12 @@
+{
+  "initial_delay_seconds": 5,
+  "table_slots": {
+    "cards_slot_frame": ["cards.6_of_clubs", "cards.6_of_diamonds"],
+    "cards_slot_frame_2": ["cards.7_of_hearts", "cards.7_of_spades"],
+    "cards_slot_frame_3": ["cards.8_of_clubs", "cards.8_of_diamonds"],
+    "cards_slot_frame_4": ["cards.9_of_hearts", "cards.9_of_spades"],
+    "cards_slot_frame_5": ["cards.10_of_clubs", "cards.10_of_diamonds"],
+    "cards_slot_frame_6": ["cards.j_of_hearts", "cards.j_of_spades"],
+    "cards_slot_frame_7": ["cards.q_of_clubs", "cards.q_of_diamonds"]
+  }
+}
