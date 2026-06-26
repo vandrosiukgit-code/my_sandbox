@@ -1,8 +1,8 @@
 """Visible-card decorator for player hand fan activities."""
 
-import pygame
-
 from activities.base_activity import Activity
+from activities import card_visibility
+from activities import normalizers
 
 
 class VisibleCardsHandDecorator(Activity):
@@ -142,7 +142,7 @@ class VisibleCardsHandDecorator(Activity):
         frames = self.resource_manager.get_frames(resource_key)
         if not frames:
             raise KeyError(f"Card resource has no frames: {resource_key!r}")
-        return pygame.Surface(frames[0].get_size(), pygame.SRCALPHA)
+        return card_visibility.create_transparent_surface_like(frames[0])
 
     def remove_card_by_group_id(self, group_id):
         """Remove one visual card while preserving the wrapper card list order."""
@@ -230,18 +230,7 @@ class VisibleCardsHandDecorator(Activity):
 
     @staticmethod
     def normalize_cards(cards):
-        normalized = []
-        for card in cards or ():
-            if isinstance(card, str):
-                normalized.append(card)
-            elif isinstance(card, dict):
-                resource_key = card.get("resource_key") or card.get("key")
-                if not resource_key:
-                    raise TypeError(f"Card descriptor requires resource_key or key: {card!r}")
-                normalized.append(str(resource_key))
-            else:
-                raise TypeError(f"Unsupported card descriptor: {card!r}")
-        return tuple(normalized)
+        return normalizers.normalize_visible_cards(cards)
 
     def limit_cards(self, cards):
         if self.max_cards is None:
@@ -252,12 +241,7 @@ class VisibleCardsHandDecorator(Activity):
 
     @staticmethod
     def normalize_max_cards(max_cards):
-        if max_cards is None:
-            return None
-        value = int(max_cards)
-        if value < 0:
-            raise ValueError(f"max_cards must be non-negative: {max_cards!r}")
-        return value
+        return normalizers.normalize_strict_max_cards(max_cards)
 
     @staticmethod
     def normalize_slice(card_slice):

@@ -2,6 +2,7 @@
 
 from actions import SlotCardHoverFlightAction
 from activities.base_activity import Activity
+from activities import normalizers
 
 
 class PlayAreaSlotsActivity(Activity):
@@ -609,22 +610,12 @@ class PlayAreaSlotsActivity(Activity):
 
     @staticmethod
     def normalize_pair(value):
-        if isinstance(value, dict):
-            return int(round(float(value.get("x", 0)))), int(round(float(value.get("y", 0))))
-        if not isinstance(value, (tuple, list)) or len(value) < 2:
-            raise ValueError(f"Expected pair as dict/list/tuple: {value!r}")
-        return int(round(float(value[0]))), int(round(float(value[1])))
+        return normalizers.normalize_int_pair(value, error_type=ValueError)
 
     @classmethod
     def normalize_optional_pair(cls, value):
-        if value is None:
-            return None
-        return cls.normalize_pair(value)
+        return normalizers.normalize_optional_pair(value, cls.normalize_pair)
 
     @classmethod
     def normalize_offsets(cls, offsets):
-        if offsets is None:
-            return None
-        if not isinstance(offsets, (tuple, list)):
-            raise ValueError(f"slot_offsets must be a list or tuple of pairs: {offsets!r}")
-        return tuple(cls.normalize_pair(offset) for offset in offsets)
+        return normalizers.normalize_offsets(offsets, cls.normalize_pair)

@@ -2,6 +2,7 @@
 
 from actions import BotCardPlayAction
 from activities.base_activity import Activity
+from activities.generated_groups import GeneratedGroupRegistry
 
 
 class CardDealSequenceActivity(Activity):
@@ -18,9 +19,16 @@ class CardDealSequenceActivity(Activity):
         self.pending_steps = []
         self.current_action = None
         self.current_step = None
-        self.flight_groups = []
-        self.flight_index = 0
+        self.flight_group_registry = GeneratedGroupRegistry("card_deal_sequence.flight_card")
         self.sequence_active = False
+
+    @property
+    def flight_groups(self):
+        return self.flight_group_registry.iter_groups()
+
+    @flight_groups.setter
+    def flight_groups(self, groups):
+        self.flight_group_registry.set_groups(groups)
 
     def start_deal(self, snapshot):
         if self.sequence_active:
@@ -131,7 +139,7 @@ class CardDealSequenceActivity(Activity):
             flip_enabled=flip_enabled,
         )
         self.current_action = action
-        self.flight_groups.append(action.group)
+        self.flight_group_registry.append(action.group)
         self.on_step_started(player_id, resource_key, hand_index)
         action.start()
 
@@ -161,14 +169,13 @@ class CardDealSequenceActivity(Activity):
         self.sequence_active = False
 
     def get_next_flight_group_id(self):
-        self.flight_index += 1
-        return f"card_deal_sequence.flight_card.{self.flight_index}"
+        return self.flight_group_registry.next_id()
 
     def remove_flight_group(self, group):
-        self.flight_groups = [item for item in self.flight_groups if item is not group]
+        self.flight_group_registry.remove(group)
 
     def iter_generated_groups(self):
-        return tuple(self.flight_groups)
+        return self.flight_group_registry.iter_groups()
 
     def apply_fixture(self, fixture):
         """Accept the screen fixture protocol; runner starts deal snapshots explicitly."""

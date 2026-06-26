@@ -3,6 +3,8 @@
 import pygame
 
 from activities.base_activity import Activity
+from activities import card_visibility
+from activities import normalizers
 from game_screen import debug_overlay
 from group import Group
 
@@ -463,16 +465,11 @@ class CardsSlotActivityDecorator(Activity):
 
     def apply_transparent_card_surface(self, group):
         frames = self.ensure_card_original_frames(group)
-        if not frames:
-            return
-        width, height = frames[0].get_size()
-        transparent_surface = pygame.Surface((width, height), pygame.SRCALPHA)
-        group.set_primary_layer_frames([transparent_surface], position=(0, 0))
+        card_visibility.apply_transparent_primary_surface(group, frames)
 
     def restore_card_surface(self, group):
         frames = self.ensure_card_original_frames(group)
-        if frames:
-            group.set_primary_layer_frames([frame.copy() for frame in frames], position=(0, 0))
+        card_visibility.restore_primary_frames(group, frames)
 
     def calculate_generated_groups_local_bounds(self):
         bounds = None
@@ -540,10 +537,7 @@ class CardsSlotActivityDecorator(Activity):
 
     @staticmethod
     def get_fixture_cards(fixture):
-        for key in ("cards", "card_resource_keys", "resource_keys"):
-            if key in fixture:
-                return fixture[key]
-        return None
+        return normalizers.get_fixture_cards(fixture)
 
     @staticmethod
     def get_fixture_card_visual_state(fixture):
@@ -573,36 +567,19 @@ class CardsSlotActivityDecorator(Activity):
 
     @staticmethod
     def normalize_cards(cards):
-        if cards is None:
-            return tuple()
-        if isinstance(cards, str):
-            return (cards,)
-        return tuple(str(card) for card in cards)
+        return normalizers.normalize_cards(cards)
 
     def limit_cards(self, cards):
-        if self.max_cards is None:
-            return tuple(cards)
-        return tuple(cards[: self.max_cards])
+        return normalizers.limit_cards(cards, self.max_cards)
 
     @staticmethod
     def normalize_max_cards(max_cards):
-        if max_cards is None:
-            return None
-        return max(0, int(max_cards))
+        return normalizers.normalize_max_cards(max_cards)
 
     @staticmethod
     def normalize_scale_factor(value):
-        if value is None:
-            return None
-        scale = float(value)
-        if scale <= 0:
-            raise ValueError(f"scale_factor must be positive: {value!r}")
-        return scale
+        return normalizers.normalize_scale_factor(value)
 
     @staticmethod
     def normalize_pair(value):
-        if isinstance(value, dict):
-            value = (value.get("x", 0), value.get("y", 0))
-        if not isinstance(value, (tuple, list)) or len(value) < 2:
-            raise TypeError(f"Expected coordinate pair: {value!r}")
-        return int(round(float(value[0]))), int(round(float(value[1])))
+        return normalizers.normalize_int_pair(value)

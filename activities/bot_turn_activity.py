@@ -2,6 +2,7 @@
 
 from actions import BotCardPlayAction, CardSelectionAction, PlayerCardPlayAction
 from activities.base_activity import Activity
+from activities.generated_groups import GeneratedGroupRegistry
 
 
 class BotTurnActivity(Activity):
@@ -50,9 +51,16 @@ class BotTurnActivity(Activity):
         self.current_action = None
         self.current_step = None
         self.current_phase = None
-        self.flight_groups = []
+        self.flight_group_registry = GeneratedGroupRegistry("bot_turn.flight_card")
         self.pending_source_removals = []
-        self.next_flight_group_index = 0
+
+    @property
+    def flight_groups(self):
+        return self.flight_group_registry.iter_groups()
+
+    @flight_groups.setter
+    def flight_groups(self, groups):
+        self.flight_group_registry.set_groups(groups)
 
     def start(self):
         super().start()
@@ -64,9 +72,8 @@ class BotTurnActivity(Activity):
             self.current_action = None
             self.current_step = None
             self.current_phase = None
-            self.flight_groups = []
+            self.flight_group_registry.clear()
             self.pending_source_removals = []
-            self.next_flight_group_index = 0
             self.start_next_step()
         except Exception:
             self.finish()
@@ -231,7 +238,7 @@ class BotTurnActivity(Activity):
             action_kwargs["back_resource_key"] = back_resource_key
             action_kwargs["face_resource_key"] = face_resource_key
         action = action_class(**action_kwargs)
-        self.flight_groups.append(action.group)
+        self.flight_group_registry.append(action.group)
         return action
 
     def select_source_group_for_target(self, hand_activity, generated_groups, target_center):
@@ -315,8 +322,7 @@ class BotTurnActivity(Activity):
         return getattr(activity, "play_area_slots_activity", activity)
 
     def get_next_flight_group_id(self):
-        self.next_flight_group_index += 1
-        return f"bot_turn.flight_card.{self.next_flight_group_index}"
+        return self.flight_group_registry.next_id()
 
     def get_card_play_action_class(self, hand_id):
         action_type = self.hand_action_types.get(hand_id) or self.infer_hand_action_type(hand_id)
@@ -399,10 +405,10 @@ class BotTurnActivity(Activity):
             owner.remove_generated_group(source_group)
 
     def remove_flight_group(self, group):
-        self.flight_groups = [flight_group for flight_group in self.flight_groups if flight_group is not group]
+        self.flight_group_registry.remove(group)
 
     def iter_generated_groups(self):
-        return tuple(self.flight_groups)
+        return self.flight_group_registry.iter_groups()
 
     def finish(self):
         try:
@@ -413,7 +419,7 @@ class BotTurnActivity(Activity):
             self.current_step = None
             self.current_phase = None
             self.pending_steps = []
-            self.flight_groups = []
+            self.flight_group_registry.clear()
             self.pending_source_removals = []
         finally:
             if self.slot_layout_frozen and callable(self.release_slot_layout):

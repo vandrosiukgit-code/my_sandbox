@@ -2,6 +2,7 @@
 
 from actions import PlayerCardPlayAction
 from activities.base_activity import Activity
+from activities.generated_groups import GeneratedGroupRegistry
 
 
 class PlayerTurnActivity(Activity):
@@ -28,13 +29,20 @@ class PlayerTurnActivity(Activity):
         self.turn_context = None
         self.turn_active = False
         self.current_action = None
-        self.flight_groups = []
-        self.next_flight_group_index = 0
+        self.flight_group_registry = GeneratedGroupRegistry("player_turn.flight_card")
         self.freeze_slot_layout = freeze_slot_layout
         self.release_slot_layout = release_slot_layout
         self.remove_source_card = remove_source_card
         self.slot_layout_frozen = False
         self.slot_layout_release_pending = False
+
+    @property
+    def flight_groups(self):
+        return self.flight_group_registry.iter_groups()
+
+    @flight_groups.setter
+    def flight_groups(self, groups):
+        self.flight_group_registry.set_groups(groups)
 
     @staticmethod
     def validate_play_area_slots_activity(play_area_slots_activity):
@@ -85,12 +93,11 @@ class PlayerTurnActivity(Activity):
             group_id=self.get_next_flight_group_id(),
             cleanup_group=self.remove_flight_group,
         )
-        self.flight_groups.append(action.group)
+        self.flight_group_registry.append(action.group)
         return action
 
     def get_next_flight_group_id(self):
-        self.next_flight_group_index += 1
-        return f"player_turn.flight_card.{self.next_flight_group_index}"
+        return self.flight_group_registry.next_id()
 
     def build_turn_context(self, turn_context):
         context = dict(turn_context or {})
@@ -128,7 +135,7 @@ class PlayerTurnActivity(Activity):
         if self.place_turn_card_in_target_slot() and callable(self.remove_source_card):
             self.remove_source_card(self.turn_context)
         self.current_action = None
-        self.flight_groups = []
+        self.flight_group_registry.clear()
         self.turn_active = False
         self.turn_context = None
         self.slot_layout_release_pending = self.has_pending_slot_transfers()
@@ -169,17 +176,13 @@ class PlayerTurnActivity(Activity):
             self.play_area_slots_activity.draw(screen)
 
     def iter_generated_groups(self):
-        groups = list(self.flight_groups)
+        groups = list(self.flight_group_registry.iter_groups())
         if hasattr(self.play_area_slots_activity, "iter_generated_groups"):
             groups.extend(self.play_area_slots_activity.iter_generated_groups())
         return tuple(groups)
 
     def remove_flight_group(self, group):
-        self.flight_groups = [
-            flight_group
-            for flight_group in self.flight_groups
-            if flight_group is not group
-        ]
+        self.flight_group_registry.remove(group)
 
     def has_pending_slot_transfers(self):
         checker = getattr(self.play_area_slots_activity, "has_pending_slot_transfers", None)
@@ -206,7 +209,7 @@ class PlayerTurnActivity(Activity):
             self.turn_active = False
             self.turn_context = None
             self.current_action = None
-            self.flight_groups = []
+            self.flight_group_registry.clear()
             self.slot_layout_release_pending = False
         finally:
             self.release_frozen_slot_layout()

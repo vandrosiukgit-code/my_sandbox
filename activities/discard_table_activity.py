@@ -2,6 +2,7 @@
 
 from actions.bot_card_play_action import BotCardPlayAction, CardFlightGeometry
 from activities.base_activity import Activity
+from activities.generated_groups import GeneratedGroupRegistry
 from animations.base_animation import Animation
 from group.group import Group, Layer
 
@@ -27,13 +28,20 @@ class DiscardTableActivity(Activity):
         self.resource_manager = resource_manager
         self.discard_duration = max(0.0, float(duration))
         self.rise_distance = int(round(float(rise_distance)))
-        self.discard_groups = []
+        self.discard_group_registry = GeneratedGroupRegistry("discard_table.fade_card")
         self.animations = []
-        self.flight_index = 0
         self.initial_delay_seconds = 0.0
         self.delay_elapsed = 0.0
         self.sequence_active = False
         self.discard_started = False
+
+    @property
+    def discard_groups(self):
+        return self.discard_group_registry.iter_groups()
+
+    @discard_groups.setter
+    def discard_groups(self, groups):
+        self.discard_group_registry.set_groups(groups)
 
     def start_discard(self, table_slots, initial_delay_seconds=0.0):
         self.set_table_cards(table_slots)
@@ -69,7 +77,7 @@ class DiscardTableActivity(Activity):
 
     def start_fade(self):
         self.discard_started = True
-        self.discard_groups = []
+        self.discard_group_registry.clear()
         self.animations = []
         for card in self.get_table_cards():
             group = self.create_discard_group(card)
@@ -79,7 +87,7 @@ class DiscardTableActivity(Activity):
                 duration=self.discard_duration,
                 rise_distance=self.rise_distance,
             )
-            self.discard_groups.append(group)
+            self.discard_group_registry.append(group)
             self.animations.append(animation)
             self.remove_table_card(card)
             animation.start()
@@ -113,16 +121,15 @@ class DiscardTableActivity(Activity):
     def finish_sequence(self):
         self.sequence_active = False
         self.clear_table()
-        self.discard_groups = []
+        self.discard_group_registry.clear()
         self.animations = []
         self.finish()
 
     def get_next_discard_group_id(self):
-        self.flight_index += 1
-        return f"discard_table.fade_card.{self.flight_index}"
+        return self.discard_group_registry.next_id()
 
     def iter_generated_groups(self):
-        return tuple(self.discard_groups)
+        return self.discard_group_registry.iter_groups()
 
     def apply_fixture(self, fixture):
         """Accept the screen fixture protocol; runner starts discard explicitly."""

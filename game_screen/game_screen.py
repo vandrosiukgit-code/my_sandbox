@@ -7,7 +7,7 @@ import pygame
 from base import BaseGameScreen
 from actions import MoveGroupAction
 from game_screen.frame import Frame
-from game_screen.events import ScreenInputEvent, VisualCommand, FrameHit
+from game_screen.events import ActivityResult, ControllerResponse, ScreenInputEvent, VisualCommand, FrameHit
 from core.gui_manifest import DEFAULT_GUI_ACTIVITIES, GuiManifest
 
 
@@ -327,11 +327,33 @@ class GameScreen(BaseGameScreen):
             return ()
 
         if hasattr(self.game_controller, "handle_input"):
-            return self.game_controller.handle_input(input_event) or ()
+            return self.get_controller_response_commands(self.game_controller.handle_input(input_event))
 
         if input_event.group_id and hasattr(self.game_controller, "on_group_clicked"):
             self.game_controller.on_group_clicked(input_event.group_id)
         return ()
+
+    def forward_activity_result_to_controller(self, result):
+        """Send an ActivityResult to GameController and return visual commands."""
+        if self.game_controller is None:
+            return ()
+        if not isinstance(result, ActivityResult):
+            raise TypeError("result must be an ActivityResult")
+        handler = getattr(self.game_controller, "handle_activity_result", None)
+        if handler is None:
+            return ()
+        return self.get_controller_response_commands(handler(result))
+
+    @staticmethod
+    def get_controller_response_commands(response):
+        """Normalize legacy command iterables and ControllerResponse objects."""
+        if response is None:
+            return ()
+        if isinstance(response, ControllerResponse):
+            return response.commands
+        if isinstance(response, VisualCommand):
+            return (response,)
+        return tuple(response or ())
 
     def dispatch_visual_commands(self, visual_commands):
         for command in visual_commands or ():

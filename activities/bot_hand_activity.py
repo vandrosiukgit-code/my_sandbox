@@ -10,6 +10,8 @@ import math
 import pygame
 
 from activities.base_activity import Activity
+from activities import card_visibility
+from activities import normalizers
 from game_screen import debug_overlay
 from group import Group
 
@@ -104,7 +106,7 @@ class BotHandActivity(Activity):
             if index < revealed_count:
                 continue
             surface = self.resource_manager.get_frames(resource_key)[0]
-            self.set_card_base_frames(index, [pygame.Surface(surface.get_size(), pygame.SRCALPHA)], apply_layout=False)
+            self.set_card_base_frames(index, [card_visibility.create_transparent_surface_like(surface)], apply_layout=False)
         self.apply_fan_layout()
 
     def reveal_card(self, hand_index):
@@ -367,20 +369,11 @@ class BotHandActivity(Activity):
     @staticmethod
     def normalize_pair(value):
         """Return a two-number tuple from fixture/list/tuple input."""
-        if isinstance(value, dict):
-            return (float(value.get("x", 0)), float(value.get("y", 0)))
-        if isinstance(value, (tuple, list)) and len(value) >= 2:
-            return (float(value[0]), float(value[1]))
-        return (0.0, 0.0)
+        return normalizers.normalize_float_pair(value)
 
     @staticmethod
     def normalize_scale_factor(value):
-        if value is None:
-            return None
-        scale = float(value)
-        if scale <= 0:
-            raise ValueError(f"scale_factor must be positive: {value!r}")
-        return scale
+        return normalizers.normalize_scale_factor(value)
 
     def add_generated_group(self, index):
         """Создать одну visual-only Group рубашки карты."""
