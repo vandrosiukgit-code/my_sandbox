@@ -3,6 +3,23 @@
 `GameScreen` adapts raw pygame input to controller input and applies controller
 visual commands through `GuiManifest`.
 
+This file describes the GUI contract layer only. It is not the authoritative
+contract for game rules. The authoritative domain contract lives in
+`core/durak`.
+
+## Contract Hierarchy
+
+```text
+Domain contract
+    -> core/durak domain actions / domain events / snapshots
+
+Adapter contract
+    -> core/game_controller.py translations between domain and GUI
+
+GUI contract
+    -> ScreenInputEvent / ActivityResult / VisualCommand / ControllerResponse
+```
+
 ## Input Path
 
 ```text
@@ -29,7 +46,8 @@ raw_event   original pygame event
 ```
 
 It does not contain game meaning. A click on a group is only an input fact; the
-controller decides whether it matters.
+adapter/controller decides whether it matters and, if needed, translates it
+into a domain action.
 
 ## Output Path
 

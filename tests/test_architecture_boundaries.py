@@ -19,7 +19,13 @@ def imported_modules(path):
 
 class ArchitectureBoundaryTests(unittest.TestCase):
     def test_durak_domain_does_not_import_visual_runtime_modules(self):
-        forbidden_roots = {"pygame", "activities", "group", "game_screen.frame", "actions"}
+        forbidden_roots = {
+            "pygame",
+            "activities",
+            "group",
+            "game_screen",
+            "actions",
+        }
         offenders = {}
 
         for path in (PROJECT_ROOT / "core" / "durak").glob("*.py"):
@@ -28,6 +34,22 @@ class ArchitectureBoundaryTests(unittest.TestCase):
                 module
                 for module in imports
                 if module in forbidden_roots or module.split(".", 1)[0] in forbidden_roots
+            )
+            if forbidden:
+                offenders[str(path.relative_to(PROJECT_ROOT))] = forbidden
+
+        self.assertEqual(offenders, {})
+
+    def test_durak_domain_does_not_import_gui_contract_modules(self):
+        forbidden_modules = {"game_screen.events"}
+        offenders = {}
+
+        for path in (PROJECT_ROOT / "core" / "durak").glob("*.py"):
+            imports = imported_modules(path)
+            forbidden = sorted(
+                module
+                for module in imports
+                if module in forbidden_modules or module.startswith("game_screen.")
             )
             if forbidden:
                 offenders[str(path.relative_to(PROJECT_ROOT))] = forbidden

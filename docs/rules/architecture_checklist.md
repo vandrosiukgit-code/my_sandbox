@@ -22,6 +22,14 @@ Action         — short finite visual step.
 GuiManifest    — public visual command/target language.
 ```
 
+Contract hierarchy:
+
+```text
+Domain contract  -> core/durak only
+Adapter contract -> screen-facing translation layer
+GUI contract     -> ScreenInputEvent / ActivityResult / VisualCommand / ControllerResponse
+```
+
 ---
 
 ## 2. Critical boundary checklist
@@ -33,6 +41,19 @@ GuiManifest    — public visual command/target language.
 - [ ] Does not depend on `Group`, `Frame`, `Activity`, or `Action`.
 - [ ] Receives normalized input facts, not raw visual objects.
 - [ ] Emits decisions/commands, not direct visual mutations.
+
+### Domain Contract
+
+- [ ] `core/durak` owns the authoritative game rules and autonomous session flow.
+- [ ] `core/durak` exposes domain actions, domain events, and domain snapshots.
+- [ ] `core/durak` does not import GUI contracts.
+- [ ] Full game sessions can be executed and tested without GUI.
+
+### Adapter Layer
+
+- [ ] The screen-facing adapter translates between domain results and GUI contracts.
+- [ ] The adapter does not decide round completion, legal actions, or bot behavior.
+- [ ] The adapter does not become a second rules engine.
 
 ### RenderEngine
 
@@ -211,6 +232,7 @@ Check:
 - [ ] Visual `Group` is translated to `group_id`.
 - [ ] If needed, `group_id` is mapped to `card_id` / `hand_index` before game decision.
 - [ ] `GameController` decides legality and meaning.
+- [ ] GUI input is translated into domain actions before entering the domain layer.
 
 ---
 
@@ -235,6 +257,7 @@ Check:
 - [ ] Stable visual modes map to `Activity`.
 - [ ] Short visual steps map to `Action`.
 - [ ] `GroupStore` handles configured group resource/text updates.
+- [ ] Domain events are translated by the adapter layer before they become `VisualCommand`.
 
 ---
 

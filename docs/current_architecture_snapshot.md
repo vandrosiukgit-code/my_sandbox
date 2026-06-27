@@ -38,6 +38,8 @@ main.py
 - `GameScreen` normalizes mouse input into `ScreenInputEvent`.
 - `GameScreen` dispatches `VisualCommand` objects through public GUI targets.
 - `GuiManifest` is derived from configured group `manifest_targets`.
+- `core/durak` now contains autonomous Durak session logic that can conduct
+  bot-vs-bot games without GUI participation.
 
 ## Coordinate Contract
 
@@ -56,10 +58,21 @@ main.py
   that enter `pygame.Rect`, fixture positions, layer positions, blit positions,
   or scaled surface sizes are rounded to integer pixels.
 
+## Contract Layers
+
+- Domain contract:
+  `core/durak` domain actions, domain events, snapshots, and autonomous
+  session flow.
+- Adapter contract:
+  `core/game_controller.py` translation between domain results and GUI-facing
+  controller responses.
+- GUI contract:
+  `game_screen/events.py` transport types for screen/activity orchestration.
+
 ## What Is Still Draft
 
-- `GameController` has no real game rules yet. It stores a fixture
-  `GameState`, records clicks/input events, and returns no real commands.
+- `core/game_controller.py` still contains first-playable adapter logic that
+  should be reduced to a pure translator over `core/durak`.
 - `Activity` and `Action` are still base contracts; no concrete visual process
   pipeline is wired into gameplay.
 - Cards exist as assets and fixture state, but card groups are not yet part of
@@ -78,4 +91,5 @@ main.py
 1. Recreate the virtual environment from `requirements.txt`.
 2. Add a small manifest validation script for duplicate target IDs, missing
    resources, and stale group/frame references.
-3. Start implementing real `GameController` rules and card group placement.
+3. Reduce `core/game_controller.py` to a pure adapter over the domain contract.
+4. Connect GUI visual flows to domain events instead of duplicating rules.

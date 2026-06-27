@@ -194,9 +194,28 @@ Action         — short finite visual step.
 GuiManifest    — public visual command/target language.
 ```
 
+Contract hierarchy:
+
+```text
+Domain contract      — core/durak only. Game rules, game state, domain actions,
+                       domain snapshots, domain events, autonomous session flow.
+Adapter contract     — screen-facing translation between domain results and GUI
+                       commands. No game rules.
+GUI contract         — ScreenInputEvent, ActivityResult, VisualCommand,
+                       ControllerResponse. Screen/activity orchestration only.
+```
+
 Hard boundaries:
 
 - Game rules belong only to `GameController`.
+- `core/durak` is the authoritative domain layer for game rules and full
+  autonomous session flow.
+- `core/durak` must not import or depend on GUI contracts such as
+  `ScreenInputEvent`, `ActivityResult`, `VisualCommand`, or
+  `ControllerResponse`.
+- `core/game_controller.py` is a screen-facing adapter layer. It may translate
+  between domain results and GUI contracts, but it must not become a second
+  rules engine.
 - `RenderEngine` must not contain game logic or screen orchestration.
 - `GameScreen` owns screen-level orchestration.
 - `Activity` must not become a screen orchestrator.
@@ -339,6 +358,15 @@ At the end of screen-space movement, resolve the final screen position back into
 
 ## 8. Input / output flow
 
+Domain flow:
+
+```text
+External caller / tests / adapter
+    -> core/durak domain actions
+    -> core/durak controller
+    -> domain snapshot + domain events
+```
+
 Input path:
 
 ```text
@@ -374,6 +402,13 @@ table.surface
 
 over direct group/layer internals unless low-level visual code is being changed.
 
+Rule:
+
+```text
+GUI contracts are adapter-facing only.
+They must not become the primary contract for domain rules or autonomous game flow.
+```
+
 ---
 
 ## 9. Project validation checklist
@@ -381,6 +416,8 @@ over direct group/layer internals unless low-level visual code is being changed.
 After project code changes, verify the relevant items:
 
 - `GameController` has no `pygame` or visual-object dependency.
+- `core/durak` has no dependency on GUI contracts or visual runtime modules.
+- `core/game_controller.py` remains a translator, not a second owner of rules.
 - `Activity` did not gain game-rule responsibility.
 - `Activity` did not become a screen-level registry owner.
 - `Action` remains finite.

@@ -20,8 +20,13 @@ main.py
             -> active group IDs
 ```
 
-Game rules are still draft-level. `GameController` stores a fixture
-`GameState`, records input events, and returns no real game commands yet.
+Game rules are split by layer and must stay that way:
+
+- `core/durak` is the authoritative domain layer for game rules, state,
+  autonomous session flow, domain actions, snapshots, and domain events.
+- `core/game_controller.py` is a screen-facing adapter over that domain layer.
+- `game_screen/events.py` defines GUI contracts only; those types are not part
+  of the domain layer.
 
 ## Main Idea
 
@@ -105,8 +110,34 @@ TableScreen
     table/left/right/top/bottom player groups.
 
 GameController
-    Draft rule boundary. Owns game state and receives normalized input, but
-    currently only records clicks/input events.
+    Layered into two responsibilities:
+    - core/durak: authoritative game rules and autonomous session flow.
+    - core/game_controller.py: screen-facing adapter that translates domain
+      results into GUI contracts.
+
+## Contract Hierarchy
+
+The project uses a strict contract hierarchy:
+
+```text
+Domain contract
+    -> core/durak
+    -> domain actions, domain snapshot, domain events, autonomous session flow
+
+Adapter contract
+    -> core/game_controller.py
+    -> translation between domain results and GUI commands
+
+GUI contract
+    -> game_screen/events.py
+    -> ScreenInputEvent, ActivityResult, VisualCommand, ControllerResponse
+```
+
+Rules:
+
+- `core/durak` must not import GUI contracts or visual runtime modules.
+- The adapter layer may depend on both domain and GUI contracts.
+- GUI contracts must not be used as the source of truth for game rules.
 ```
 
 ## Coordinate Contract
