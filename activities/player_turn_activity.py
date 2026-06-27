@@ -35,6 +35,8 @@ class PlayerTurnActivity(Activity):
         self.remove_source_card = remove_source_card
         self.slot_layout_frozen = False
         self.slot_layout_release_pending = False
+        self.source_card_removed = False
+        self.completed_turn_context = None
 
     @property
     def flight_groups(self):
@@ -71,6 +73,7 @@ class PlayerTurnActivity(Activity):
         try:
             self.turn_context = self.build_turn_context(turn_context)
             self.current_action = self.create_player_card_action(self.turn_context)
+            self.remove_source_card_for_turn()
             if self.current_action is not None:
                 self.current_action.start()
             self.turn_active = True
@@ -95,6 +98,15 @@ class PlayerTurnActivity(Activity):
         )
         self.flight_group_registry.append(action.group)
         return action
+
+    def remove_source_card_for_turn(self):
+        """Remove the source hand card before flight so hand relayout runs with it."""
+        if self.source_card_removed:
+            return False
+        if not callable(self.remove_source_card):
+            return False
+        self.source_card_removed = bool(self.remove_source_card(self.turn_context))
+        return self.source_card_removed
 
     def get_next_flight_group_id(self):
         return self.flight_group_registry.next_id()
@@ -132,12 +144,13 @@ class PlayerTurnActivity(Activity):
 
     def finish_turn(self):
         """Finish the current visual turn without finishing the activity."""
-        if self.place_turn_card_in_target_slot() and callable(self.remove_source_card):
-            self.remove_source_card(self.turn_context)
+        self.completed_turn_context = dict(self.turn_context or {})
+        self.place_turn_card_in_target_slot()
         self.current_action = None
         self.flight_group_registry.clear()
         self.turn_active = False
         self.turn_context = None
+        self.source_card_removed = False
         self.slot_layout_release_pending = self.has_pending_slot_transfers()
         if not self.slot_layout_release_pending:
             self.release_frozen_slot_layout()
@@ -197,6 +210,11 @@ class PlayerTurnActivity(Activity):
         if hasattr(self.play_area_slots_activity, "apply_fixture"):
             self.play_area_slots_activity.apply_fixture(fixture)
 
+    def consume_completed_turn_context(self):
+        context = self.completed_turn_context
+        self.completed_turn_context = None
+        return context
+
     def is_finished(self):
         return self._finished
 
@@ -209,6 +227,8 @@ class PlayerTurnActivity(Activity):
             self.turn_active = False
             self.turn_context = None
             self.current_action = None
+            self.source_card_removed = False
+            self.completed_turn_context = None
             self.flight_group_registry.clear()
             self.slot_layout_release_pending = False
         finally:

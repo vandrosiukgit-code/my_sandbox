@@ -39,6 +39,42 @@ class DurakGameController:
             )
         ]
 
+    def get_unanswered_attack_card_ids(self) -> list[str]:
+        return [
+            pair.attack_card_id
+            for pair in self.state.table.pairs
+            if not pair.is_defended()
+        ]
+
+    def get_available_attack_card_ids(self, player_id: str) -> tuple[str, ...]:
+        if self.state.phase != GamePhase.ATTACKING or self.state.attacker_id != player_id:
+            return ()
+        return tuple(self.state.get_participant(player_id).hand)
+
+    def get_available_defense_pairs(self, player_id: str) -> tuple[tuple[str, str], ...]:
+        if self.state.phase != GamePhase.DEFENDING or self.state.defender_id != player_id:
+            return ()
+        participant = self.state.get_participant(player_id)
+        available_pairs = []
+        for attack_card_id in self.get_unanswered_attack_card_ids():
+            attack_card = self.state.cards[attack_card_id]
+            for defense_card_id in participant.hand:
+                defense_card = self.state.cards[defense_card_id]
+                if self.rules.can_beat(attack_card, defense_card, self.state.trump_suit):
+                    available_pairs.append((attack_card_id, defense_card_id))
+        return tuple(available_pairs)
+
+    def get_available_throw_in_card_ids(self, player_id: str) -> tuple[str, ...]:
+        participant = self.state.get_participant(player_id)
+        available_card_ids = []
+        for card_id in participant.hand:
+            if self.rules.can_throw_in(self.state, ThrowInAction(player_id, card_id)):
+                available_card_ids.append(card_id)
+        return tuple(available_card_ids)
+
+    def can_complete_defense(self) -> bool:
+        return self.state.phase == GamePhase.DEFENDING and self.state.table.all_defended()
+
     def apply_attack(self, action: AttackAction) -> list[GameEvent]:
         if not self.rules.can_start_attack(self.state, action):
             raise ValueError("Illegal attack")
@@ -67,10 +103,21 @@ class DurakGameController:
         defender = self.state.get_participant(action.player_id)
         defender.remove_card(action.defense_card_id)
         self.state.table.defend(action.attack_card_id, action.defense_card_id)
-        events = [GameEvent("card_defended", {"player_id": action.player_id, "attack_card_id": action.attack_card_id, "defense_card_id": action.defense_card_id})]
-        if self.state.table.all_defended():
-            events.extend(self.resolve_successful_defense())
-        return events
+        return [
+            GameEvent(
+                "card_defended",
+                {
+                    "player_id": action.player_id,
+                    "attack_card_id": action.attack_card_id,
+                    "defense_card_id": action.defense_card_id,
+                },
+            )
+        ]
+
+    def complete_defense(self) -> list[GameEvent]:
+        if not self.can_complete_defense():
+            raise ValueError("Cannot complete defense while table is not fully defended")
+        return self.resolve_successful_defense()
 
     def apply_take_cards(self, action: TakeCardsAction) -> list[GameEvent]:
         if not self.rules.can_take_cards(self.state, action):
@@ -100,6 +147,112 @@ class DurakGameController:
         self.thrower_ids.clear()
         self._update_finished_players()
         return [GameEvent("cards_discarded", {"card_ids": card_ids})]
+
+    def choose_participant_action(self, player_id: str):
+        participant = self.state.get_participant(player_id)
+        chooser = getattr(participant, "choose_action", None)
+        if not callable(chooser):
+            return None
+        try:
+            return chooser(self.state, self.rules)
+        except TypeError:
+            return chooser(self.state)
+
+    def get_throw_in_turn_order(self) -> list[str]:
+        if self.state.attacker_id is None:
+            return []
+        ordered = []
+        start_index = self.state.turn_order.index(self.state.attacker_id)
+        for offset in range(len(self.state.turn_order)):
+            player_id = self.state.turn_order[(start_index + offset) % len(self.state.turn_order)]
+            participant = self.state.participants[player_id]
+            if not participant.is_active or player_id == self.state.defender_id:
+                continue
+            ordered.append(player_id)
+        return ordered
+
+    def get_active_player_ids_with_cards(self) -> list[str]:
+        return [
+            player_id
+            for player_id in self.state.turn_order
+            if self.state.participants[player_id].is_active and self.state.participants[player_id].hand
+        ]
+
+    def next_active_player_with_cards(self, player_id: str | None) -> str | None:
+        active_ids = self.get_active_player_ids_with_cards()
+        if not active_ids:
+            return None
+        if player_id not in self.state.turn_order:
+            return active_ids[0]
+        start = self.state.turn_order.index(player_id)
+        for offset in range(1, len(self.state.turn_order) + 1):
+            candidate = self.state.turn_order[(start + offset) % len(self.state.turn_order)]
+            participant = self.state.participants[candidate]
+            if participant.is_active and participant.hand:
+                return candidate
+        return None
+
+    def normalize_turn_owners(self) -> None:
+        active_with_cards = self.get_active_player_ids_with_cards()
+        if not active_with_cards:
+            self.state.phase = GamePhase.FINISHED
+            return
+        if len(active_with_cards) == 1 and not self.state.deck.card_ids and not self.state.table.pairs:
+            for player_id, participant in self.state.participants.items():
+                participant.is_active = player_id in active_with_cards
+            self.state.fool_id = active_with_cards[0]
+            self.state.phase = GamePhase.FINISHED
+            return
+        if self.state.phase == GamePhase.ATTACKING:
+            if self.state.attacker_id not in active_with_cards:
+                self.state.attacker_id = active_with_cards[0]
+            self.state.defender_id = self.next_active_player_with_cards(self.state.attacker_id)
+
+    def play_automatic_step(self) -> list[GameEvent]:
+        if self.state.phase == GamePhase.NOT_STARTED:
+            return self.start_game()
+        self.normalize_turn_owners()
+        if self.state.phase == GamePhase.FINISHED:
+            return []
+        if self.state.phase == GamePhase.ATTACKING:
+            if self.state.attacker_id is None:
+                raise RuntimeError("Attacking phase requires attacker_id")
+            action = self.choose_participant_action(self.state.attacker_id)
+            if not isinstance(action, AttackAction):
+                raise RuntimeError(f"Attacker {self.state.attacker_id!r} did not provide AttackAction")
+            return self.apply_attack(action)
+
+        if self.get_unanswered_attack_card_ids():
+            if self.state.defender_id is None:
+                raise RuntimeError("Defending phase requires defender_id")
+            action = self.choose_participant_action(self.state.defender_id)
+            if isinstance(action, DefendAction):
+                return self.apply_defense(action)
+            if isinstance(action, TakeCardsAction):
+                return self.apply_take_cards(action)
+            if self.get_available_defense_pairs(self.state.defender_id):
+                raise RuntimeError(f"Defender {self.state.defender_id!r} has legal defense but returned {action!r}")
+            return self.apply_take_cards(TakeCardsAction(self.state.defender_id))
+
+        if self.state.table.all_defended():
+            for player_id in self.get_throw_in_turn_order():
+                action = self.choose_participant_action(player_id)
+                if isinstance(action, ThrowInAction) and self.rules.can_throw_in(self.state, action):
+                    return self.apply_throw_in(action)
+            return self.complete_defense()
+
+        return []
+
+    def play_game(self, max_steps: int = 2048) -> list[GameEvent]:
+        events: list[GameEvent] = []
+        for _ in range(max_steps):
+            if self.state.phase == GamePhase.FINISHED:
+                return events
+            step_events = self.play_automatic_step()
+            if not step_events and self.state.phase != GamePhase.FINISHED:
+                raise RuntimeError("Automatic game stalled without reaching FINISHED phase")
+            events.extend(step_events)
+        raise RuntimeError(f"Automatic game exceeded step limit: {max_steps}")
 
     def _create_initial_state(self, participants: list[BaseParticipant], cards: list[Card]) -> DurakGameState:
         if len(cards) < len(participants) * self.rules.hand_size + 1:

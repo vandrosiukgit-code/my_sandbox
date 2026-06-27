@@ -33,6 +33,16 @@ class FakePlayAreaSlotsActivity:
         return self.generated_groups
 
 
+class FakeFlightAction:
+    def __init__(self, events):
+        self.events = events
+        self.started = False
+
+    def start(self):
+        self.started = True
+        self.events.append("action.start")
+
+
 class GeneratedGroupLifecycleTests(unittest.TestCase):
     def test_card_deal_sequence_exposes_and_cleans_flight_group(self):
         activity = CardDealSequenceActivity(
@@ -59,6 +69,32 @@ class GeneratedGroupLifecycleTests(unittest.TestCase):
         activity.flight_groups = ["flight-group"]
 
         self.assertEqual(activity.iter_generated_groups(), ("flight-group", "slot-group"))
+
+    def test_player_turn_removes_source_card_before_starting_flight(self):
+        play_area = FakePlayAreaSlotsActivity()
+        events = []
+
+        class TestPlayerTurnActivity(PlayerTurnActivity):
+            def create_player_card_action(self, turn_context):
+                _ = turn_context
+                return FakeFlightAction(events)
+
+        activity = TestPlayerTurnActivity(
+            play_area,
+            remove_source_card=lambda _turn_context: events.append("source.remove") or True,
+        )
+
+        self.assertTrue(
+            activity.start_turn(
+                {
+                    "resource_key": "cards.6_of_clubs",
+                    "source_screen_geometry": {"center": (0, 0), "size": (10, 14)},
+                    "target_screen_geometry": {"center": (20, 20), "size": (10, 14)},
+                }
+            )
+        )
+        self.assertEqual(events, ["source.remove", "action.start"])
+        self.assertTrue(activity.source_card_removed)
 
     def test_discard_table_exposes_groups_during_fade_and_clears_on_finish(self):
         table_cards = [

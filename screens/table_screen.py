@@ -16,6 +16,7 @@ from activities import (
 )
 from core.resource import ResourceManager
 from game_screen import debug_overlay
+from game_screen.events import ActivityResult
 from game_screen.game_screen import GameScreen
 
 
@@ -97,7 +98,7 @@ class TableScreen(GameScreen):
             play_area_slots_activity,
             freeze_slot_layout=self.freeze_play_area_slot_layout,
             release_slot_layout=self.release_play_area_slot_layout,
-            remove_source_card=self.remove_bottom_player_hand_card,
+            remove_source_card=self.remove_hand_card,
         )
         card_deal_sequence_activity = CardDealSequenceActivity(
             source_geometry_provider=deck_activity.get_deal_source_screen_geometry,
@@ -174,8 +175,26 @@ class TableScreen(GameScreen):
         self._fixture_mtimes = {}
         self._fixture_check_elapsed = 0.0
         self._fixture_check_interval = 0.2
+        self.controller_game_started = False
+        self.controller_owned_visual_state = False
         self._bottom_player_hand_fan_area_signature = None
         self.reload_fixture_if_changed(force=True)
+
+    def start(self):
+        super().start()
+        self.start_controller_game()
+
+    def start_controller_game(self):
+        if self.controller_game_started or self.game_controller is None:
+            return
+        starter = getattr(self.game_controller, "start_game", None)
+        if not callable(starter):
+            return
+        commands = self.get_controller_response_commands(starter())
+        if commands:
+            self.controller_owned_visual_state = True
+        self.dispatch_visual_commands(commands)
+        self.controller_game_started = True
 
     def create_cards_slot_activity(self, frame, index=0):
         _ = index
@@ -410,6 +429,7 @@ class TableScreen(GameScreen):
             self.reload_fixture_if_changed()
         self.configure_bottom_player_hand_fan_area()
         super().update(dt)
+        self.forward_completed_turn_results()
 
     def draw(self, screen):
         """Draw table scene in explicit visual order.
@@ -617,7 +637,32 @@ class TableScreen(GameScreen):
         if command_type == "start_player_turn":
             payload = self.get_command_value(command, "payload", {}) or {}
             return self.start_player_turn_from_command(payload.get("turn_context", {}))
+        if command_type == "deck.set_trump":
+            payload = self.get_command_value(command, "payload", {}) or {}
+            return self.set_deck_trump_from_command(payload)
+        if command_type == "deal.initial":
+            payload = self.get_command_value(command, "payload", {}) or {}
+            return self.start_initial_deal_from_command(payload)
+        if command_type == "turn.prompt":
+            payload = self.get_command_value(command, "payload", {}) or {}
+            self.last_turn_prompt = dict(payload)
+            return None
         return super().dispatch_visual_command(command)
+
+    def set_deck_trump_from_command(self, payload):
+        deck_activity = self.get_named_activity("deck_frame")
+        setter = getattr(deck_activity, "set_trump_resource_key", None)
+        resource_key = (payload or {}).get("resource_key")
+        if callable(setter) and resource_key:
+            return setter(resource_key)
+        return None
+
+    def start_initial_deal_from_command(self, payload):
+        activity = self.get_named_activity("card_deal_sequence")
+        starter = getattr(activity, "start_deal", None)
+        if not callable(starter):
+            return None
+        return starter(payload or {})
 
     def get_start_game_target_screen_geometry(self, target_activity_id, hand_index=None):
         if hand_index is not None:
@@ -650,6 +695,16 @@ class TableScreen(GameScreen):
     def get_play_area_slots_activity(self):
         activity = self.get_named_activity("play_area_frame")
         return getattr(activity, "play_area_slots_activity", activity)
+
+    def remove_hand_card(self, turn_context):
+        """Remove the visual source card from the hand that owns the current turn."""
+        group_id = (turn_context or {}).get("group_id")
+        player_id = (turn_context or {}).get("player_id") or (turn_context or {}).get("frame_id")
+        if not group_id or not player_id:
+            return False
+        hand_activity = self.get_named_activity(player_id)
+        remover = getattr(hand_activity, "remove_card_by_group_id", None)
+        return bool(remover(group_id)) if callable(remover) else False
 
     def remove_bottom_player_hand_card(self, turn_context):
         """Remove the landed card from the lower hand's visual-only groups."""
@@ -686,12 +741,63 @@ class TableScreen(GameScreen):
         activity = self.get_named_activity("play_area_frame")
         if activity is None:
             return None
+        turn_context = self.resolve_turn_context(turn_context or {})
         if hasattr(activity, "start_turn"):
             return activity.start_turn(turn_context)
         return activity.start()
 
+    def resolve_turn_context(self, turn_context):
+        context = dict(turn_context or {})
+        if context.get("source_screen_geometry") and context.get("group_id"):
+            return context
+        player_id = context.get("player_id")
+        card_id = context.get("card_id") or context.get("resource_key")
+        if not player_id or not card_id:
+            return context
+        hand_activity = self.find_nested_activity_with_method(
+            self.get_named_activity(player_id),
+            "get_card_selection_context",
+        )
+        if hand_activity is None:
+            return context
+        geometry_owner = self.find_nested_activity_with_method(
+            self.get_named_activity(player_id),
+            "get_group_card_screen_geometry",
+        )
+        if geometry_owner is None or not hasattr(hand_activity, "iter_generated_groups"):
+            return context
+        for group in hand_activity.iter_generated_groups():
+            card_context = hand_activity.get_card_selection_context(group)
+            if not card_context:
+                continue
+            if card_context.get("card_id") != card_id and card_context.get("resource_key") != card_id:
+                continue
+            context.update(card_context)
+            context["source_screen_geometry"] = geometry_owner.get_group_card_screen_geometry(group)
+            return context
+        return context
+
+    def forward_completed_turn_results(self):
+        activity = self.get_named_activity("play_area_frame")
+        consumer = getattr(activity, "consume_completed_turn_context", None)
+        if not callable(consumer):
+            return
+        completed_context = consumer()
+        if not completed_context:
+            return
+        commands = self.forward_activity_result_to_controller(
+            ActivityResult(
+                type="turn.completed",
+                source="play_area_frame",
+                payload={"turn_context": completed_context},
+            )
+        )
+        self.dispatch_visual_commands(commands)
+
     def reload_fixture_if_changed(self, force=False):
         """Hot reload dev fixture and apply it to screen activities."""
+        if self.controller_owned_visual_state and not force:
+            return
         changed_paths = []
         existing_paths = []
         for fixture_path in self.fixture_paths:

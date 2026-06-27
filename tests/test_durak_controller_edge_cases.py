@@ -98,7 +98,11 @@ class DurakControllerEdgeCaseTests(unittest.TestCase):
 
         events = controller.apply_defense(DefendAction("defender", "a_clubs", "6_hearts"))
 
-        self.assertEqual([event.type for event in events], ["card_defended", "cards_discarded"])
+        self.assertEqual([event.type for event in events], ["card_defended"])
+
+        complete_events = controller.complete_defense()
+
+        self.assertEqual([event.type for event in complete_events], ["cards_discarded"])
 
     def test_defense_rejects_non_trump_against_trump(self):
         attacker = BaseHumanPlayer("attacker", "Attacker", 0, hand=[])
@@ -207,6 +211,7 @@ class DurakControllerEdgeCaseTests(unittest.TestCase):
         )
 
         controller.apply_defense(DefendAction("defender", "6_clubs", "7_clubs"))
+        controller.complete_defense()
 
         self.assertEqual(controller.state.attacker_id, "defender")
         self.assertEqual(controller.state.defender_id, "next")

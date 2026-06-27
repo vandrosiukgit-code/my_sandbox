@@ -148,7 +148,13 @@ class DurakGameControllerTests(unittest.TestCase):
 
         events = controller.apply_defense(DefendAction("human", "6_spades", "7_spades"))
 
-        self.assertEqual([event.type for event in events], ["card_defended", "cards_discarded"])
+        self.assertEqual([event.type for event in events], ["card_defended"])
+        self.assertEqual(controller.state.discard_pile, [])
+        self.assertEqual(controller.state.table.pairs[0].defense_card_id, "7_spades")
+
+        events = controller.complete_defense()
+
+        self.assertEqual([event.type for event in events], ["cards_discarded"])
         self.assertEqual(controller.state.discard_pile, ["6_spades", "7_spades"])
         self.assertEqual(controller.state.attacker_id, "human")
         self.assertEqual(controller.state.defender_id, "bot")
