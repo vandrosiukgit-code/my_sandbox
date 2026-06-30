@@ -98,7 +98,10 @@ Activity
     Long-lived visual behavior mode/process. Can live for a frame, for a
     phase, or for the whole game session. Examples: a player hand that lays
     out cards, reacts to hover, accepts commands, and starts short actions.
-    Can own generated visual-only groups while it lives.
+    Can own generated visual-only groups while it lives. If visual stacking
+    order differs from logical ownership order, the activity should expose
+    `iter_groups_in_draw_order()` explicitly instead of overloading
+    `iter_generated_groups()`.
 
 Action
     Short finite visual step. Starts, updates over time, and completes.
@@ -211,6 +214,29 @@ game_table
 `TableScreen.put_configured_group()` is defensive: if a configured group is not
 present in `GroupStore`, the screen simply skips it.
 
+## Table Slot Card Order
+
+Play-area table slots use a strict visual law:
+
+- first card in a slot = logical index `0`;
+- second card in a slot = logical index `1`;
+- first card must remain visually below the second card.
+
+This rule is implemented by keeping logical slot state in
+`CardsSlotActivityDecorator.generated_groups` and exposing visual stacking
+through draw-order iteration. The rule must survive every path that commits
+cards into table slots:
+
+- direct slot updates;
+- `PlayAreaSlotsActivity.place_player_card()`;
+- overflow transfer batches inside `PlayAreaSlotsActivity`;
+- player turn commit inside `PlayerTurnActivity`;
+- bot turn commit inside `BotTurnActivity`.
+
+Nested activities must preserve this contract when they aggregate child groups.
+If a parent activity simply concatenates `iter_generated_groups()` from child
+activities, it can accidentally invert visual stacking semantics.
+
 ## GUI Manifest
 
 The public GUI language is built at runtime rather than hand-authored in a
@@ -300,6 +326,22 @@ Generated groups are screen representations of controller data. They are owned
 and cleaned up by the activity that created them, but they do not create,
 delete, or mutate game entities. Game entity lifecycle belongs to
 `GameController`.
+
+When generated groups are also rendered children of another activity, two
+orders may coexist:
+
+- logical/generated order, used for indexing and commits;
+- draw order, used only for visual stacking.
+
+The project distinguishes these through:
+
+```text
+iter_generated_groups()      -> logical/runtime ownership order
+iter_groups_in_draw_order()  -> visual stacking order
+```
+
+Use the second contract only for rendering. Do not silently reinterpret the
+first contract as draw order.
 
 ## Assets
 

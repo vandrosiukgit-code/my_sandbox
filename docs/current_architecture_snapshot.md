@@ -1,6 +1,6 @@
 # Current Architecture Snapshot
 
-Date: 2026-06-05
+Date: 2026-06-30
 
 This document records the current observed architecture. It is intentionally
 shorter and more factual than the historical refactor backlog.
@@ -87,14 +87,37 @@ main.py
   external layout contract and must not infer replacement geometry from bot
   hands or rendered card bounds.
 
+## Table Slot Visual Contract
+
+- Table card slots are owned visually by `CardsSlotActivityDecorator`.
+- Slot card order is logical and stable:
+  - index `0` is the first card in the slot;
+  - index `1` is the second card in the slot.
+- Visual stacking must follow the same order:
+  - the first card is drawn first and stays visually below;
+  - the second card is drawn after it and stays visually above.
+- This rule applies equally to:
+  - direct slot rendering;
+  - placement through `PlayAreaSlotsActivity`;
+  - player-turn commit through `PlayerTurnActivity`;
+  - bot-turn commit through `BotTurnActivity`.
+- Nested activity aggregation must preserve slot draw order through
+  `iter_groups_in_draw_order()` instead of reconstructing order from
+  `iter_generated_groups()`.
+- During the final phase of a player turn, the transient flight group must be
+  drawn above settled slot cards until the commit completes.
+
 ## What Is Still Draft
 
 - `core/game_controller.py` still contains first-playable adapter logic that
   should be reduced to a pure translator over `core/durak`.
-- `Activity` and `Action` are still base contracts; no concrete visual process
-  pipeline is wired into gameplay.
-- Cards exist as assets and fixture state, but card groups are not yet part of
-  the current `TableScreen` layout.
+- `Activity` and `Action` remain base contracts, but the table screen already
+  uses concrete visual pipelines for:
+  - player hand rendering;
+  - bot hand rendering;
+  - player turn animation;
+  - bot turn animation;
+  - play-area slot aggregation and overflow transfer.
 
 ## Current Architecture Risks
 
@@ -103,6 +126,9 @@ main.py
   `python scripts/update_gui_manifest.py`.
 - The local `.venv` can be machine-specific and should be recreated before
   verification.
+- Draw-order regressions can reappear if a parent activity consumes only
+  `iter_generated_groups()` and ignores a child `iter_groups_in_draw_order()`
+  contract.
 
 ## Recommended Next Steps
 

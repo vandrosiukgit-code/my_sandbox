@@ -8,16 +8,19 @@ group-ов и подготовка конкретных ресурсов жив�
 import os
 
 from core import GameController
-from core.render_engine import RenderEngine
+from core.render_engine import RenderEngine, ScreenTransition
 from core.resource import ResourceManager
+from core.settings_repository import SettingsRepository
 from group import GroupStore
-from screens.table_screen import TableScreen
+from screens import StartMenuScreen, TableScreen
 
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(PROJECT_DIR, "assets")
 SCREEN_SIZE = (1280, 720)
+START_MENU_SCREEN_SIZE = StartMenuScreen.SCREEN_SIZE
 WINDOW_TITLE = "The Fool's Reef"
+CONFIG_PATH = os.path.join(PROJECT_DIR, "config", "game_settings.json")
 
 
 def build_app_context():
@@ -60,13 +63,40 @@ def create_screen_factory(app_context):
     return screen_factory
 
 
+def create_start_menu_screen_factory(app_context):
+    def table_screen_factory(_render_context=None):
+        ResourceManager.build_runtime_cache(app_context["assets_dir"])
+        app_context["group_store"].build()
+        return TableScreen(
+            group_store=app_context["group_store"],
+            game_controller=app_context["game_controller"],
+        )
+
+    def start_menu_factory(_render_context=None):
+        settings_repository = SettingsRepository(CONFIG_PATH)
+
+        def start_game(_config):
+            return ScreenTransition(
+                screen_factory=table_screen_factory,
+                screen_size=app_context["screen_size"],
+                title=app_context["window_title"],
+            )
+
+        return StartMenuScreen(
+            settings_repository=settings_repository,
+            on_play=start_game,
+        )
+
+    return start_menu_factory
+
+
 def main():
     """Запустить графический runtime с текущим стартовым экраном."""
     app_context = build_app_context()
-    screen_factory = create_screen_factory(app_context)
+    screen_factory = create_start_menu_screen_factory(app_context)
     render_engine = RenderEngine(
         screen_factory=screen_factory,
-        screen_size=app_context["screen_size"],
+        screen_size=START_MENU_SCREEN_SIZE,
         title=app_context["window_title"],
     )
     render_engine.run()

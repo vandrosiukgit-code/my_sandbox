@@ -29,6 +29,13 @@ class RenderContext:
     fixed_size: bool
 
 
+@dataclass(frozen=True)
+class ScreenTransition:
+    screen_factory: object
+    screen_size: tuple[int, int] | None = None
+    title: str | None = None
+
+
 class GameScreenLike(Protocol):
     """Minimal screen contract used by RenderEngine."""
 
@@ -147,6 +154,9 @@ class RenderEngine:
     def should_stop_from_event(self, event):
         """Return True when the screen explicitly requests shutdown."""
         result = self.dispatch_event(event)
+        if isinstance(result, ScreenTransition):
+            self.apply_screen_transition(result)
+            return False
         return result is False or result == "quit"
 
     def dispatch_event(self, event):
@@ -184,6 +194,19 @@ class RenderEngine:
         self.finish_screen(self.game_screen)
         self.game_screen = game_screen
         self.start_screen(self.game_screen)
+
+    def apply_screen_transition(self, transition):
+        if transition.screen_size is not None and tuple(transition.screen_size) != self.screen_size:
+            self.screen_size = tuple(transition.screen_size)
+            self.screen = pygame.display.set_mode(
+                self.screen_size,
+                flags=self.display_flags,
+                vsync=self.vsync,
+            )
+            self.context = self.build_context()
+        if transition.title is not None:
+            self.set_title(transition.title)
+        self.set_game_screen(self.create_screen(transition.screen_factory))
 
     @staticmethod
     def start_screen(game_screen):

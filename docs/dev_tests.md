@@ -17,6 +17,9 @@ Dev tests are not a replacement for unit tests or integration tests. They are
 manual smoke tests for high-risk visual flows while the gameplay layer is still
 under construction.
 
+Several slot/render-path regressions are now covered by automated tests and
+must be treated as contract checks rather than manual-only behavior.
+
 ## Test Type
 
 In QA terminology, these scenarios are closest to:
@@ -136,6 +139,8 @@ source group was not removed
 target slot did not receive resource key
 slot first/second position was overwritten incorrectly
 movement target was calculated from wrong coordinate space
+flight group was drawn under settled slot card
+slot draw order ignored first-card-under-second-card rule
 ```
 
 Avoid vague reports such as:
@@ -158,4 +163,32 @@ Automated checks:
 Dev test:
 - fixtures\action_runner.py launched player_card_play action sandbox.
 - Result: observed manually; issues recorded separately.
+```
+
+## Automated Slot/Render Contracts
+
+The following automated suites now lock the table-slot rendering contract:
+
+```text
+tests.test_table_slot_visual_order
+tests.test_generated_group_lifecycle
+tests.test_play_area_slots_activity_transfers
+tests.test_bot_turn_activity_sequence
+tests.test_card_visibility_behavior
+tests.test_first_playable_assembly
+```
+
+In particular, the following rule is no longer a manual-only expectation:
+
+```text
+When a table slot contains two cards,
+the first card stays visually below the second card.
+```
+
+The player-turn path also has a separate transient rule:
+
+```text
+During the final flight phase,
+the moving player card is drawn above already settled slot cards
+until commit completes.
 ```
