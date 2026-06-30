@@ -194,6 +194,16 @@ class PlayerTurnActivity(Activity):
             groups.extend(self.play_area_slots_activity.iter_generated_groups())
         return tuple(groups)
 
+    def iter_groups_in_draw_order(self):
+        groups = []
+        group_iterator = getattr(self.play_area_slots_activity, "iter_groups_in_draw_order", None)
+        if not callable(group_iterator):
+            group_iterator = getattr(self.play_area_slots_activity, "iter_generated_groups", None)
+        if callable(group_iterator):
+            groups.extend(group_iterator())
+        groups.extend(self.flight_group_registry.iter_groups())
+        return tuple(groups)
+
     def remove_flight_group(self, group):
         self.flight_group_registry.remove(group)
 

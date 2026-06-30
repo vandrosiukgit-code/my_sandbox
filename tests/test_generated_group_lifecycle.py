@@ -19,6 +19,7 @@ class FakePlayAreaSlotsActivity:
     def __init__(self):
         self.started = False
         self.generated_groups = ("slot-group",)
+        self.draw_groups = ("slot-draw-group",)
 
     def start(self):
         self.started = True
@@ -31,6 +32,9 @@ class FakePlayAreaSlotsActivity:
 
     def iter_generated_groups(self):
         return self.generated_groups
+
+    def iter_groups_in_draw_order(self):
+        return self.draw_groups
 
 
 class FakeFlightAction:
@@ -69,6 +73,7 @@ class GeneratedGroupLifecycleTests(unittest.TestCase):
         activity.flight_groups = ["flight-group"]
 
         self.assertEqual(activity.iter_generated_groups(), ("flight-group", "slot-group"))
+        self.assertEqual(activity.iter_groups_in_draw_order(), ("slot-draw-group", "flight-group"))
 
     def test_player_turn_removes_source_card_before_starting_flight(self):
         play_area = FakePlayAreaSlotsActivity()

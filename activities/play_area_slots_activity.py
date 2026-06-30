@@ -110,6 +110,20 @@ class PlayAreaSlotsActivity(Activity):
                 groups.append(group)
         return tuple(groups)
 
+    def iter_groups_in_draw_order(self):
+        groups = []
+        for activity in self.slot_activities.values():
+            group_iterator = getattr(activity, "iter_groups_in_draw_order", None)
+            if not callable(group_iterator):
+                group_iterator = getattr(activity, "iter_generated_groups", None)
+            if callable(group_iterator):
+                groups.extend(group_iterator())
+        for action in self.slot_transfer_actions:
+            group = getattr(action, "group", None)
+            if group is not None:
+                groups.append(group)
+        return tuple(groups)
+
     def draw_debug_overlay(self, screen):
         _ = screen
 

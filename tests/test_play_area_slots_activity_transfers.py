@@ -22,6 +22,15 @@ class FakeSlotActivity:
         index = (context or {}).get("slot_card_index", len(self.card_resource_keys))
         return {"center": (30 + index, 40), "size": (10, 14), "angle_degrees": 0.0}
 
+    def iter_generated_groups(self):
+        return tuple(
+            type("Group", (), {"id": f"group-{index}", "card_resource_key": resource_key})()
+            for index, resource_key in enumerate(self.card_resource_keys)
+        )
+
+    def iter_groups_in_draw_order(self):
+        return self.iter_generated_groups()
+
 
 class FakeAction:
     def __init__(self):
@@ -101,6 +110,20 @@ class PlayAreaSlotsTransferTests(unittest.TestCase):
         self.assertEqual(activity.pending_slot_transfer_batches, [])
         self.assertEqual(activity.pending_player_card_data, [])
         self.assertEqual(activity.next_overflow_direction, 1)
+
+    def test_iter_groups_in_draw_order_uses_slot_draw_order_contract(self):
+        activity = self.make_activity()
+        first = FakeSlotActivity(("cards.6_of_clubs", "cards.7_of_hearts"))
+        second = FakeSlotActivity(("cards.8_of_spades",))
+        activity.slot_activities = {"first": first, "second": second}
+        activity.slot_transfer_actions = []
+
+        draw_order = [group.card_resource_key for group in activity.iter_groups_in_draw_order()]
+
+        self.assertEqual(
+            draw_order,
+            ["cards.6_of_clubs", "cards.7_of_hearts", "cards.8_of_spades"],
+        )
 
     def test_resolve_slot_local_rect_prefers_explicit_override(self):
         activity = self.make_activity()

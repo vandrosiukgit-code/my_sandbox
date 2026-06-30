@@ -422,7 +422,10 @@ class CardsSlotActivityDecorator(Activity):
             pygame.draw.rect(screen, (255, 232, 64), rect, 2)
 
     def iter_generated_groups(self):
-        return tuple(reversed(self.generated_groups))
+        return tuple(self.generated_groups)
+
+    def iter_groups_in_draw_order(self):
+        return tuple(self.generated_groups)
 
     def finish(self):
         self.clear_generated_groups()

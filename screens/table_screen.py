@@ -482,9 +482,12 @@ class TableScreen(GameScreen):
         for activity in self.iter_active_activities():
             if self.should_hide_activity_generated_groups(activity):
                 continue
-            if not hasattr(activity, "iter_generated_groups"):
+            group_iterator = getattr(activity, "iter_groups_in_draw_order", None)
+            if not callable(group_iterator):
+                group_iterator = getattr(activity, "iter_generated_groups", None)
+            if not callable(group_iterator):
                 continue
-            for group in activity.iter_generated_groups():
+            for group in group_iterator():
                 if group.id in seen_group_ids:
                     continue
                 seen_group_ids.add(group.id)
