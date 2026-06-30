@@ -59,3 +59,41 @@ class BotTurnActivitySequenceTests(unittest.TestCase):
 
         activity.finish()
         self.assertEqual(activity.iter_generated_groups(), ())
+
+    def test_land_flight_group_preserves_slot_card_index_for_final_placement(self):
+        class PlayAreaSlotsActivity:
+            def __init__(self):
+                self.calls = []
+
+            def place_player_card(self, card_data):
+                self.calls.append(dict(card_data))
+                return True
+
+        play_area = PlayAreaSlotsActivity()
+        activity = BotTurnActivity(get_activity=lambda activity_id: play_area if activity_id == "play_area_frame" else None)
+        removed = []
+        activity.remove_flight_group = lambda group: removed.append(group)
+
+        flight_group = object()
+        source_group = object()
+        activity.land_flight_group(
+            flight_group,
+            "right_player_hand",
+            source_group,
+            "cards_slot_frame",
+            1,
+            "cards.q_of_clubs",
+        )
+
+        self.assertEqual(removed, [flight_group])
+        self.assertEqual(
+            play_area.calls,
+            [
+                {
+                    "resource_key": "cards.q_of_clubs",
+                    "target_slot_id": "cards_slot_frame",
+                    "slot_card_index": 1,
+                }
+            ],
+        )
+        self.assertEqual(activity.pending_source_removals, [("right_player_hand", source_group)])

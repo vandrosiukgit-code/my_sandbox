@@ -5,45 +5,14 @@ emits screen-level visual commands, but does not import pygame, Activity,
 Group, Frame, or screen geometry.
 """
 
+import random
+
 from base import BaseGameController
-from core.durak import AttackAction, BaseBotPlayer, BaseHumanPlayer, Card, DefendAction, DurakGameController
-from core.durak.actions import TakeCardsAction, ThrowInAction
-from core.durak.cards import RANK_ORDER, Rank, Suit
+from core.durak import AttackAction, BaseHumanPlayer, Card, DefendAction, DurakGameController, Rank, RuleBasedBotPlayer, Suit
+from core.durak.actions import ThrowInAction
 from core.durak.state import GamePhase
 from core.game_state import CardState, GameState
 from game_screen.events import ControllerResponse, VisualCommand
-
-
-class PassiveBotPlayer(BaseBotPlayer):
-    """Bot participant placeholder for the first controller-connected build."""
-
-    def choose_action(self, state):
-        if state.phase == GamePhase.ATTACKING and state.attacker_id == self.player_id:
-            if not self.hand:
-                return None
-            return AttackAction(self.player_id, (self.hand[0],))
-        if state.phase != GamePhase.DEFENDING:
-            return None
-        if state.defender_id == self.player_id:
-            attack_card_id = next(
-                (pair.attack_card_id for pair in state.table.pairs if not pair.is_defended()),
-                None,
-            )
-            if attack_card_id is None:
-                return None
-            attack_card = state.cards[attack_card_id]
-            for card_id in self.hand:
-                defense_card = state.cards[card_id]
-                trump_suit = state.trump_suit
-                if attack_card.suit == defense_card.suit and RANK_ORDER[defense_card.rank] > RANK_ORDER[attack_card.rank]:
-                    return DefendAction(self.player_id, attack_card_id, card_id)
-                if defense_card.suit == trump_suit and attack_card.suit != trump_suit:
-                    return DefendAction(self.player_id, attack_card_id, card_id)
-            return TakeCardsAction(self.player_id)
-        for card_id in self.hand:
-            if state.cards[card_id].rank in state.table.ranks_on_table(state.cards):
-                return ThrowInAction(self.player_id, card_id)
-        return None
 
 
 class GameController(BaseGameController):
@@ -60,19 +29,38 @@ class GameController(BaseGameController):
         self.input_events = []
         self.started = False
         self.durak_game = durak_game or self.create_default_durak_game()
+        self._last_snapshot = self.durak_game.build_snapshot()
+        self._pending_visual_commands = []
+
+    def get_waiting_player_ids(self):
+        return (self.HUMAN_PLAYER_ID,)
+
+    def queue_visual_commands(self, commands):
+        self._pending_visual_commands.extend(tuple(commands or ()))
+
+    def flush_pending_visual_commands(self):
+        if not self._pending_visual_commands:
+            return ()
+        commands = []
+        while self._pending_visual_commands:
+            command = self._pending_visual_commands.pop(0)
+            commands.append(command)
+            if getattr(command, "blocking", True):
+                break
+        return tuple(commands)
 
     def start_game(self):
         if self.started:
             return ControllerResponse(state_view=self.get_state_view())
         self.started = True
-        events = self.durak_game.start_game()
+        result = self.durak_game.build_result(self.durak_game.start_game(), waiting_player_ids=self.get_waiting_player_ids())
+        self._last_snapshot = result.snapshot
         return ControllerResponse(
             commands=(
                 self.build_deck_trump_command(),
                 self.build_initial_deal_command(),
-                self.build_turn_prompt_command(),
             ),
-            state_view={"events": events, **self.get_state_view()},
+            state_view={"events": result.events, **self.get_state_view(result)},
         )
 
     def load_fixture(self, state):
@@ -91,78 +79,92 @@ class GameController(BaseGameController):
         if input_event.type != "click" or not selected_card:
             return ControllerResponse(state_view=self.get_state_view())
 
-        command = self.apply_selected_human_card(selected_card)
-        commands = (command, self.build_turn_prompt_command()) if command is not None else (self.build_turn_prompt_command(),)
+        result, command = self.apply_selected_human_card(selected_card)
+        self._last_snapshot = result.snapshot
+        commands = (command,) if command is not None else (self.build_turn_prompt_command(result),)
         return ControllerResponse(commands=commands, state_view=self.get_state_view())
 
     def handle_activity_result(self, result):
-        _ = result
-        commands = self.continue_after_visual_step()
-        return ControllerResponse(commands=tuple(commands), state_view=self.get_state_view())
+        if getattr(result, "status", "completed") != "completed":
+            return ControllerResponse(commands=(self.build_turn_prompt_command(),), state_view=self.get_state_view())
+        queued_commands = self.flush_pending_visual_commands()
+        if queued_commands:
+            return ControllerResponse(commands=queued_commands, state_view=self.get_state_view())
+        previous_snapshot = self._last_snapshot
+        domain_result = self.durak_game.advance_to_next_checkpoint(waiting_player_ids=self.get_waiting_player_ids())
+        commands = self.build_commands_from_domain_result(domain_result, previous_snapshot)
+        self._last_snapshot = domain_result.snapshot
+        return ControllerResponse(commands=tuple(commands), state_view=self.get_state_view(domain_result))
 
     def get_state(self):
         return self.state
 
-    def get_state_view(self):
-        state = self.durak_game.state
-        available_card_ids = self.get_available_human_card_ids()
+    def get_state_view(self, domain_result=None):
+        snapshot = (domain_result.snapshot if domain_result is not None else self.durak_game.build_snapshot())
+        available_card_ids = (
+            tuple(domain_result.available_card_ids)
+            if domain_result is not None and domain_result.waiting_player_id == self.HUMAN_PLAYER_ID
+            else self.durak_game.get_available_card_ids_for_player(self.HUMAN_PLAYER_ID)
+        )
         return {
-            "phase": state.phase.value,
-            "attacker_id": state.attacker_id,
-            "defender_id": state.defender_id,
-            "trump_suit": state.trump_suit.value,
-            "trump_card_id": state.trump_card_id,
-            "deck_count": len(state.deck.card_ids),
+            "phase": snapshot.phase,
+            "attacker_id": snapshot.attacker_id,
+            "defender_id": snapshot.defender_id,
+            "trump_suit": snapshot.trump_suit,
+            "trump_card_id": snapshot.trump_card_id,
+            "deck_count": snapshot.deck_count,
             "human_available_card_ids": tuple(available_card_ids),
             "human_turn_finished": not bool(available_card_ids),
             "players": {
-                player_id: participant.get_public_view()
-                for player_id, participant in state.participants.items()
+                player.player_id: {
+                    "player_id": player.player_id,
+                    "name": player.name,
+                    "seat_index": player.seat_index,
+                    "hand_size": player.hand_size,
+                    "is_active": player.is_active,
+                }
+                for player in snapshot.players
             },
             "table": [
                 {
                     "attack_card_id": pair.attack_card_id,
                     "defense_card_id": pair.defense_card_id,
                 }
-                for pair in state.table.pairs
+                for pair in snapshot.table_pairs
             ],
         }
 
     def apply_selected_human_card(self, selected_card):
         card_id = self.resolve_selected_card_id(selected_card)
         if not card_id:
-            return None
+            return self.durak_game.build_result(waiting_player_ids=self.get_waiting_player_ids()), None
 
         state = self.durak_game.state
         player_id = self.HUMAN_PLAYER_ID
         try:
             if state.phase == GamePhase.ATTACKING and state.attacker_id == player_id:
-                events = self.durak_game.apply_attack(AttackAction(player_id, (card_id,)))
-                return self.build_play_card_command(selected_card, card_id, events)
+                result = self.durak_game.submit_action(AttackAction(player_id, (card_id,)), waiting_player_ids=self.get_waiting_player_ids())
+                return result, self.build_play_card_command(selected_card, card_id, result.events)
             if state.phase == GamePhase.DEFENDING and state.defender_id == player_id:
                 attack_card_id = self.find_first_attack_card_beaten_by(card_id)
                 if attack_card_id is None:
-                    return None
-                events = self.durak_game.apply_defense(DefendAction(player_id, attack_card_id, card_id))
-                return self.build_play_card_command(selected_card, card_id, events)
-            if state.phase == GamePhase.DEFENDING and state.defender_id != player_id:
-                events = self.durak_game.apply_throw_in(ThrowInAction(player_id, card_id))
-                return self.build_play_card_command(selected_card, card_id, events)
+                    return self.durak_game.build_result(waiting_player_ids=self.get_waiting_player_ids()), None
+                result = self.durak_game.submit_action(
+                    DefendAction(player_id, attack_card_id, card_id),
+                    waiting_player_ids=self.get_waiting_player_ids(),
+                )
+                return result, self.build_play_card_command(selected_card, card_id, result.events)
+            if state.phase == GamePhase.DEFENDING and state.defender_id != player_id and state.table.all_defended():
+                result = self.durak_game.submit_action(ThrowInAction(player_id, card_id), waiting_player_ids=self.get_waiting_player_ids())
+                return result, self.build_play_card_command(selected_card, card_id, result.events)
         except ValueError:
-            return None
-        return None
+            return self.durak_game.build_result(waiting_player_ids=self.get_waiting_player_ids()), None
+        return self.durak_game.build_result(waiting_player_ids=self.get_waiting_player_ids()), None
 
     def find_first_attack_card_beaten_by(self, defense_card_id):
-        state = self.durak_game.state
-        for pair in state.table.pairs:
-            if pair.is_defended():
-                continue
-            if self.durak_game.rules.can_beat(
-                state.cards[pair.attack_card_id],
-                state.cards[defense_card_id],
-                state.trump_suit,
-            ):
-                return pair.attack_card_id
+        for attack_card_id, candidate_defense_card_id in self.durak_game.get_available_defense_pairs(self.HUMAN_PLAYER_ID):
+            if candidate_defense_card_id == defense_card_id:
+                return attack_card_id
         return None
 
     @staticmethod
@@ -183,6 +185,7 @@ class GameController(BaseGameController):
                 "card_id": self.durak_game.state.trump_card_id,
                 "resource_key": self.durak_game.state.trump_card_id,
                 "suit": self.durak_game.state.trump_suit.value,
+                "deck_count": len(self.durak_game.state.deck.card_ids),
             },
             command_id="game.start.trump",
             blocking=False,
@@ -212,63 +215,42 @@ class GameController(BaseGameController):
                 visual_cards[player_id] = tuple(self.BOT_CARD_RESOURCE_KEY for _card_id in hand)
         return visual_cards
 
-    def build_turn_prompt_command(self):
-        available_card_ids = self.get_available_human_card_ids()
+    def build_turn_prompt_command(self, domain_result=None):
+        if domain_result is None:
+            domain_result = self.durak_game.build_result(waiting_player_ids=self.get_waiting_player_ids())
+        available_card_ids = (
+            tuple(domain_result.available_card_ids)
+            if domain_result.waiting_player_id == self.HUMAN_PLAYER_ID
+            else ()
+        )
         return VisualCommand(
             type="turn.prompt",
             payload={
-                "attacker_id": self.durak_game.state.attacker_id,
-                "defender_id": self.durak_game.state.defender_id,
-                "phase": self.durak_game.state.phase.value,
+                "attacker_id": domain_result.snapshot.attacker_id,
+                "defender_id": domain_result.snapshot.defender_id,
+                "phase": domain_result.snapshot.phase,
                 "available_card_ids": tuple(available_card_ids),
                 "turn_finished": not bool(available_card_ids),
+                "can_take_cards": bool(domain_result.can_take_cards),
             },
             command_id="game.turn.prompt",
             blocking=False,
         )
 
     def get_available_human_card_ids(self):
-        state = self.durak_game.state
-        participant = state.get_participant(self.HUMAN_PLAYER_ID)
-        hand = tuple(participant.hand)
-        if not hand:
-            return ()
-        if state.phase == GamePhase.ATTACKING and state.attacker_id == self.HUMAN_PLAYER_ID:
-            return hand
-        if state.phase != GamePhase.DEFENDING:
-            return ()
-        if state.defender_id == self.HUMAN_PLAYER_ID:
-            return self.get_available_human_defense_card_ids()
-        if not state.table.all_defended():
-            return ()
-        return self.get_available_human_throw_in_card_ids()
+        return tuple(self.durak_game.get_available_card_ids_for_player(self.HUMAN_PLAYER_ID))
 
     def get_available_human_defense_card_ids(self):
-        state = self.durak_game.state
-        participant = state.get_participant(self.HUMAN_PLAYER_ID)
-        available_card_ids = []
-        for card_id in participant.hand:
-            if self.find_first_attack_card_beaten_by(card_id) is not None:
-                available_card_ids.append(card_id)
-        return tuple(available_card_ids)
+        return tuple(
+            defense_card_id
+            for _attack_card_id, defense_card_id in self.durak_game.get_available_defense_pairs(self.HUMAN_PLAYER_ID)
+        )
 
     def get_available_human_throw_in_card_ids(self):
-        return self.get_available_throw_in_card_ids(self.HUMAN_PLAYER_ID)
+        return tuple(self.durak_game.get_available_throw_in_card_ids(self.HUMAN_PLAYER_ID))
 
     def get_available_throw_in_card_ids(self, player_id):
-        state = self.durak_game.state
-        participant = state.get_participant(player_id)
-        available_card_ids = []
-        for card_id in participant.hand:
-            try:
-                if self.durak_game.rules.can_throw_in(
-                    state,
-                    ThrowInAction(player_id, card_id),
-                ):
-                    available_card_ids.append(card_id)
-            except ValueError:
-                continue
-        return tuple(available_card_ids)
+        return tuple(self.durak_game.get_available_throw_in_card_ids(player_id))
 
     def build_play_card_command(self, selected_card, card_id, events):
         turn_context = dict(selected_card)
@@ -281,114 +263,6 @@ class GameController(BaseGameController):
             command_id=f"play.{card_id}",
             blocking=True,
         )
-
-    def continue_after_visual_step(self):
-        guard = 0
-        while guard < 12:
-            guard += 1
-            if self.durak_game.state.phase == GamePhase.FINISHED:
-                return (self.build_turn_prompt_command(),)
-            if self.should_wait_for_throw_in_window():
-                return (self.build_turn_prompt_command(),)
-            if self.is_human_waiting_for_input():
-                return (self.build_turn_prompt_command(),)
-            command = self.apply_next_automatic_step()
-            if command is not None:
-                if isinstance(command, VisualCommand) and command.type == "turn.prompt":
-                    return (command,)
-                return (command, self.build_turn_prompt_command())
-        return (self.build_turn_prompt_command(),)
-
-    def is_human_waiting_for_input(self):
-        state = self.durak_game.state
-        available_card_ids = self.get_available_human_card_ids()
-        if not available_card_ids:
-            return False
-        if state.phase == GamePhase.ATTACKING:
-            return state.attacker_id == self.HUMAN_PLAYER_ID
-        if state.phase == GamePhase.DEFENDING:
-            return state.defender_id == self.HUMAN_PLAYER_ID or state.defender_id != self.HUMAN_PLAYER_ID
-        return False
-
-    def apply_next_automatic_step(self):
-        state = self.durak_game.state
-        if state.phase == GamePhase.DEFENDING and state.defender_id == self.HUMAN_PLAYER_ID:
-            self.durak_game.apply_take_cards(TakeCardsAction(self.HUMAN_PLAYER_ID))
-            return None
-        if state.phase == GamePhase.DEFENDING and state.table.all_defended():
-            if self.any_throw_in_available():
-                if self.get_available_human_throw_in_card_ids():
-                    return self.build_turn_prompt_command()
-                return self.apply_next_automatic_throw_in()
-            self.durak_game.complete_defense()
-            return None
-
-        active_player_id = self.get_active_automatic_player_id()
-        if active_player_id is None:
-            return None
-        participant = state.get_participant(active_player_id)
-        chooser = getattr(participant, "choose_action", None)
-        if not callable(chooser):
-            return None
-        action = chooser(state)
-        if action is None:
-            return None
-        if isinstance(action, AttackAction):
-            events = self.durak_game.apply_attack(action)
-            return self.build_auto_play_card_command(active_player_id, action.card_ids[0], events)
-        if isinstance(action, DefendAction):
-            events = self.durak_game.apply_defense(action)
-            return self.build_auto_play_card_command(active_player_id, action.defense_card_id, events)
-        if isinstance(action, ThrowInAction):
-            events = self.durak_game.apply_throw_in(action)
-            return self.build_auto_play_card_command(active_player_id, action.card_id, events)
-        if isinstance(action, TakeCardsAction):
-            self.durak_game.apply_take_cards(action)
-        return None
-
-    def should_wait_for_throw_in_window(self):
-        state = self.durak_game.state
-        return (
-            state.phase == GamePhase.DEFENDING
-            and state.table.all_defended()
-            and bool(self.get_available_human_throw_in_card_ids())
-        )
-
-    def any_throw_in_available(self):
-        state = self.durak_game.state
-        if state.phase != GamePhase.DEFENDING or not state.table.all_defended():
-            return False
-        for player_id, participant in state.participants.items():
-            if player_id == state.defender_id or not participant.is_active:
-                continue
-            if self.get_available_throw_in_card_ids(player_id):
-                return True
-        return False
-
-    def apply_next_automatic_throw_in(self):
-        state = self.durak_game.state
-        for player_id in state.turn_order:
-            if player_id in (state.defender_id, self.HUMAN_PLAYER_ID):
-                continue
-            available_card_ids = self.get_available_throw_in_card_ids(player_id)
-            if not available_card_ids:
-                continue
-            action = ThrowInAction(player_id, available_card_ids[0])
-            events = self.durak_game.apply_throw_in(action)
-            return self.build_auto_play_card_command(player_id, action.card_id, events)
-        return None
-
-    def get_active_automatic_player_id(self):
-        state = self.durak_game.state
-        if state.phase == GamePhase.ATTACKING:
-            if state.attacker_id != self.HUMAN_PLAYER_ID:
-                return state.attacker_id
-            return None
-        if state.phase == GamePhase.DEFENDING:
-            if state.defender_id != self.HUMAN_PLAYER_ID:
-                return state.defender_id
-            return None
-        return None
 
     def build_auto_play_card_command(self, player_id, card_id, events):
         return VisualCommand(
@@ -405,13 +279,134 @@ class GameController(BaseGameController):
             blocking=True,
         )
 
+    def build_auto_command_from_event(self, event):
+        if event.type == "cards_attacked":
+            card_ids = tuple(event.payload.get("card_ids", ()))
+            if card_ids:
+                return self.build_auto_play_card_command(event.payload["player_id"], card_ids[0], (event,))
+        if event.type == "card_defended":
+            return self.build_auto_play_card_command(
+                event.payload["player_id"],
+                event.payload["defense_card_id"],
+                (event,),
+            )
+        if event.type == "card_thrown_in":
+            return self.build_auto_play_card_command(
+                event.payload["player_id"],
+                event.payload["card_id"],
+                (event,),
+            )
+        return None
+
+    def build_table_slots_payload(self, snapshot):
+        table_slots = {}
+        for index, pair in enumerate(snapshot.table_pairs):
+            slot_id = "cards_slot_frame" if index == 0 else f"cards_slot_frame_{index}"
+            cards = [pair.attack_card_id]
+            if pair.defense_card_id is not None:
+                cards.append(pair.defense_card_id)
+            table_slots[slot_id] = tuple(cards)
+        return table_slots
+
+    def build_visual_hand_prefix(self, player_id, count):
+        count = max(0, int(count))
+        if player_id == self.HUMAN_PLAYER_ID:
+            hand = tuple(self.durak_game.state.get_participant(player_id).hand)
+            return hand[:count]
+        return tuple(self.BOT_CARD_RESOURCE_KEY for _ in range(count))
+
+    def build_follow_up_deal_command(self, previous_snapshot, current_snapshot, baseline_hand_sizes=None):
+        previous_players = {player.player_id: player for player in previous_snapshot.players}
+        current_players = {player.player_id: player for player in current_snapshot.players}
+        baseline_hand_sizes = dict(baseline_hand_sizes or {})
+        hands_before_deal = {}
+        cards_to_deal = {}
+        deal_order = []
+        for player_id in self.PLAYER_ORDER:
+            previous_hand_size = baseline_hand_sizes.get(
+                player_id,
+                previous_players.get(player_id).hand_size if player_id in previous_players else 0,
+            )
+            current_hand_size = current_players.get(player_id).hand_size if player_id in current_players else 0
+            if current_hand_size <= previous_hand_size:
+                continue
+            current_visual_hand = self.build_visual_hand_prefix(player_id, current_hand_size)
+            hands_before_deal[player_id] = current_visual_hand[:previous_hand_size]
+            cards_to_deal[player_id] = current_visual_hand[previous_hand_size:current_hand_size]
+            deal_order.append(player_id)
+        if not cards_to_deal:
+            return None
+        return VisualCommand(
+            type="deal.initial",
+            target="card_deal_sequence",
+            payload={
+                "hands_before_deal": hands_before_deal,
+                "cards_to_deal": cards_to_deal,
+                "deal_order": tuple(deal_order),
+                "duration": 0.18,
+            },
+            command_id="game.followup.deal",
+            blocking=True,
+        )
+
+    def build_commands_from_domain_result(self, domain_result, previous_snapshot=None):
+        commands = []
+        previous_snapshot = previous_snapshot or self._last_snapshot
+        for event in domain_result.events:
+            command = self.build_auto_command_from_event(event)
+            if command is not None:
+                commands.append(command)
+                break
+            if event.type == "cards_discarded":
+                discard_command = VisualCommand(
+                    type="table.discard",
+                    payload={"table_slots": self.build_table_slots_payload(previous_snapshot)},
+                    command_id="game.table.discard",
+                    blocking=True,
+                )
+                commands.append(discard_command)
+                deal_command = self.build_follow_up_deal_command(previous_snapshot, domain_result.snapshot)
+                if deal_command is not None:
+                    self.queue_visual_commands((deal_command,))
+                break
+            if event.type == "cards_taken":
+                defender_id = event.payload["player_id"]
+                previous_players = {player.player_id: player for player in previous_snapshot.players}
+                previous_hand_size = previous_players.get(defender_id).hand_size if defender_id in previous_players else 0
+                taken_cards_count = len(event.payload.get("card_ids", ()))
+                take_command = VisualCommand(
+                    type="table.take",
+                    payload={
+                        "defender_id": defender_id,
+                        "cards_before": self.build_visual_hand_prefix(defender_id, previous_hand_size),
+                        "table_slots": self.build_table_slots_payload(previous_snapshot),
+                    },
+                    command_id="game.table.take",
+                    blocking=True,
+                )
+                commands.append(take_command)
+                baseline_hand_sizes = {
+                    defender_id: previous_hand_size + taken_cards_count,
+                }
+                deal_command = self.build_follow_up_deal_command(
+                    previous_snapshot,
+                    domain_result.snapshot,
+                    baseline_hand_sizes=baseline_hand_sizes,
+                )
+                if deal_command is not None:
+                    self.queue_visual_commands((deal_command,))
+                break
+        if not commands:
+            commands.append(self.build_turn_prompt_command(domain_result))
+        return tuple(commands)
+
     @classmethod
     def create_default_durak_game(cls):
         participants = [
             BaseHumanPlayer(cls.HUMAN_PLAYER_ID, "Player", 0),
-            PassiveBotPlayer("right_player_hand", "Right Bot", 1),
-            PassiveBotPlayer("top_player_hand", "Top Bot", 2),
-            PassiveBotPlayer("left_player_hand", "Left Bot", 3),
+            RuleBasedBotPlayer("right_player_hand", "Right Bot", 1),
+            RuleBasedBotPlayer("top_player_hand", "Top Bot", 2),
+            RuleBasedBotPlayer("left_player_hand", "Left Bot", 3),
         ]
         return DurakGameController(participants, cls.create_default_deck())
 
@@ -423,6 +418,17 @@ class GameController(BaseGameController):
             for suit in Suit
         ]
         return cls.place_card_at(cls.place_card_at(cards, "cards.6_of_hearts", 0), "cards.a_of_hearts", 24)
+
+    @classmethod
+    def create_shuffled_deck(cls, rng=None):
+        cards = [
+            Card(f"cards.{rank.value}_of_{suit.value}", rank, suit)
+            for rank in Rank
+            for suit in Suit
+        ]
+        shuffler = rng if rng is not None else random.SystemRandom()
+        shuffler.shuffle(cards)
+        return cards
 
     @staticmethod
     def place_card_at(cards, card_id, index):

@@ -2,7 +2,13 @@
 
 import unittest
 
-from tools.gui_geometry_report import apply_candidate_rects, detect_geometry_issues
+from tools.gui_geometry_report import (
+    apply_candidate_rects,
+    build_screen,
+    collect_objects,
+    detect_geometry_issues,
+    prepare_collision_test_state,
+)
 
 
 def make_object(key, x, y, width, height, kind="frame", object_id=None):
@@ -101,3 +107,212 @@ class GuiGeometryReportTests(unittest.TestCase):
         )
 
         self.assertEqual(overlaps, [])
+
+    def test_collect_objects_includes_bottom_player_fan_from_nested_activity(self):
+        screen = build_screen()
+        self.addCleanup(__import__("pygame").quit)
+
+        object_keys = {item["key"] for item in collect_objects(screen)}
+
+        self.assertIn("fan_occupied:bottom_player_hand", object_keys)
+
+    def test_prepare_collision_test_state_creates_all_four_filled_fans(self):
+        screen = build_screen()
+        self.addCleanup(__import__("pygame").quit)
+
+        prepare_collision_test_state(screen)
+        object_keys = {item["key"] for item in collect_objects(screen)}
+
+        self.assertEqual(
+            {
+                "fan_occupied:left_player_hand",
+                "fan_occupied:right_player_hand",
+                "fan_occupied:top_player_hand",
+                "fan_occupied:bottom_player_hand",
+            } - object_keys,
+            set(),
+        )
+
+    def test_build_screen_enables_bottom_player_fan_debug_overlay(self):
+        screen = build_screen()
+        self.addCleanup(__import__("pygame").quit)
+
+        activity = screen.get_named_activity("bottom_player_hand")
+        visible_cards_activity = getattr(activity, "hand_activity", None)
+        player_hand_activity = getattr(visible_cards_activity, "hand_activity", None)
+
+        self.assertIsNotNone(player_hand_activity)
+        self.assertTrue(getattr(player_hand_activity, "debug_fan_rect", False))
+
+    def test_current_bottom_left_slot_has_no_geometry_issues(self):
+        screen = build_screen()
+        self.addCleanup(__import__("pygame").quit)
+
+        report = detect_geometry_issues(
+            collect_objects(screen),
+            screen.SCREEN_SIZE,
+            collision_subject_keys=("frame:cards_slot_frame_8",),
+        )
+
+        self.assertEqual(report, ([], []))
+
+    def test_existing_table_slots_keep_fixed_legacy_rects(self):
+        screen = build_screen()
+        self.addCleanup(__import__("pygame").quit)
+
+        objects = {
+            item["key"]: item["rect"]
+            for item in collect_objects(screen)
+            if item["key"].startswith("frame:cards_slot_frame")
+        }
+
+        self.assertEqual(objects["frame:cards_slot_frame"], {"x": 567, "y": 292, "width": 138, "height": 136, "left": 567, "top": 292, "right": 705, "bottom": 428, "center": [636, 360]})
+        self.assertEqual(objects["frame:cards_slot_frame_2"], {"x": 424, "y": 292, "width": 138, "height": 136, "left": 424, "top": 292, "right": 562, "bottom": 428, "center": [493, 360]})
+        self.assertEqual(objects["frame:cards_slot_frame_3"], {"x": 710, "y": 292, "width": 138, "height": 136, "left": 710, "top": 292, "right": 848, "bottom": 428, "center": [779, 360]})
+        self.assertEqual(objects["frame:cards_slot_frame_4"], {"x": 281, "y": 292, "width": 138, "height": 136, "left": 281, "top": 292, "right": 419, "bottom": 428, "center": [350, 360]})
+        self.assertEqual(objects["frame:cards_slot_frame_5"], {"x": 853, "y": 292, "width": 138, "height": 136, "left": 853, "top": 292, "right": 991, "bottom": 428, "center": [922, 360]})
+        self.assertEqual(objects["frame:cards_slot_frame_6"], {"x": 281, "y": 144, "width": 138, "height": 136, "left": 281, "top": 144, "right": 419, "bottom": 280, "center": [350, 212]})
+        self.assertEqual(objects["frame:cards_slot_frame_7"], {"x": 853, "y": 144, "width": 138, "height": 136, "left": 853, "top": 144, "right": 991, "bottom": 280, "center": [922, 212]})
+
+    def test_upper_left_slot_override_does_not_expand_bottom_hand_corridor(self):
+        screen = build_screen()
+        self.addCleanup(__import__("pygame").quit)
+
+        bottom_fan = next(
+            item for item in collect_objects(screen)
+            if item["key"] == "fan_occupied:bottom_player_hand"
+        )
+
+        self.assertGreaterEqual(bottom_fan["rect"]["left"], 300)
+
+    def test_bottom_player_hand_keeps_legacy_interactive_fan_geometry(self):
+        screen = build_screen()
+        self.addCleanup(__import__("pygame").quit)
+
+        bottom_fan = next(
+            item["rect"]
+            for item in collect_objects(screen)
+            if item["key"] == "fan_occupied:bottom_player_hand"
+        )
+
+        self.assertEqual(
+            bottom_fan,
+            {
+                "x": 336,
+                "y": 439,
+                "width": 608,
+                "height": 256,
+                "left": 336,
+                "top": 439,
+                "right": 944,
+                "bottom": 695,
+                "center": [640, 567],
+            },
+        )
+
+    def test_slot_override_does_not_change_any_hand_fan_rect(self):
+        screen = build_screen()
+        self.addCleanup(__import__("pygame").quit)
+
+        before = {
+            item["key"]: item["rect"]
+            for item in collect_objects(screen)
+            if item["key"].startswith("fan_occupied:")
+        }
+
+        screen.apply_gui_fixture_tree(
+            {
+                "play_area_frame": {
+                    "activity": {
+                        "slot_local_rects": {
+                            "cards_slot_frame_8": [20, 20, 138, 136],
+                        },
+                    },
+                },
+            }
+        )
+        screen.update(0.0)
+
+        after = {
+            item["key"]: item["rect"]
+            for item in collect_objects(screen)
+            if item["key"].startswith("fan_occupied:")
+        }
+
+        self.assertEqual(after, before)
+
+    def test_bottom_hand_signature_ignores_extra_slot_frame(self):
+        screen = build_screen()
+        self.addCleanup(__import__("pygame").quit)
+
+        before_signature = screen.get_bottom_player_hand_fan_area_signature()
+
+        screen.apply_gui_fixture_tree(
+            {
+                "play_area_frame": {
+                    "activity": {
+                        "slot_local_rects": {
+                            "cards_slot_frame_8": [20, 20, 138, 136],
+                        },
+                    },
+                },
+            }
+        )
+        screen.update(0.0)
+
+        self.assertEqual(
+            screen.get_bottom_player_hand_fan_area_signature(),
+            before_signature,
+        )
+
+    def test_bottom_hand_signature_changes_when_anchor_slot_moves(self):
+        screen = build_screen()
+        self.addCleanup(__import__("pygame").quit)
+
+        before_signature = screen.get_bottom_player_hand_fan_area_signature()
+
+        screen.apply_gui_fixture_tree(
+            {
+                "play_area_frame": {
+                    "activity": {
+                        "slot_local_rects": {
+                            "cards_slot_frame_4": [220, 272, 138, 136],
+                        },
+                    },
+                },
+            }
+        )
+        screen.update(0.0)
+
+        self.assertNotEqual(
+            screen.get_bottom_player_hand_fan_area_signature(),
+            before_signature,
+        )
+
+    def test_hand_card_count_changes_do_not_move_play_area_slots(self):
+        screen = build_screen()
+        self.addCleanup(__import__("pygame").quit)
+
+        before = {
+            item["key"]: item["rect"]
+            for item in collect_objects(screen)
+            if item["key"].startswith("frame:cards_slot_frame")
+        }
+
+        screen.apply_card_counts_fixture(
+            {
+                "left_player_hand": 3,
+                "right_player_hand": 14,
+                "top_player_hand": 2,
+                "bottom_player_hand": 11,
+            }
+        )
+        screen.update(0.0)
+
+        after = {
+            item["key"]: item["rect"]
+            for item in collect_objects(screen)
+            if item["key"].startswith("frame:cards_slot_frame")
+        }
+
+        self.assertEqual(after, before)

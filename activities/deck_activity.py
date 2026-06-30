@@ -9,6 +9,10 @@ from group import Group
 class DeckActivity(Activity):
     """Own visual-only deck-back and face-up trump groups in one Frame."""
 
+    EMPTY_DECK_ALPHA = 120
+    TAKEN_TRUMP_ALPHA = 120
+    EMPTY_DECK_TINT = (90, 90, 90, 255)
+
     def __init__(
         self,
         frame,
@@ -17,6 +21,8 @@ class DeckActivity(Activity):
         trump_resource_key="cards.a_of_spades",
         group_id=None,
         deal_cards_callback=None,
+        deck_empty_alpha=None,
+        trump_taken_alpha=None,
     ):
         super().__init__(duration=0.0)
         self.frame = frame
@@ -26,9 +32,16 @@ class DeckActivity(Activity):
         self.group_id = group_id or f"{frame.id}.card_back"
         self.trump_group_id = f"{frame.id}.trump"
         self.deal_cards_callback = deal_cards_callback
+        self.deck_empty_alpha = self.EMPTY_DECK_ALPHA if deck_empty_alpha is None else int(deck_empty_alpha)
+        self.trump_taken_alpha = self.TAKEN_TRUMP_ALPHA if trump_taken_alpha is None else int(trump_taken_alpha)
         self.deck_group = None
         self.trump_group = None
         self.last_deal_requests = ()
+        self.deck_count = 1
+        self._deck_empty_visual_applied = False
+        self._trump_taken_visual_applied = False
+        self._deck_group_base_frames = ()
+        self._trump_group_base_frames = ()
 
     def start(self):
         if self.started:
@@ -39,12 +52,15 @@ class DeckActivity(Activity):
             (("card_back", self.resource_key),),
             resource_manager=self.resource_manager,
         )
+        self._deck_group_base_frames = self.deck_group.get_primary_layer_frames()
         self.trump_group = Group.create_group(
             self.trump_group_id,
             (("trump_face", self.trump_resource_key),),
             resource_manager=self.resource_manager,
         )
         self.rotate_trump_face()
+        self._trump_group_base_frames = self.trump_group.get_primary_layer_frames()
+        self.apply_visual_state()
         self.layout_groups()
 
     def rotate_trump_face(self):
@@ -70,7 +86,63 @@ class DeckActivity(Activity):
             resource_manager=self.resource_manager,
         )
         self.rotate_trump_face()
+        self._trump_group_base_frames = self.trump_group.get_primary_layer_frames()
+        self.apply_visual_state()
         self.layout_groups()
+
+    def set_deck_count(self, deck_count):
+        """Update only the visual empty/non-empty deck state supplied by a caller."""
+        try:
+            normalized_count = max(0, int(deck_count))
+        except (TypeError, ValueError):
+            return
+        if normalized_count == self.deck_count and self.deck_group is not None:
+            return
+        self.deck_count = normalized_count
+        self.apply_visual_state()
+
+    def apply_visual_state(self):
+        self.apply_deck_visual_state()
+        self.apply_trump_visual_state()
+
+    def apply_deck_visual_state(self):
+        if self.deck_group is None:
+            return
+        if not self._deck_group_base_frames:
+            self._deck_group_base_frames = self.deck_group.get_primary_layer_frames()
+        should_dim = self.deck_count <= 0
+        if should_dim == self._deck_empty_visual_applied:
+            return
+        if should_dim:
+            self.deck_group.set_primary_layer_frames(
+                tuple(self.build_dimmed_frame(frame, self.deck_empty_alpha) for frame in self._deck_group_base_frames)
+            )
+        else:
+            self.deck_group.set_primary_layer_frames(self._deck_group_base_frames)
+        self._deck_empty_visual_applied = should_dim
+
+    def apply_trump_visual_state(self):
+        if self.trump_group is None:
+            return
+        if not self._trump_group_base_frames:
+            self._trump_group_base_frames = self.trump_group.get_primary_layer_frames()
+        should_dim = self.deck_count <= 0
+        if should_dim == self._trump_taken_visual_applied:
+            return
+        if should_dim:
+            self.trump_group.set_primary_layer_frames(
+                tuple(self.build_dimmed_frame(frame, self.trump_taken_alpha) for frame in self._trump_group_base_frames)
+            )
+        else:
+            self.trump_group.set_primary_layer_frames(self._trump_group_base_frames)
+        self._trump_taken_visual_applied = should_dim
+
+    @classmethod
+    def build_dimmed_frame(cls, frame, alpha):
+        dimmed = frame.copy()
+        dimmed.fill(cls.EMPTY_DECK_TINT, special_flags=pygame.BLEND_RGBA_MULT)
+        dimmed.set_alpha(int(alpha))
+        return dimmed
 
     def layout_groups(self):
         """Place both visual deck groups inside the assigned local Frame."""
@@ -132,7 +204,8 @@ class DeckActivity(Activity):
     def apply_fixture(self, fixture):
         """Accept a controller-shaped deck snapshot from development fixtures.
 
-        Supported fields are ``trump_resource_key`` and ``deals``.  A deal has
+        Supported fields are ``trump_resource_key``, ``deck_count``,
+        ``deck_empty_alpha``, ``trump_taken_alpha`` and ``deals``. A deal has
         ``target_activity_id`` and ``card_resource_keys``.  The callback is
         injected by the screen, so this Activity never resolves or mutates a
         player hand itself.
@@ -141,6 +214,12 @@ class DeckActivity(Activity):
             return
         if "trump_resource_key" in fixture:
             self.set_trump_resource_key(fixture["trump_resource_key"])
+        if "deck_empty_alpha" in fixture:
+            self.deck_empty_alpha = int(fixture["deck_empty_alpha"])
+        if "trump_taken_alpha" in fixture:
+            self.trump_taken_alpha = int(fixture["trump_taken_alpha"])
+        if "deck_count" in fixture:
+            self.set_deck_count(fixture["deck_count"])
         if "deals" in fixture:
             self.deal_cards(fixture["deals"])
 
@@ -153,4 +232,6 @@ class DeckActivity(Activity):
                 self.frame.remove_group(group.id)
         self.trump_group = None
         self.deck_group = None
+        self._deck_group_base_frames = ()
+        self._trump_group_base_frames = ()
         super().finish()

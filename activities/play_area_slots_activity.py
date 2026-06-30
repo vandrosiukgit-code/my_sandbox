@@ -51,6 +51,7 @@ class PlayAreaSlotsActivity(Activity):
         self.center = None
         self.step = None
         self.slot_offsets = None
+        self.slot_local_rects = {}
         self.slot_activity_fixture = self.merge_slot_activity_fixture(None)
         self.managed_slot_ids = [self.prototype_slot_frame.id]
         self.slot_activities = {}
@@ -124,6 +125,14 @@ class PlayAreaSlotsActivity(Activity):
         if "step" in fixture:
             self.step = self.normalize_optional_pair(fixture.get("step"))
         self.slot_offsets = self.normalize_offsets(fixture.get("slot_offsets"))
+        if "slot_local_rects" in fixture:
+            # Fixture patches may override one slot at a time during geometry
+            # diagnostics, so preserve existing explicit rects unless replaced.
+            merged_slot_local_rects = dict(self.slot_local_rects)
+            merged_slot_local_rects.update(
+                self.normalize_slot_local_rects(fixture.get("slot_local_rects"))
+            )
+            self.slot_local_rects = merged_slot_local_rects
         self.slot_activity_fixture = self.merge_slot_activity_fixture(fixture.get("slot_activity"))
         self.apply_layout()
 
@@ -151,9 +160,15 @@ class PlayAreaSlotsActivity(Activity):
         for index, frame_id in enumerate(self.managed_slot_ids):
             slot_frame = self.screen.get_screen_frame(frame_id)
             offset_x, offset_y = slot_offsets[index]
-            x = center[0] + offset_x * step_x - slot_size[0] // 2
-            y = center[1] + offset_y * step_y - slot_size[1] // 2
-            slot_frame.set_local_rect((x, y, slot_size[0], slot_size[1]))
+            slot_frame.set_local_rect(
+                self.resolve_slot_local_rect(
+                    frame_id,
+                    slot_size,
+                    center,
+                    (step_x, step_y),
+                    (offset_x, offset_y),
+                )
+            )
             activity = self.slot_activities.get(frame_id)
             if activity is not None and hasattr(activity, "normalize_slot_content"):
                 activity.normalize_slot_content()
@@ -193,6 +208,7 @@ class PlayAreaSlotsActivity(Activity):
             self.center,
             self.step,
             self.slot_offsets,
+            self.freeze_mapping(self.slot_local_rects),
             self.get_layout_slot_size(
                 tuple(self.get_slot_offset(index) for index in range(self.slot_count))
             ),
@@ -293,6 +309,16 @@ class PlayAreaSlotsActivity(Activity):
             if content_rect.width > 0 and content_rect.height > 0:
                 return content_rect.size
         return self.prototype_slot_frame.local_rect.size
+
+    def resolve_slot_local_rect(self, frame_id, slot_size, center, step, offset):
+        explicit_rect = self.slot_local_rects.get(frame_id)
+        if explicit_rect is not None:
+            return explicit_rect
+        step_x, step_y = step
+        offset_x, offset_y = offset
+        x = center[0] + offset_x * step_x - slot_size[0] // 2
+        y = center[1] + offset_y * step_y - slot_size[1] // 2
+        return x, y, slot_size[0], slot_size[1]
 
     def ensure_slot_frames(self):
         target_ids = [self.get_slot_frame_id(index) for index in range(self.slot_count)]
@@ -619,3 +645,33 @@ class PlayAreaSlotsActivity(Activity):
     @classmethod
     def normalize_offsets(cls, offsets):
         return normalizers.normalize_offsets(offsets, cls.normalize_pair)
+
+    @classmethod
+    def normalize_slot_local_rects(cls, mapping):
+        if mapping is None:
+            return {}
+        if not isinstance(mapping, dict):
+            raise TypeError("slot_local_rects must be a mapping of frame_id to rect")
+        normalized = {}
+        for frame_id, rect in mapping.items():
+            if not isinstance(frame_id, str) or not frame_id:
+                raise TypeError("slot_local_rects keys must be non-empty frame_id strings")
+            normalized[frame_id] = cls.normalize_rect(rect)
+        return normalized
+
+    @classmethod
+    def normalize_rect(cls, value):
+        if isinstance(value, dict):
+            x = value.get("x")
+            y = value.get("y")
+            width = value.get("width")
+            height = value.get("height")
+            return (
+                int(round(x)),
+                int(round(y)),
+                int(round(width)),
+                int(round(height)),
+            )
+        if isinstance(value, (list, tuple)) and len(value) == 4:
+            return tuple(int(round(item)) for item in value)
+        raise TypeError("slot rect must be a 4-item sequence or mapping with x/y/width/height")

@@ -63,7 +63,12 @@ class PlayerHandActivity(BotHandActivity):
         self.fan_area_local_rect = None
 
     def set_fan_area_local_rect(self, rect):
-        """Set explicit frame-local layout area for the player hand fan."""
+        """Set explicit frame-local layout area for the player hand fan.
+
+        TableScreen owns this contract. Once provided, it is the authoritative
+        layout corridor for the interactive bottom fan and must not be inferred
+        from bot-hand geometry or generated card bounds.
+        """
         if rect is None:
             self.fan_area_local_rect = None
             return

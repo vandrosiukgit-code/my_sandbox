@@ -385,6 +385,7 @@ class BotTurnActivity(Activity):
                 {
                     "resource_key": resource_key,
                     "target_slot_id": slot_id,
+                    "slot_card_index": slot_card_index,
                 }
             )
             return

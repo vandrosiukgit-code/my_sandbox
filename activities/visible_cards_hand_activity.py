@@ -31,6 +31,7 @@ class VisibleCardsHandDecorator(Activity):
         self.owns_hand_activity = bool(owns_hand_activity)
         self.card_resource_keys = self.limit_cards(self.normalize_cards(cards or ()))
         self.revealed_card_indices = set(range(len(self.card_resource_keys)))
+        self._pending_layout_rebuild = False
         self.configure_hand_activity()
 
     @staticmethod
@@ -158,6 +159,47 @@ class VisibleCardsHandDecorator(Activity):
             self.set_cards(cards, force=True)
             return True
         return False
+
+    def extract_card_by_group_id(self, group_id):
+        """Remove one visible card without rebuilding the remaining fan yet."""
+        for group in self.hand_activity.iter_generated_groups():
+            if group.id != group_id:
+                continue
+            context = self.hand_activity.get_card_selection_context(group)
+            index = context.get("hand_index") if context is not None else None
+            if index is None or not 0 <= index < len(self.card_resource_keys):
+                return False
+            cards = list(self.card_resource_keys)
+            cards.pop(index)
+            self.card_resource_keys = tuple(cards)
+            self.revealed_card_indices = set(range(len(self.card_resource_keys)))
+            remover = getattr(self.hand_activity, "remove_generated_group", None)
+            if not callable(remover):
+                return False
+            removed = remover(group, relayout=False)
+            if removed is None:
+                return False
+            self._pending_layout_rebuild = True
+            return True
+        return False
+
+    def rebuild_layout(self):
+        """Rebuild the current fan from the preserved card list."""
+        if self._pending_layout_rebuild:
+            self.hand_activity.clear_generated_groups()
+            self.configure_hand_activity()
+            if getattr(self.hand_activity, "started", False):
+                self.hand_activity.sync_visual_groups()
+                self.hand_activity.apply_fan_layout()
+            self._pending_layout_rebuild = False
+            return True
+        if getattr(self.hand_activity, "started", False):
+            self.hand_activity.apply_fan_layout()
+            return True
+        return False
+
+    def has_pending_layout_rebuild(self):
+        return bool(self._pending_layout_rebuild)
 
     def get_card_resource_key(self, index):
         if index < 0 or index >= len(self.card_resource_keys):

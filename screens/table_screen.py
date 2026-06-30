@@ -9,14 +9,16 @@ from activities import (
     CardsSlotActivityDecorator,
     CardDealSequenceActivity,
     DeckActivity,
+    DiscardTableActivity,
     PlayerHandActivity,
     PlayerTurnActivity,
     PlayAreaSlotsActivity,
+    TakeTableActivity,
     VisibleCardsHandDecorator,
 )
 from core.resource import ResourceManager
 from game_screen import debug_overlay
-from game_screen.events import ActivityResult
+from game_screen.events import ActivityResult, ControllerResponse
 from game_screen.game_screen import GameScreen
 
 
@@ -36,12 +38,21 @@ class TableScreen(GameScreen):
     CENTER_PLAYER_FRAME_SIZE = (300, 260)
     PORTRAIT_FRAME_SIZE = (200, 200)
     DECK_FRAME_SIZE = (160, 160)
-    DECK_FRAME_POSITION = (1021, PLAY_AREA_INSET)
+    DECK_FRAME_POSITION = (1071, PLAY_AREA_INSET)
     CARD_SLOT_FRAME_SIZE_RATIO = (0.72, 0.53)
     SIDE_HAND_SLOT_GUTTER = 80
     BOTTOM_PLAYER_HAND_PROBE_ENABLED = False
     BOTTOM_PLAYER_HAND_PROBE_COLOR = (255, 0, 0)
     BOTTOM_PLAYER_HAND_PROBE_BOTTOM_OFFSET = 50
+    BOTTOM_PLAYER_HAND_ANCHOR_SLOT_FRAME_IDS = (
+        "cards_slot_frame",
+        "cards_slot_frame_2",
+        "cards_slot_frame_3",
+        "cards_slot_frame_4",
+        "cards_slot_frame_5",
+        "cards_slot_frame_6",
+        "cards_slot_frame_7",
+    )
 
     def __init__(self, group_store, game_controller):
         super().__init__(
@@ -118,6 +129,8 @@ class TableScreen(GameScreen):
                     center_offset=(0, 0),
                     max_card_angle=60,
                     sector_angle_extra=30,
+                    debug_fan_rect=True,
+                    debug_fan_rect_color=(255, 128, 64),
                 ),
                 cards=(),
                 resource_manager=ResourceManager,
@@ -178,6 +191,10 @@ class TableScreen(GameScreen):
         self.controller_game_started = False
         self.controller_owned_visual_state = False
         self._bottom_player_hand_fan_area_signature = None
+        self._bottom_player_hand_layout_lock_depth = 0
+        self._bottom_player_hand_layout_release_pending = False
+        self._bottom_player_hand_turn_rebuild_pending = False
+        self._activity_result_watchers = []
         self.reload_fixture_if_changed(force=True)
 
     def start(self):
@@ -370,17 +387,11 @@ class TableScreen(GameScreen):
             self._locked_play_area_slot_horizontal_local_bounds = None
 
     def calculate_play_area_slot_horizontal_local_bounds(self, play_area_frame):
-        """Calculate current frame-local slot bounds from visual occupancy."""
-        left_fan_rect = self.get_hand_fan_occupied_screen_rect("left_player_hand")
-        right_fan_rect = self.get_hand_fan_occupied_screen_rect("right_player_hand")
-        if left_fan_rect is not None and right_fan_rect is not None:
-            left_screen_x = left_fan_rect.right
-            right_screen_x = right_fan_rect.left
-        else:
-            left_frame_rect = self.get_frame_screen_rect("left_player_frame")
-            right_frame_rect = self.get_frame_screen_rect("right_player_frame")
-            left_screen_x = left_frame_rect.right + self.SIDE_HAND_SLOT_GUTTER
-            right_screen_x = right_frame_rect.left - self.SIDE_HAND_SLOT_GUTTER
+        """Calculate stable frame-local slot bounds from fixed side anchors."""
+        left_frame_rect = self.get_frame_screen_rect("left_player_frame")
+        right_frame_rect = self.get_frame_screen_rect("right_player_frame")
+        left_screen_x = left_frame_rect.right + self.SIDE_HAND_SLOT_GUTTER
+        right_screen_x = right_frame_rect.left - self.SIDE_HAND_SLOT_GUTTER
         left_local_x = play_area_frame.to_local((left_screen_x, 0))[0]
         right_local_x = play_area_frame.to_local((right_screen_x, 0))[0]
         content_rect = play_area_frame.content_rect
@@ -390,16 +401,6 @@ class TableScreen(GameScreen):
             max(content_rect.left, left_local_x),
             min(content_rect.right, right_local_x),
         )
-
-    def get_hand_fan_occupied_screen_rect(self, activity_id):
-        """Return an explicit hand-fan occupancy rect for slot layout."""
-        activity = self.find_nested_activity_with_method(
-            self.get_named_activity(activity_id),
-            "get_fan_occupied_screen_rect",
-        )
-        if activity is None:
-            return None
-        return activity.get_fan_occupied_screen_rect()
 
     @staticmethod
     def center_child(parent_size, child_size):
@@ -429,7 +430,10 @@ class TableScreen(GameScreen):
             self.reload_fixture_if_changed()
         self.configure_bottom_player_hand_fan_area()
         super().update(dt)
+        self.rebuild_bottom_player_hand_if_ready()
+        self.forward_activity_completion_results()
         self.forward_completed_turn_results()
+        self.release_pending_bottom_player_hand_layout()
 
     def draw(self, screen):
         """Draw table scene in explicit visual order.
@@ -501,7 +505,17 @@ class TableScreen(GameScreen):
         pygame.draw.rect(screen, self.BOTTOM_PLAYER_HAND_PROBE_COLOR, probe_rect)
 
     def calculate_bottom_player_hand_available_screen_rect(self):
-        """Return screen-space area reserved for the bottom hand arc probe."""
+        """Return the legacy interactive screen-space corridor for the bottom hand.
+
+        This is the authoritative layout input for the bottom player's fan.
+        It may depend only on stable frame geometry:
+        - bottom player hand frame;
+        - bottom player portrait frame;
+        - legacy anchor slot frames that shape the original corridor.
+
+        Dynamic hand occupancy, generated card groups, and extra slot frames
+        outside that anchor set must not change this rect.
+        """
         hand_frame = self.get_screen_frame("bottom_player_hand")
         hand_rect = hand_frame.rect.copy()
         side_slot_bounds = self.calculate_side_play_area_slot_screen_bounds()
@@ -532,6 +546,8 @@ class TableScreen(GameScreen):
         )
         if activity is None:
             return
+        if self._bottom_player_hand_layout_lock_depth > 0:
+            return
         signature = self.get_bottom_player_hand_fan_area_signature()
         if signature == self._bottom_player_hand_fan_area_signature:
             return
@@ -543,11 +559,33 @@ class TableScreen(GameScreen):
         activity.set_fan_area_local_rect(local_rect)
         self._bottom_player_hand_fan_area_signature = signature
 
+    def freeze_bottom_player_hand_layout(self):
+        self._bottom_player_hand_layout_lock_depth += 1
+        return self._bottom_player_hand_layout_lock_depth
+
+    def request_bottom_player_hand_layout_release(self):
+        if self._bottom_player_hand_layout_lock_depth <= 0:
+            return False
+        self._bottom_player_hand_layout_release_pending = True
+        return True
+
+    def release_pending_bottom_player_hand_layout(self):
+        if not self._bottom_player_hand_layout_release_pending:
+            return False
+        if self.has_blocking_visual_activity():
+            return False
+        self._bottom_player_hand_layout_lock_depth = 0
+        self._bottom_player_hand_layout_release_pending = False
+        self._bottom_player_hand_fan_area_signature = None
+        self.configure_bottom_player_hand_fan_area()
+        return True
+
     def get_bottom_player_hand_fan_area_signature(self):
+        """Return stable inputs that are allowed to relayout the bottom fan."""
         return (
             tuple(self.get_frame_screen_rect("bottom_player_hand")),
             tuple(self.get_frame_screen_rect("bottom_player_portrait")),
-            tuple(tuple(rect) for rect in self.get_play_area_slot_frame_screen_rects()),
+            tuple(tuple(rect) for rect in self.get_bottom_hand_anchor_slot_frame_screen_rects()),
         )
 
     @staticmethod
@@ -568,7 +606,7 @@ class TableScreen(GameScreen):
         return self.calculate_side_play_area_slot_screen_bounds()
 
     def calculate_side_play_area_slot_screen_bounds(self):
-        slot_rects = self.get_play_area_slot_frame_screen_rects()
+        slot_rects = self.get_bottom_hand_anchor_slot_frame_screen_rects()
         if not slot_rects:
             return None
 
@@ -587,7 +625,7 @@ class TableScreen(GameScreen):
         )
 
     def calculate_central_play_area_slots_bottom(self):
-        slot_rects = self.get_play_area_slot_frame_screen_rects()
+        slot_rects = self.get_bottom_hand_anchor_slot_frame_screen_rects()
         if len(slot_rects) < 3:
             return None
 
@@ -616,6 +654,14 @@ class TableScreen(GameScreen):
             if self.is_play_area_slot_frame_id(activity_id) and self.has_screen_frame(activity_id)
         ]
 
+    def get_bottom_hand_anchor_slot_frame_screen_rects(self):
+        """Return only the slot frames that define the legacy bottom-hand corridor."""
+        return [
+            self.get_frame_screen_rect(frame_id)
+            for frame_id in self.BOTTOM_PLAYER_HAND_ANCHOR_SLOT_FRAME_IDS
+            if self.has_screen_frame(frame_id)
+        ]
+
     def get_play_area_slot_content_screen_rects(self):
         """Return dynamic card bounds inside play-area slots for debug/inspection only."""
         rects = []
@@ -636,33 +682,225 @@ class TableScreen(GameScreen):
         command_type = self.get_command_value(command, "type")
         if command_type == "start_player_turn":
             payload = self.get_command_value(command, "payload", {}) or {}
-            return self.start_player_turn_from_command(payload.get("turn_context", {}))
+            return self.start_player_turn_from_command(payload.get("turn_context", {}), command)
         if command_type == "deck.set_trump":
             payload = self.get_command_value(command, "payload", {}) or {}
             return self.set_deck_trump_from_command(payload)
         if command_type == "deal.initial":
             payload = self.get_command_value(command, "payload", {}) or {}
-            return self.start_initial_deal_from_command(payload)
+            return self.start_initial_deal_from_command(payload, command)
+        if command_type == "table.take":
+            payload = self.get_command_value(command, "payload", {}) or {}
+            return self.start_take_table_from_command(payload, command)
+        if command_type == "table.discard":
+            payload = self.get_command_value(command, "payload", {}) or {}
+            return self.start_discard_table_from_command(payload, command)
         if command_type == "turn.prompt":
             payload = self.get_command_value(command, "payload", {}) or {}
             self.last_turn_prompt = dict(payload)
             return None
         return super().dispatch_visual_command(command)
 
+    def dispatch_visual_commands(self, visual_commands):
+        for command in visual_commands or ():
+            self.dispatch_visual_command(command)
+
     def set_deck_trump_from_command(self, payload):
         deck_activity = self.get_named_activity("deck_frame")
         setter = getattr(deck_activity, "set_trump_resource_key", None)
+        deck_count_setter = getattr(deck_activity, "set_deck_count", None)
         resource_key = (payload or {}).get("resource_key")
         if callable(setter) and resource_key:
-            return setter(resource_key)
+            setter(resource_key)
+        deck_count = (payload or {}).get("deck_count")
+        if callable(deck_count_setter) and deck_count is not None:
+            return deck_count_setter(deck_count)
         return None
 
-    def start_initial_deal_from_command(self, payload):
+    def sync_deck_activity_from_state_view(self, state_view):
+        if not isinstance(state_view, dict):
+            return None
+        deck_count = state_view.get("deck_count")
+        if deck_count is None:
+            return None
+        deck_activity = self.get_named_activity("deck_frame")
+        setter = getattr(deck_activity, "set_deck_count", None)
+        if callable(setter):
+            return setter(deck_count)
+        return None
+
+    def get_controller_response_commands(self, response):
+        commands = GameScreen.get_controller_response_commands(response)
+        state_view = getattr(response, "state_view", None) if isinstance(response, ControllerResponse) else None
+        self.sync_deck_activity_from_state_view(state_view)
+        return commands
+
+    def start_initial_deal_from_command(self, payload, command=None):
         activity = self.get_named_activity("card_deal_sequence")
         starter = getattr(activity, "start_deal", None)
         if not callable(starter):
             return None
-        return starter(payload or {})
+        started = starter(payload or {})
+        if started:
+            self.register_activity_result_watcher(
+                activity=activity,
+                result=ActivityResult(
+                    type="deal.completed",
+                    source="card_deal_sequence",
+                    command_id=getattr(command, "command_id", None),
+                ),
+                completion_check=lambda watched_activity: (
+                    not getattr(watched_activity, "sequence_active", False)
+                    and getattr(watched_activity, "current_action", None) is None
+                ),
+            )
+        return started
+
+    def get_current_table_cards(self):
+        result = []
+        slots = self.get_play_area_slots_activity().slot_activities
+        for slot_id, slot in slots.items():
+            for index, key in enumerate(slot.card_resource_keys):
+                result.append(
+                    {
+                        "slot_id": slot_id,
+                        "resource_key": key,
+                        "geometry": slot.get_card_screen_geometry(index),
+                    }
+                )
+        return result
+
+    def set_current_table_cards(self, table_slots):
+        self.clear_play_area_slot_cards()
+        slots = self.get_play_area_slots_activity().slot_activities
+        for slot_id, cards in (table_slots or {}).items():
+            if slot_id in slots:
+                slots[slot_id].set_cards(cards, force=True)
+
+    def remove_current_table_card(self, card):
+        slots = self.get_play_area_slots_activity().slot_activities
+        slot = slots[card["slot_id"]]
+        cards = list(slot.card_resource_keys)
+        if card["resource_key"] in cards:
+            cards.remove(card["resource_key"])
+        slot.set_cards(cards, force=True)
+
+    def register_activity_result_watcher(self, activity, result, completion_check=None):
+        if activity is None:
+            return
+        if not hasattr(self, "_activity_result_watchers"):
+            self._activity_result_watchers = []
+        if completion_check is None:
+            completion_check = lambda watched_activity: callable(getattr(watched_activity, "is_finished", None)) and watched_activity.is_finished()
+        self._activity_result_watchers.append(
+            {
+                "activity": activity,
+                "result": result,
+                "completion_check": completion_check,
+            }
+        )
+
+    def forward_activity_completion_results(self):
+        pending_watchers = []
+        completed_results = []
+        for watcher in self._activity_result_watchers:
+            activity = watcher["activity"]
+            completion_check = watcher["completion_check"]
+            try:
+                completed = bool(completion_check(activity))
+            except Exception:
+                completed = False
+            if completed:
+                completed_results.append(watcher["result"])
+            else:
+                pending_watchers.append(watcher)
+        self._activity_result_watchers = pending_watchers
+        for result in completed_results:
+            if result.type in {"table.take.completed", "table.discard.completed", "deal.completed"}:
+                self.request_bottom_player_hand_layout_release()
+            commands = self.forward_activity_result_to_controller(result)
+            self.dispatch_visual_commands(commands)
+
+    def start_take_table_from_command(self, payload, command=None):
+        defender_id = payload.get("defender_id")
+        table_slots = payload.get("table_slots", {})
+        cards_before = tuple(payload.get("cards_before", ()))
+        self.set_current_table_cards(table_slots)
+        activity = TakeTableActivity(
+            self.get_current_table_cards,
+            self.set_current_table_cards,
+            self.remove_current_table_card,
+            self.prepare_card_deal_hands,
+            self.get_start_game_target_screen_geometry,
+            self.reveal_card_deal,
+            self.clear_play_area_slot_cards,
+            ResourceManager,
+            0.26,
+        )
+        self.add_activity(activity)
+        started = activity.start_take_plan(
+            (
+                {
+                    "defender_id": defender_id,
+                    "cards_before": cards_before,
+                    "table_slots": table_slots,
+                },
+            ),
+            0.0,
+        )
+        if started:
+            self.register_activity_result_watcher(
+                activity=activity,
+                result=ActivityResult(
+                    type="table.take.completed",
+                    source="take_table",
+                    command_id=getattr(command, "command_id", None),
+                ),
+            )
+        return started
+
+    def start_discard_table_from_command(self, payload, command=None):
+        table_slots = payload.get("table_slots", {})
+        self.set_current_table_cards(table_slots)
+        activity = DiscardTableActivity(
+            self.get_current_table_cards,
+            self.set_current_table_cards,
+            self.remove_current_table_card,
+            self.clear_play_area_slot_cards,
+            ResourceManager,
+            0.5,
+            45,
+        )
+        self.add_activity(activity)
+        started = activity.start_discard(table_slots, 0.0)
+        if started:
+            self.register_activity_result_watcher(
+                activity=activity,
+                result=ActivityResult(
+                    type="table.discard.completed",
+                    source="discard_table",
+                    command_id=getattr(command, "command_id", None),
+                ),
+            )
+        return started
+
+    def has_blocking_visual_activity(self):
+        for activity in self.iter_active_activities():
+            if getattr(activity, "turn_active", False):
+                return True
+            if getattr(activity, "sequence_active", False):
+                return True
+            if getattr(activity, "plan_active", False):
+                return True
+            if getattr(activity, "slot_layout_release_pending", False):
+                return True
+            current_action = getattr(activity, "current_action", None)
+            if current_action is not None:
+                return True
+            animations = getattr(activity, "animations", None)
+            if animations and any(not animation.is_finished() for animation in animations):
+                return True
+        return False
 
     def get_start_game_target_screen_geometry(self, target_activity_id, hand_index=None):
         if hand_index is not None:
@@ -703,8 +941,41 @@ class TableScreen(GameScreen):
         if not group_id or not player_id:
             return False
         hand_activity = self.get_named_activity(player_id)
+        extractor = getattr(hand_activity, "extract_card_by_group_id", None)
         remover = getattr(hand_activity, "remove_card_by_group_id", None)
-        return bool(remover(group_id)) if callable(remover) else False
+        if player_id == "bottom_player_hand" and callable(extractor):
+            removed = bool(extractor(group_id))
+        else:
+            removed = bool(remover(group_id)) if callable(remover) else False
+        if removed and player_id == "bottom_player_hand":
+            self.freeze_bottom_player_hand_layout()
+            self._bottom_player_hand_turn_rebuild_pending = True
+        return removed
+
+    def rebuild_bottom_player_hand_after_turn(self):
+        hand_activity = self.get_named_activity("bottom_player_hand")
+        rebuilder = getattr(hand_activity, "rebuild_layout", None)
+        rebuilt = bool(rebuilder()) if callable(rebuilder) else False
+        if rebuilt:
+            self._bottom_player_hand_turn_rebuild_pending = False
+        return rebuilt
+
+    def rebuild_bottom_player_hand_if_ready(self):
+        hand_activity = self.get_named_activity("bottom_player_hand")
+        has_pending = getattr(hand_activity, "has_pending_layout_rebuild", None)
+        if not self._bottom_player_hand_turn_rebuild_pending and (
+            not callable(has_pending) or not has_pending()
+        ):
+            return False
+        turn_activity = self.get_named_activity("play_area_frame")
+        if turn_activity is not None:
+            if getattr(turn_activity, "turn_active", False):
+                return False
+            if getattr(turn_activity, "current_action", None) is not None:
+                return False
+            if getattr(turn_activity, "slot_layout_release_pending", False):
+                return False
+        return self.rebuild_bottom_player_hand_after_turn()
 
     def remove_bottom_player_hand_card(self, turn_context):
         """Remove the landed card from the lower hand's visual-only groups."""
@@ -737,11 +1008,13 @@ class TableScreen(GameScreen):
             )
         )
 
-    def start_player_turn_from_command(self, turn_context):
+    def start_player_turn_from_command(self, turn_context, command=None):
         activity = self.get_named_activity("play_area_frame")
         if activity is None:
             return None
         turn_context = self.resolve_turn_context(turn_context or {})
+        if getattr(command, "command_id", None):
+            turn_context["command_id"] = command.command_id
         if hasattr(activity, "start_turn"):
             return activity.start_turn(turn_context)
         return activity.start()
@@ -766,7 +1039,8 @@ class TableScreen(GameScreen):
         )
         if geometry_owner is None or not hasattr(hand_activity, "iter_generated_groups"):
             return context
-        for group in hand_activity.iter_generated_groups():
+        generated_groups = tuple(hand_activity.iter_generated_groups())
+        for group in generated_groups:
             card_context = hand_activity.get_card_selection_context(group)
             if not card_context:
                 continue
@@ -775,6 +1049,13 @@ class TableScreen(GameScreen):
             context.update(card_context)
             context["source_screen_geometry"] = geometry_owner.get_group_card_screen_geometry(group)
             return context
+        if generated_groups:
+            fallback_group = generated_groups[-1]
+            fallback_context = hand_activity.get_card_selection_context(fallback_group) or {}
+            context.update(fallback_context)
+            context["card_id"] = card_id
+            context["resource_key"] = card_id
+            context["source_screen_geometry"] = geometry_owner.get_group_card_screen_geometry(fallback_group)
         return context
 
     def forward_completed_turn_results(self):
@@ -785,10 +1066,12 @@ class TableScreen(GameScreen):
         completed_context = consumer()
         if not completed_context:
             return
+        self.rebuild_bottom_player_hand_after_turn()
         commands = self.forward_activity_result_to_controller(
             ActivityResult(
                 type="turn.completed",
                 source="play_area_frame",
+                command_id=completed_context.get("command_id"),
                 payload={"turn_context": completed_context},
             )
         )

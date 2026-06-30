@@ -2,6 +2,7 @@
 
 from core.durak.actions import AttackAction, DefendAction, TakeCardsAction, ThrowInAction
 from core.durak.cards import Card, RANK_ORDER
+from core.durak.contracts import DomainResult, GameSnapshot, PlayerSnapshot, TablePairSnapshot
 from core.durak.events import GameEvent
 from core.durak.participants import BaseParticipant
 from core.durak.rules import DurakRules
@@ -38,6 +39,98 @@ class DurakGameController:
                 },
             )
         ]
+
+    def build_snapshot(self) -> GameSnapshot:
+        return GameSnapshot(
+            phase=self.state.phase.value,
+            attacker_id=self.state.attacker_id,
+            defender_id=self.state.defender_id,
+            trump_suit=self.state.trump_suit.value,
+            trump_card_id=self.state.trump_card_id,
+            deck_count=len(self.state.deck.card_ids),
+            discard_count=len(self.state.discard_pile),
+            fool_id=self.state.fool_id,
+            players=tuple(
+                PlayerSnapshot(
+                    player_id=participant.player_id,
+                    name=participant.name,
+                    seat_index=participant.seat_index,
+                    hand_size=participant.hand_size(),
+                    is_active=participant.is_active,
+                )
+                for participant in self.state.participants.values()
+            ),
+            table_pairs=tuple(
+                TablePairSnapshot(
+                    attack_card_id=pair.attack_card_id,
+                    defense_card_id=pair.defense_card_id,
+                )
+                for pair in self.state.table.pairs
+            ),
+        )
+
+    def get_available_card_ids_for_player(self, player_id: str) -> tuple[str, ...]:
+        participant = self.state.get_participant(player_id)
+        if not participant.hand:
+            return ()
+        if self.state.phase == GamePhase.ATTACKING and self.state.attacker_id == player_id:
+            return self.get_available_attack_card_ids(player_id)
+        if self.state.phase != GamePhase.DEFENDING:
+            return ()
+        if self.state.defender_id == player_id:
+            return tuple(defense_card_id for _attack_card_id, defense_card_id in self.get_available_defense_pairs(player_id))
+        if not self.state.table.all_defended():
+            return ()
+        return self.get_available_throw_in_card_ids(player_id)
+
+    def can_player_take_cards(self, player_id: str) -> bool:
+        return bool(self.rules.can_take_cards(self.state, TakeCardsAction(player_id)))
+
+    def get_waiting_player_id(self, player_ids) -> str | None:
+        for player_id in player_ids or ():
+            if self.get_available_card_ids_for_player(player_id):
+                return player_id
+            if self.state.phase == GamePhase.DEFENDING and self.state.defender_id == player_id and self.can_player_take_cards(player_id):
+                return player_id
+        return None
+
+    def build_result(self, events=(), waiting_player_ids=()) -> DomainResult:
+        waiting_player_id = self.get_waiting_player_id(tuple(waiting_player_ids or ()))
+        available_card_ids = ()
+        can_take_cards = False
+        if waiting_player_id is not None:
+            available_card_ids = self.get_available_card_ids_for_player(waiting_player_id)
+            can_take_cards = self.can_player_take_cards(waiting_player_id)
+        return DomainResult(
+            events=tuple(events or ()),
+            snapshot=self.build_snapshot(),
+            waiting_player_id=waiting_player_id,
+            available_card_ids=tuple(available_card_ids),
+            can_take_cards=bool(can_take_cards),
+        )
+
+    def submit_action(self, action, waiting_player_ids=()) -> DomainResult:
+        if isinstance(action, AttackAction):
+            events = self.apply_attack(action)
+        elif isinstance(action, DefendAction):
+            events = self.apply_defense(action)
+        elif isinstance(action, ThrowInAction):
+            events = self.apply_throw_in(action)
+        elif isinstance(action, TakeCardsAction):
+            events = self.apply_take_cards(action)
+        else:
+            raise TypeError(f"Unsupported domain action: {type(action)!r}")
+        return self.build_result(events, waiting_player_ids=waiting_player_ids)
+
+    def advance_to_next_checkpoint(self, waiting_player_ids=(), max_steps: int = 64) -> DomainResult:
+        for _ in range(max_steps):
+            result = self.build_result(waiting_player_ids=waiting_player_ids)
+            if result.waiting_player_id is not None or self.state.phase == GamePhase.FINISHED:
+                return result
+            step_events = self.play_automatic_step()
+            if step_events:
+                return self.build_result(step_events, waiting_player_ids=waiting_player_ids)
+        raise RuntimeError(f"Failed to reach next checkpoint within {max_steps} steps")
 
     def get_unanswered_attack_card_ids(self) -> list[str]:
         return [

@@ -20,6 +20,12 @@ from screens.table_screen import TableScreen
 
 
 ASSETS_DIR = os.path.join(PROJECT_DIR, "assets")
+DEFAULT_COLLISION_TEST_CARD_COUNTS = {
+    "left_player_hand": 18,
+    "right_player_hand": 18,
+    "top_player_hand": 18,
+    "bottom_player_hand": 18,
+}
 
 
 def rect_data(rect):
@@ -44,6 +50,18 @@ def build_screen():
     group_store.build()
     game_controller = GameController(GameController.create_fixture_state())
     screen = TableScreen(group_store=group_store, game_controller=game_controller)
+    screen.update(0.0)
+    prepare_collision_test_state(screen)
+    return screen
+
+
+def prepare_collision_test_state(screen, card_counts=None):
+    counts = dict(DEFAULT_COLLISION_TEST_CARD_COUNTS)
+    if card_counts:
+        counts.update(card_counts)
+    applier = getattr(screen, "apply_card_counts_fixture", None)
+    if callable(applier):
+        applier(counts)
     screen.update(0.0)
     return screen
 
@@ -86,21 +104,33 @@ def collect_objects(screen):
         seen_group_ids.add(group.id)
 
     for activity_id, activity in screen.iter_named_activities():
-        getter = getattr(activity, "get_fan_occupied_screen_rect", None)
-        if callable(getter):
-            rect = getter()
-            if rect is not None:
-                objects.append(
-                    make_object(
-                        key=f"fan_occupied:{activity_id}",
-                        kind="fan_occupied",
-                        object_id=activity_id,
-                        owner_frame_id=None,
-                        rect=rect,
-                        hit_rect=rect,
-                    )
+        nested_activity = find_nested_activity_with_method(
+            activity,
+            "get_fan_occupied_screen_rect",
+        )
+        if nested_activity is None:
+            continue
+        rect = nested_activity.get_fan_occupied_screen_rect()
+        if rect is not None:
+            objects.append(
+                make_object(
+                    key=f"fan_occupied:{activity_id}",
+                    kind="fan_occupied",
+                    object_id=activity_id,
+                    owner_frame_id=None,
+                    rect=rect,
+                    hit_rect=rect,
                 )
+            )
     return objects
+
+
+def find_nested_activity_with_method(activity, method_name):
+    while activity is not None:
+        if callable(getattr(activity, method_name, None)):
+            return activity
+        activity = getattr(activity, "hand_activity", None)
+    return None
 
 
 def make_group_object(group, kind, owner_activity_id):

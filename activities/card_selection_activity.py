@@ -315,6 +315,27 @@ class CardSelectionActivity(Activity):
         remover = getattr(self.hand_activity, "remove_card_by_group_id", None)
         return bool(remover(group_id)) if callable(remover) else False
 
+    def extract_card_by_group_id(self, group_id):
+        """Discard selection state, then remove one card without hand relayout."""
+        action = self.selection_actions.pop(group_id, None)
+        if action is not None and hasattr(action, "cancel"):
+            action.cancel()
+        self.rest_states.pop(group_id, None)
+        if self.hovered_group is not None and self.hovered_group.id == group_id:
+            self.hovered_group = None
+        if self.get_selected_group_id() == group_id:
+            self.selected_card_context = None
+        remover = getattr(self.hand_activity, "extract_card_by_group_id", None)
+        return bool(remover(group_id)) if callable(remover) else False
+
+    def rebuild_layout(self):
+        rebuilder = getattr(self.hand_activity, "rebuild_layout", None)
+        return bool(rebuilder()) if callable(rebuilder) else False
+
+    def has_pending_layout_rebuild(self):
+        getter = getattr(self.hand_activity, "has_pending_layout_rebuild", None)
+        return bool(getter()) if callable(getter) else False
+
     def get_rest_hit_rect(self, group):
         self.get_base_position(group)
         self.get_base_scale(group)

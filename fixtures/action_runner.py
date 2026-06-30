@@ -14,7 +14,6 @@ import subprocess
 import sys
 from dataclasses import dataclass
 
-
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS_DIR = os.path.join(PROJECT_DIR, "assets")
 if PROJECT_DIR not in sys.path:
@@ -38,6 +37,7 @@ ACTION_ORDER = (
     "table_deal_cards",
     "take_table",
     "discard_table",
+    "auto_game",
 )
 
 
@@ -253,6 +253,7 @@ def resolve_action(action_id):
 
 
 def configure_player_card_play_parser(parser):
+    parser.add_argument("--start-delay", type=float, default=10.0)
     parser.add_argument("--duration", type=float, default=0.35)
     parser.add_argument("--target-slot-id", default="cards_slot_frame")
     parser.add_argument("--card-index-from-end", type=int, default=0)
@@ -261,6 +262,7 @@ def configure_player_card_play_parser(parser):
 
 
 def configure_bot_turn_parser(parser):
+    parser.add_argument("--start-delay", type=float, default=10.0)
     parser.add_argument("--duration", type=float, default=0.5145)
     parser.add_argument("--bot-hand-id", action="append", dest="bot_hand_ids")
     parser.add_argument("--target-slot-id", action="append", dest="target_slot_ids")
@@ -270,12 +272,18 @@ def configure_bot_turn_parser(parser):
 
 
 def configure_start_game_parser(parser):
+    parser.add_argument("--start-delay", type=float, default=10.0)
     parser.add_argument("--card-count", type=int, default=6)
     parser.add_argument("--duration", type=float, default=0.26)
     parser.add_argument("--recipient", action="append", dest="recipient_order")
 
 
+def configure_auto_game_parser(parser):
+    parser.add_argument("--start-delay", type=float, default=10.0)
+
+
 def configure_deal_cards_parser(parser):
+    parser.add_argument("--start-delay", type=float, default=10.0)
     parser.add_argument("--duration", type=float, default=0.26)
     parser.add_argument(
         "--deal",
@@ -286,10 +294,12 @@ def configure_deal_cards_parser(parser):
 
 
 def configure_take_table_parser(parser):
+    parser.add_argument("--start-delay", type=float, default=10.0)
     parser.add_argument("--duration", type=float, default=0.26)
 
 
 def configure_discard_table_parser(parser):
+    parser.add_argument("--start-delay", type=float, default=10.0)
     parser.add_argument("--duration", type=float, default=0.5)
     parser.add_argument("--rise-distance", type=float, default=45)
 
@@ -321,7 +331,7 @@ def run_player_card_play(args):
             game_controller=game_controller,
         )
         prepare_isolated_screen(screen)
-        start_player_card_play(screen, args)
+        attach_delayed_start(screen, lambda: start_player_card_play(screen, args), args.start_delay)
         return screen
 
     render_engine = RenderEngine(
@@ -361,13 +371,124 @@ def run_bot_turn(args):
             game_controller=game_controller,
         )
         prepare_isolated_screen(screen)
-        start_bot_turn(screen, args, BotTurnActivity)
+        attach_delayed_start(screen, lambda: start_bot_turn(screen, args, BotTurnActivity), args.start_delay)
         return screen
 
     render_engine = RenderEngine(
         screen_factory=screen_factory,
         screen_size=(1280, 720),
         title="The Fool's Reef - activity: bot_turn",
+    )
+    render_engine.run()
+    return 0
+
+
+@action_run(
+    "auto_game",
+    "Launch a full automatic party after a startup delay.",
+    (
+        "The table boots normally, waits ten seconds by default, then the "
+        "controller conducts a full bot-vs-bot session through the screen adapter."
+    ),
+    configure_auto_game_parser,
+)
+def run_auto_game(args):
+    from core import GameController
+    from core.durak import Card, DurakGameController, Rank, RuleBasedBotPlayer, Suit
+    from core.render_engine import RenderEngine
+    from core.resource import ResourceManager
+    from game_screen.events import ActivityResult
+    from group import GroupStore
+    from screens.table_screen import TableScreen
+
+    class AutoGameController(GameController):
+        AUTONOMOUS_PLAYER_IDS = ()
+
+        def get_waiting_player_ids(self):
+            return self.AUTONOMOUS_PLAYER_IDS
+
+        def get_state_view(self, domain_result=None):
+            snapshot = domain_result.snapshot if domain_result is not None else self.durak_game.build_snapshot()
+            return {
+                "phase": snapshot.phase,
+                "attacker_id": snapshot.attacker_id,
+                "defender_id": snapshot.defender_id,
+                "trump_suit": snapshot.trump_suit,
+                "trump_card_id": snapshot.trump_card_id,
+                "deck_count": snapshot.deck_count,
+                "human_available_card_ids": (),
+                "human_turn_finished": True,
+                "players": {
+                    player.player_id: {
+                        "player_id": player.player_id,
+                        "name": player.name,
+                        "seat_index": player.seat_index,
+                        "hand_size": player.hand_size,
+                        "is_active": player.is_active,
+                    }
+                    for player in snapshot.players
+                },
+                "table": [
+                    {
+                        "attack_card_id": pair.attack_card_id,
+                        "defense_card_id": pair.defense_card_id,
+                    }
+                    for pair in snapshot.table_pairs
+                ],
+            }
+
+        @classmethod
+        def create_default_durak_game(cls):
+            participants = [
+                RuleBasedBotPlayer("bottom_player_hand", "Bottom Bot", 0),
+                RuleBasedBotPlayer("right_player_hand", "Right Bot", 1),
+                RuleBasedBotPlayer("top_player_hand", "Top Bot", 2),
+                RuleBasedBotPlayer("left_player_hand", "Left Bot", 3),
+            ]
+            cards = cls.create_shuffled_deck()
+            return DurakGameController(participants, cards)
+
+    class AutoGameScreen(TableScreen):
+        def __init__(self, *screen_args, auto_start_delay=10.0, **screen_kwargs):
+            self.auto_start_delay = max(0.0, float(auto_start_delay))
+            self.auto_elapsed = 0.0
+            self.auto_started = False
+            super().__init__(*screen_args, **screen_kwargs)
+
+        def update(self, dt):
+            super().update(dt)
+            if self.game_controller is None or not self.controller_game_started:
+                return
+            if getattr(self.game_controller.durak_game.state.phase, "value", None) == "finished":
+                return
+            if hasattr(self, "has_blocking_visual_activity") and self.has_blocking_visual_activity():
+                return
+            self.auto_elapsed += dt
+            if self.auto_elapsed < self.auto_start_delay and not self.auto_started:
+                return
+            self.auto_started = True
+            self.auto_start_delay = 0.0
+            commands = self.forward_activity_result_to_controller(
+                ActivityResult(type="auto.tick", source="action_runner.auto_game")
+            )
+            self.dispatch_visual_commands(commands)
+
+    game_controller = AutoGameController(durak_game=AutoGameController.create_default_durak_game())
+    group_store = GroupStore(resource_manager=ResourceManager)
+
+    def screen_factory(_render_context=None):
+        ResourceManager.build_runtime_cache(ASSETS_DIR)
+        group_store.build()
+        return AutoGameScreen(
+            group_store=group_store,
+            game_controller=game_controller,
+            auto_start_delay=args.start_delay,
+        )
+
+    render_engine = RenderEngine(
+        screen_factory=screen_factory,
+        screen_size=(1280, 720),
+        title="The Fool's Reef - action: auto_game",
     )
     render_engine.run()
     return 0
@@ -400,7 +521,7 @@ def run_start_game(args):
             game_controller=game_controller,
         )
         prepare_isolated_screen(screen)
-        start_start_game(screen, args)
+        attach_delayed_start(screen, lambda: start_start_game(screen, args), args.start_delay)
         return screen
 
     render_engine = RenderEngine(
@@ -433,7 +554,7 @@ def run_deal_cards(args):
         group_store.build()
         screen = TableScreen(group_store=group_store, game_controller=game_controller)
         prepare_isolated_screen(screen)
-        start_deal_cards(screen, args)
+        attach_delayed_start(screen, lambda: start_deal_cards(screen, args), args.start_delay)
         return screen
 
     render_engine = RenderEngine(
@@ -458,42 +579,44 @@ def run_take_table(args):
     def screen_factory(_context=None):
         ResourceManager.build_runtime_cache(ASSETS_DIR); group_store.build()
         screen = TableScreen(group_store, controller); prepare_isolated_screen(screen)
-        with open(os.path.join(PROJECT_DIR, "fixtures", "take_table_fixture.json"), encoding="utf-8") as file:
-            fixture = json.load(file)
-        slots = screen.get_play_area_slots_activity().slot_activities
-        takes = tuple(fixture.get("takes", ()))
-        def get_table_cards():
-            result = []
-            for slot_id, slot in slots.items():
-                for index, key in enumerate(slot.card_resource_keys):
-                    result.append({
-                        "slot_id": slot_id,
-                        "resource_key": key,
-                        "geometry": slot.get_card_screen_geometry(index),
-                    })
-            return result
-        def set_table_cards(table_slots):
-            screen.clear_play_area_slot_cards()
-            for slot_id, cards in table_slots.items():
-                slots[slot_id].set_cards(cards, force=True)
-        def remove_table_card(card):
-            slot = slots[card["slot_id"]]
-            cards = list(slot.card_resource_keys)
-            cards.remove(card["resource_key"])
-            slot.set_cards(cards, force=True)
-        activity = TakeTableActivity(
-            get_table_cards,
-            set_table_cards,
-            remove_table_card,
-            screen.prepare_card_deal_hands,
-            screen.get_start_game_target_screen_geometry,
-            screen.reveal_card_deal,
-            screen.clear_play_area_slot_cards,
-            ResourceManager,
-            args.duration,
-        )
-        screen.add_activity(activity)
-        activity.start_take_plan(takes, fixture.get("initial_delay_seconds", 0))
+        def start_take_table():
+            with open(os.path.join(PROJECT_DIR, "fixtures", "take_table_fixture.json"), encoding="utf-8") as file:
+                fixture = json.load(file)
+            slots = screen.get_play_area_slots_activity().slot_activities
+            takes = tuple(fixture.get("takes", ()))
+            def get_table_cards():
+                result = []
+                for slot_id, slot in slots.items():
+                    for index, key in enumerate(slot.card_resource_keys):
+                        result.append({
+                            "slot_id": slot_id,
+                            "resource_key": key,
+                            "geometry": slot.get_card_screen_geometry(index),
+                        })
+                return result
+            def set_table_cards(table_slots):
+                screen.clear_play_area_slot_cards()
+                for slot_id, cards in table_slots.items():
+                    slots[slot_id].set_cards(cards, force=True)
+            def remove_table_card(card):
+                slot = slots[card["slot_id"]]
+                cards = list(slot.card_resource_keys)
+                cards.remove(card["resource_key"])
+                slot.set_cards(cards, force=True)
+            activity = TakeTableActivity(
+                get_table_cards,
+                set_table_cards,
+                remove_table_card,
+                screen.prepare_card_deal_hands,
+                screen.get_start_game_target_screen_geometry,
+                screen.reveal_card_deal,
+                screen.clear_play_area_slot_cards,
+                ResourceManager,
+                args.duration,
+            )
+            screen.add_activity(activity)
+            activity.start_take_plan(takes, 0)
+        attach_delayed_start(screen, start_take_table, args.start_delay)
         return screen
     RenderEngine(screen_factory, screen_size=(1280, 720), title="The Fool's Reef - activity: take_table").run()
     return 0
@@ -516,47 +639,49 @@ def run_discard_table(args):
         group_store.build()
         screen = TableScreen(group_store, controller)
         prepare_isolated_screen(screen)
-        with open(os.path.join(PROJECT_DIR, "fixtures", "discard_table_fixture.json"), encoding="utf-8") as file:
-            fixture = json.load(file)
+        def start_discard_table():
+            with open(os.path.join(PROJECT_DIR, "fixtures", "discard_table_fixture.json"), encoding="utf-8") as file:
+                fixture = json.load(file)
 
-        slots = screen.get_play_area_slots_activity().slot_activities
+            slots = screen.get_play_area_slots_activity().slot_activities
 
-        def get_table_cards():
-            result = []
-            for slot_id, slot in slots.items():
-                for index, key in enumerate(slot.card_resource_keys):
-                    result.append({
-                        "slot_id": slot_id,
-                        "resource_key": key,
-                        "geometry": slot.get_card_screen_geometry(index),
-                    })
-            return result
+            def get_table_cards():
+                result = []
+                for slot_id, slot in slots.items():
+                    for index, key in enumerate(slot.card_resource_keys):
+                        result.append({
+                            "slot_id": slot_id,
+                            "resource_key": key,
+                            "geometry": slot.get_card_screen_geometry(index),
+                        })
+                return result
 
-        def set_table_cards(table_slots):
-            screen.clear_play_area_slot_cards()
-            for slot_id, cards in table_slots.items():
-                slots[slot_id].set_cards(cards, force=True)
+            def set_table_cards(table_slots):
+                screen.clear_play_area_slot_cards()
+                for slot_id, cards in table_slots.items():
+                    slots[slot_id].set_cards(cards, force=True)
 
-        def remove_table_card(card):
-            slot = slots[card["slot_id"]]
-            cards = list(slot.card_resource_keys)
-            cards.remove(card["resource_key"])
-            slot.set_cards(cards, force=True)
+            def remove_table_card(card):
+                slot = slots[card["slot_id"]]
+                cards = list(slot.card_resource_keys)
+                cards.remove(card["resource_key"])
+                slot.set_cards(cards, force=True)
 
-        activity = DiscardTableActivity(
-            get_table_cards,
-            set_table_cards,
-            remove_table_card,
-            screen.clear_play_area_slot_cards,
-            ResourceManager,
-            args.duration,
-            args.rise_distance,
-        )
-        screen.add_activity(activity)
-        activity.start_discard(
-            fixture.get("table_slots", {}),
-            fixture.get("initial_delay_seconds", 0),
-        )
+            activity = DiscardTableActivity(
+                get_table_cards,
+                set_table_cards,
+                remove_table_card,
+                screen.clear_play_area_slot_cards,
+                ResourceManager,
+                args.duration,
+                args.rise_distance,
+            )
+            screen.add_activity(activity)
+            activity.start_discard(
+                fixture.get("table_slots", {}),
+                0,
+            )
+        attach_delayed_start(screen, start_discard_table, args.start_delay)
         return screen
 
     RenderEngine(screen_factory, screen_size=(1280, 720), title="The Fool's Reef - activity: discard_table").run()
@@ -570,6 +695,24 @@ def prepare_isolated_screen(screen):
     if hasattr(screen, "clear_play_area_slot_cards"):
         screen.clear_play_area_slot_cards()
     screen.update(0.0)
+
+
+def attach_delayed_start(screen, start_callback, start_delay):
+    start_delay = max(0.0, float(start_delay))
+    original_update = screen.update
+    state = {"elapsed": 0.0, "started": False}
+
+    def delayed_update(dt):
+        original_update(dt)
+        if state["started"]:
+            return
+        state["elapsed"] += dt
+        if state["elapsed"] < start_delay:
+            return
+        state["started"] = True
+        start_callback()
+
+    screen.update = delayed_update
 
 
 def start_bot_turn(screen, args, activity_class):

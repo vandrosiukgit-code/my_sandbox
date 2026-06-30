@@ -60,6 +60,13 @@ class ResourceManager:
     """Общий низкоуровневый склад графических ресурсов проекта."""
 
     MANIFEST_FILE_NAME = "resource_manifest.json"
+    SHORT_DECK_MODE = True
+    SHORT_DECK_REMOVED_PREFIXES = (
+        "cards.2_of_",
+        "cards.3_of_",
+        "cards.4_of_",
+        "cards.5_of_",
+    )
 
     _cache_frames = {}
     _runtime_cache = {}
@@ -73,11 +80,12 @@ class ResourceManager:
         cls.clear_cache()
         cls._assets_dir = os.path.abspath(assets_dir)
         cls._manifest = cls.load_or_generate_manifest(cls._assets_dir)
+        cls._manifest, pruned = cls.prune_manifest_for_short_deck(cls._manifest)
         cls._manifest, repaired, cls._manifest_warnings = cls.repair_manifest_dimensions(
             cls._assets_dir,
             cls._manifest,
         )
-        if repaired:
+        if repaired or pruned:
             cls.save_manifest(cls._assets_dir, cls._manifest)
             for warning_text in cls._manifest_warnings:
                 warnings.warn(warning_text, RuntimeWarning, stacklevel=2)
@@ -416,6 +424,30 @@ class ResourceManager:
         return repaired, changed, repair_warnings
 
     @classmethod
+    def prune_manifest_for_short_deck(cls, manifest):
+        """Remove non-Durak card resources from manifest when short-deck mode is enabled."""
+        normalized = cls.normalize_manifest(manifest)
+        if not cls.SHORT_DECK_MODE:
+            return normalized, False
+        resources = normalized.get("resources", {})
+        filtered = {
+            resource_key: entry
+            for resource_key, entry in resources.items()
+            if not cls.should_prune_for_short_deck(resource_key)
+        }
+        changed = len(filtered) != len(resources)
+        return {"resources": filtered}, changed
+
+    @classmethod
+    def should_prune_for_short_deck(cls, resource_key):
+        if not isinstance(resource_key, str):
+            return False
+        lowered = resource_key.lower()
+        if "joker" in lowered:
+            return True
+        return lowered.startswith(cls.SHORT_DECK_REMOVED_PREFIXES)
+
+    @classmethod
     def load_manifest(cls, assets_dir):
         """Прочитать resource_manifest.json."""
         manifest_path = cls.get_manifest_path(assets_dir)
@@ -485,5 +517,3 @@ class ResourceManager:
             if clean:
                 parts.append(clean)
         return ".".join(parts)
-
-

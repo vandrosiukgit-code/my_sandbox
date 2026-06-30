@@ -63,3 +63,48 @@ class ActivityNormalizerTests(unittest.TestCase):
         for value, expected in aliases.items():
             with self.subTest(value=value):
                 self.assertEqual(CardsSlotActivityDecorator.normalize_card_visual_state(value), expected)
+
+    def test_bot_hand_remove_generated_group_reindexes_remaining_groups(self):
+        class FakeFrame:
+            def remove_group(self, _group_id):
+                return None
+
+        class FakeGroup:
+            def __init__(self, group_id):
+                self.id = group_id
+
+        activity = BotHandActivity.__new__(BotHandActivity)
+        activity.frame = FakeFrame()
+        activity.generated_groups = [
+            FakeGroup("g0"),
+            FakeGroup("g1"),
+            FakeGroup("g2"),
+        ]
+        activity.group_hand_indices = {"g0": 0, "g1": 1, "g2": 2}
+        activity.group_resource_keys = {
+            "g0": "cards.6_of_clubs",
+            "g1": "cards.7_of_clubs",
+            "g2": "cards.8_of_clubs",
+        }
+        activity.group_card_ids = dict(activity.group_resource_keys)
+        activity.group_base_frames = {"g0": [], "g1": [], "g2": []}
+        activity.group_id_prefix = "test.bot_hand"
+        activity.card_count = 3
+        activity.started = False
+        activity._last_layout_signature = None
+
+        activity.remove_generated_group(activity.generated_groups[1])
+
+        self.assertEqual([group.id for group in activity.generated_groups], ["g0", "g2"])
+        self.assertEqual(activity.group_hand_indices, {"g0": 0, "g2": 1})
+        self.assertEqual(activity.group_card_ids["g2"], "test.bot_hand.card.1:cards.8_of_clubs")
+
+    def test_play_area_slot_local_rects_normalize_mapping(self):
+        self.assertEqual(
+            PlayAreaSlotsActivity.normalize_slot_local_rects(
+                {
+                    "cards_slot_frame_8": {"x": 24.4, "y": 511.6, "width": 138, "height": 136},
+                }
+            ),
+            {"cards_slot_frame_8": (24, 512, 138, 136)},
+        )

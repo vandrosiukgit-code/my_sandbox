@@ -69,6 +69,24 @@ main.py
 - GUI contract:
   `game_screen/events.py` transport types for screen/activity orchestration.
 
+## Bottom Hand Layout Contract
+
+- The bottom player's hand fan is a dedicated interactive layout, not a bot-hand
+  variant.
+- `TableScreen.calculate_bottom_player_hand_available_screen_rect()` is the
+  authoritative source of the bottom fan corridor.
+- That corridor may depend only on stable frame geometry:
+  - `bottom_player_hand` frame;
+  - `bottom_player_portrait` frame;
+  - the legacy anchor slot frames `cards_slot_frame` through
+    `cards_slot_frame_7`.
+- Extra table slots such as `cards_slot_frame_8+`, dynamic card occupancy,
+  generated groups, and transient animation positions must not change bottom
+  fan geometry.
+- `PlayerHandActivity.set_fan_area_local_rect()` consumes that corridor as an
+  external layout contract and must not infer replacement geometry from bot
+  hands or rendered card bounds.
+
 ## What Is Still Draft
 
 - `core/game_controller.py` still contains first-playable adapter logic that

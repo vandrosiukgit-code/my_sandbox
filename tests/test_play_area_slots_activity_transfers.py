@@ -101,3 +101,46 @@ class PlayAreaSlotsTransferTests(unittest.TestCase):
         self.assertEqual(activity.pending_slot_transfer_batches, [])
         self.assertEqual(activity.pending_player_card_data, [])
         self.assertEqual(activity.next_overflow_direction, 1)
+
+    def test_resolve_slot_local_rect_prefers_explicit_override(self):
+        activity = self.make_activity()
+        activity.slot_local_rects = {"cards_slot_frame_8": (24, 512, 138, 136)}
+
+        rect = activity.resolve_slot_local_rect(
+            "cards_slot_frame_8",
+            (138, 136),
+            (640, 360),
+            (143, 148),
+            (-2, 1),
+        )
+
+        self.assertEqual(rect, (24, 512, 138, 136))
+
+    def test_apply_fixture_merges_slot_local_rect_overrides(self):
+        activity = self.make_activity()
+        activity.slot_count = activity.DEFAULT_SLOT_COUNT
+        activity.columns = 1
+        activity.spacing = activity.DEFAULT_SPACING
+        activity.origin = None
+        activity.center = None
+        activity.step = None
+        activity.slot_offsets = None
+        activity.slot_local_rects = {"cards_slot_frame": (1, 2, 3, 4)}
+        activity.slot_activity_fixture = dict(activity.DEFAULT_SLOT_ACTIVITY_FIXTURE)
+        activity.apply_layout = lambda: None
+
+        activity.apply_fixture(
+            {
+                "slot_local_rects": {
+                    "cards_slot_frame_8": [24, 512, 138, 136],
+                },
+            }
+        )
+
+        self.assertEqual(
+            activity.slot_local_rects,
+            {
+                "cards_slot_frame": (1, 2, 3, 4),
+                "cards_slot_frame_8": (24, 512, 138, 136),
+            },
+        )

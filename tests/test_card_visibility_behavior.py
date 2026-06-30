@@ -58,6 +58,8 @@ class FakeHandActivity:
         self.sync_calls = 0
         self.layout_calls = 0
         self.clear_calls = 0
+        self.generated_groups = []
+        self.group_indices = {}
 
     def configure_card_resources(self, provider=None, layer_name=None, card_count=None):
         self.provider = provider
@@ -66,6 +68,7 @@ class FakeHandActivity:
 
     def start(self):
         self.started = True
+        self.sync_visual_groups()
 
     def update(self, _dt):
         pass
@@ -78,9 +81,15 @@ class FakeHandActivity:
 
     def clear_generated_groups(self):
         self.clear_calls += 1
+        self.generated_groups = []
+        self.group_indices = {}
 
     def sync_visual_groups(self):
         self.sync_calls += 1
+        while len(self.generated_groups) < self.card_count:
+            group = type("Group", (), {"id": f"group-{len(self.generated_groups)}"})()
+            self.group_indices[group.id] = len(self.generated_groups)
+            self.generated_groups.append(group)
 
     def apply_fan_layout(self):
         self.layout_calls += 1
@@ -98,6 +107,22 @@ class FakeHandActivity:
 
     def get_prepared_card_screen_geometry(self, hand_index):
         return {"center": (hand_index, hand_index), "size": (10, 14), "angle_degrees": 0.0}
+
+    def iter_generated_groups(self):
+        return tuple(self.generated_groups)
+
+    def get_card_selection_context(self, group):
+        return {"hand_index": self.group_indices[group.id], "group_id": group.id}
+
+    def remove_generated_group(self, group, relayout=True):
+        if group not in self.generated_groups:
+            return None
+        self.generated_groups.remove(group)
+        self.group_indices = {item.id: index for index, item in enumerate(self.generated_groups)}
+        self.card_count = len(self.generated_groups)
+        if relayout:
+            self.apply_fan_layout()
+        return group
 
 
 class CardVisibilityBehaviorTests(unittest.TestCase):
@@ -143,3 +168,23 @@ class CardVisibilityBehaviorTests(unittest.TestCase):
 
         activity.set_card_visual_state(0, "visible")
         self.assertEqual(group.get_primary_layer_frames()[0].get_at((0, 0)).a, 255)
+
+    def test_extract_card_defers_fan_rebuild_until_explicit_rebuild(self):
+        activity = FakeHandActivity()
+        hand = VisibleCardsHandDecorator(
+            activity,
+            resource_manager=FakeResourceManager,
+            cards=("cards.6_of_clubs", "cards.7_of_clubs", "cards.8_of_clubs"),
+        )
+        hand.start()
+        before_groups = tuple(hand.iter_generated_groups())
+        removed_group = before_groups[1]
+
+        self.assertTrue(hand.extract_card_by_group_id(removed_group.id))
+        self.assertEqual(len(hand.iter_generated_groups()), 2)
+        self.assertEqual(hand.card_resource_keys, ("cards.6_of_clubs", "cards.8_of_clubs"))
+        self.assertTrue(hand._pending_layout_rebuild)
+
+        self.assertTrue(hand.rebuild_layout())
+        self.assertFalse(hand._pending_layout_rebuild)
+        self.assertEqual(len(hand.iter_generated_groups()), 2)

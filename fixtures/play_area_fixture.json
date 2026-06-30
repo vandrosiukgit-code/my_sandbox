@@ -4,7 +4,7 @@
       "position": [20, 20],
       "scale_factor": null,
       "activity": {
-        "slot_count": 7,
+        "slot_count": 11,
         "slot_offsets": [
           [0, 0],
           [-1, 0],
@@ -12,8 +12,25 @@
           [-2, 0],
           [2, 0],
           [-2, -1],
-          [2, -1]
-        ]
+          [2, -1],
+          [2, 1],
+          [-2, 1],
+          [-2, -2],
+          [2, -2]
+        ],
+        "slot_local_rects": {
+          "cards_slot_frame": [547, 272, 138, 136],
+          "cards_slot_frame_2": [404, 272, 138, 136],
+          "cards_slot_frame_3": [690, 272, 138, 136],
+          "cards_slot_frame_4": [261, 272, 138, 136],
+          "cards_slot_frame_5": [833, 272, 138, 136],
+          "cards_slot_frame_6": [261, 124, 138, 136],
+          "cards_slot_frame_7": [833, 124, 138, 136],
+          "cards_slot_frame_8": [944, 544, 138, 136],
+          "cards_slot_frame_9": [158, 544, 138, 136],
+          "cards_slot_frame_10": [261, -24, 138, 136],
+          "cards_slot_frame_11": [833, -24, 138, 136]
+        }
       },
       "children": {
         "cards_slot_frame": {

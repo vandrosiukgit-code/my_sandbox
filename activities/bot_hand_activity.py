@@ -494,7 +494,15 @@ class BotHandActivity(Activity):
         self.group_base_frames = {}
         self._last_layout_signature = None
 
-    def remove_generated_group(self, group):
+    def reindex_generated_groups(self):
+        """Keep hand indices aligned with the current generated group order."""
+        for index, group in enumerate(self.generated_groups):
+            self.group_hand_indices[group.id] = index
+            resource_key = self.group_resource_keys.get(group.id)
+            if resource_key is not None:
+                self.group_card_ids[group.id] = self.get_card_id(index, resource_key)
+
+    def remove_generated_group(self, group, relayout=True):
         """Remove one generated visual-only Group from this hand activity."""
         if group not in self.generated_groups:
             return None
@@ -504,9 +512,10 @@ class BotHandActivity(Activity):
         self.group_card_ids.pop(group.id, None)
         self.group_resource_keys.pop(group.id, None)
         self.group_base_frames.pop(group.id, None)
+        self.reindex_generated_groups()
         self.card_count = max(0, self.card_count - 1)
         self._last_layout_signature = None
-        if self.started:
+        if relayout and self.started:
             self.apply_fan_layout()
         return group
 
