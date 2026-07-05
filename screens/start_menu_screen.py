@@ -3,9 +3,10 @@ from dataclasses import replace
 import pygame
 
 from core.settings_repository import AppConfig
+from game_screen.game_screen import GameScreen
 
 
-class StartMenuScreen:
+class StartMenuScreen(GameScreen):
     SCREEN_SIZE = (912, 513)
     BG_COLOR = (38, 29, 20)
     PANEL_COLOR = (225, 211, 182)
@@ -21,6 +22,7 @@ class StartMenuScreen:
     DECK_SKINS = ("classic", "red", "blue")
 
     def __init__(self, settings_repository, on_play=None, on_back=None):
+        super().__init__(background_color=self.BG_COLOR)
         self.settings_repository = settings_repository
         self.on_play = on_play
         self.on_back = on_back
@@ -36,13 +38,15 @@ class StartMenuScreen:
         self.status_text = "настройки не изменены"
 
     def start(self):
+        super().start()
         self._build_fonts()
 
     def finish(self):
+        super().finish()
         self.active_slider_id = None
 
     def update(self, dt):
-        _ = dt
+        super().update(dt)
         self._update_status()
 
     def draw(self, screen):

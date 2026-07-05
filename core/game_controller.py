@@ -31,6 +31,7 @@ class GameController(BaseGameController):
         self.durak_game = durak_game or self.create_default_durak_game()
         self._last_snapshot = self.durak_game.build_snapshot()
         self._pending_visual_commands = []
+        self.moves_count = 0
 
     def get_waiting_player_ids(self):
         return (self.HUMAN_PLAYER_ID,)
@@ -53,6 +54,7 @@ class GameController(BaseGameController):
         if self.started:
             return ControllerResponse(state_view=self.get_state_view())
         self.started = True
+        self.moves_count = 0
         result = self.durak_game.build_result(self.durak_game.start_game(), waiting_player_ids=self.get_waiting_player_ids())
         self._last_snapshot = result.snapshot
         return ControllerResponse(
@@ -80,6 +82,7 @@ class GameController(BaseGameController):
             return ControllerResponse(state_view=self.get_state_view())
 
         result, command = self.apply_selected_human_card(selected_card)
+        self.record_moves_from_events(result.events)
         self._last_snapshot = result.snapshot
         commands = (command,) if command is not None else (self.build_turn_prompt_command(result),)
         return ControllerResponse(commands=commands, state_view=self.get_state_view())
@@ -92,6 +95,7 @@ class GameController(BaseGameController):
             return ControllerResponse(commands=queued_commands, state_view=self.get_state_view())
         previous_snapshot = self._last_snapshot
         domain_result = self.durak_game.advance_to_next_checkpoint(waiting_player_ids=self.get_waiting_player_ids())
+        self.record_moves_from_events(domain_result.events)
         commands = self.build_commands_from_domain_result(domain_result, previous_snapshot)
         self._last_snapshot = domain_result.snapshot
         return ControllerResponse(commands=tuple(commands), state_view=self.get_state_view(domain_result))
@@ -133,6 +137,27 @@ class GameController(BaseGameController):
                 for pair in snapshot.table_pairs
             ],
         }
+
+    def get_end_game_stats(self):
+        snapshot = self.durak_game.build_snapshot()
+        loser_id = snapshot.fool_id
+        winners = tuple(player for player in snapshot.players if player.player_id != loser_id)
+        loser = next((player for player in snapshot.players if player.player_id == loser_id), None)
+        return {
+            "moves_count": self.moves_count,
+            "winner": ", ".join(player.name for player in winners) if winners else "Unknown",
+            "loser": loser.name if loser is not None else "Unknown",
+            "winner_ids": tuple(player.player_id for player in winners),
+            "loser_id": loser_id,
+            "phase": snapshot.phase,
+        }
+
+    def record_moves_from_events(self, events):
+        self.moves_count += sum(
+            1
+            for event in events or ()
+            if event.type in ("cards_attacked", "card_defended", "card_thrown_in")
+        )
 
     def apply_selected_human_card(self, selected_card):
         card_id = self.resolve_selected_card_id(selected_card)

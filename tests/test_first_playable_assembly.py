@@ -76,6 +76,26 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
         self.assertEqual(response.state_view["attacker_id"], "bottom_player_hand")
         self.assertEqual(response.state_view["defender_id"], "right_player_hand")
 
+    def test_game_controller_provides_end_game_stats(self):
+        controller = GameController()
+        controller.start_game()
+        controller.record_moves_from_events(
+            (
+                type("Event", (), {"type": "cards_attacked"})(),
+                type("Event", (), {"type": "card_defended"})(),
+            )
+        )
+        controller.durak_game.state.fool_id = "right_player_hand"
+        controller.durak_game.state.phase = GamePhase.FINISHED
+
+        stats = controller.get_end_game_stats()
+
+        self.assertEqual(stats["moves_count"], 2)
+        self.assertEqual(stats["loser"], "Right Bot")
+        self.assertEqual(stats["loser_id"], "right_player_hand")
+        self.assertIn("Player", stats["winner"])
+        self.assertEqual(stats["phase"], "finished")
+
     def test_initial_deal_command_contains_real_bottom_cards_and_hidden_bot_cards(self):
         controller = GameController()
 

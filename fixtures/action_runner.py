@@ -38,6 +38,7 @@ ACTION_ORDER = (
     "take_table",
     "discard_table",
     "auto_game",
+    "auto_game_full_flow",
 )
 
 
@@ -489,6 +490,175 @@ def run_auto_game(args):
         screen_factory=screen_factory,
         screen_size=(1280, 720),
         title="The Fool's Reef - action: auto_game",
+    )
+    render_engine.run()
+    return 0
+
+
+@action_run(
+    "auto_game_full_flow",
+    "Launch automatic party through the settings and end-game screens.",
+    (
+        "The settings screen opens first, Play starts the same automatic party "
+        "as auto_game, and a finished game transitions to the end-game stats screen."
+    ),
+    configure_auto_game_parser,
+)
+def run_auto_game_full_flow(args):
+    import pygame
+
+    from core import GameController
+    from core.durak import DurakGameController, RuleBasedBotPlayer
+    from core.render_engine import RenderEngine, ScreenTransition
+    from core.resource import ResourceManager
+    from core.settings_repository import SettingsRepository
+    from game_screen.events import ActivityResult
+    from group import GroupStore
+    from screens import EndGameScreen, StartMenuScreen
+    from screens.table_screen import TableScreen
+
+    config_path = os.path.join(PROJECT_DIR, "config", "game_settings.json")
+    end_game_event_type = pygame.USEREVENT + 17
+
+    class AutoGameController(GameController):
+        AUTONOMOUS_PLAYER_IDS = ()
+
+        def get_waiting_player_ids(self):
+            return self.AUTONOMOUS_PLAYER_IDS
+
+        def get_state_view(self, domain_result=None):
+            snapshot = domain_result.snapshot if domain_result is not None else self.durak_game.build_snapshot()
+            return {
+                "phase": snapshot.phase,
+                "attacker_id": snapshot.attacker_id,
+                "defender_id": snapshot.defender_id,
+                "trump_suit": snapshot.trump_suit,
+                "trump_card_id": snapshot.trump_card_id,
+                "deck_count": snapshot.deck_count,
+                "human_available_card_ids": (),
+                "human_turn_finished": True,
+                "players": {
+                    player.player_id: {
+                        "player_id": player.player_id,
+                        "name": player.name,
+                        "seat_index": player.seat_index,
+                        "hand_size": player.hand_size,
+                        "is_active": player.is_active,
+                    }
+                    for player in snapshot.players
+                },
+                "table": [
+                    {
+                        "attack_card_id": pair.attack_card_id,
+                        "defense_card_id": pair.defense_card_id,
+                    }
+                    for pair in snapshot.table_pairs
+                ],
+            }
+
+        @classmethod
+        def create_default_durak_game(cls):
+            participants = [
+                RuleBasedBotPlayer("bottom_player_hand", "Bottom Bot", 0),
+                RuleBasedBotPlayer("right_player_hand", "Right Bot", 1),
+                RuleBasedBotPlayer("top_player_hand", "Top Bot", 2),
+                RuleBasedBotPlayer("left_player_hand", "Left Bot", 3),
+            ]
+            return DurakGameController(participants, cls.create_shuffled_deck())
+
+    class AutoGameScreen(TableScreen):
+        def __init__(self, *screen_args, auto_start_delay=10.0, end_screen_factory=None, **screen_kwargs):
+            self.auto_start_delay = max(0.0, float(auto_start_delay))
+            self.auto_elapsed = 0.0
+            self.auto_started = False
+            self.end_screen_factory = end_screen_factory
+            self.end_transition_requested = False
+            super().__init__(*screen_args, **screen_kwargs)
+
+        def update(self, dt):
+            super().update(dt)
+            if self.game_controller is None or not self.controller_game_started:
+                return
+            if getattr(self.game_controller.durak_game.state.phase, "value", None) == "finished":
+                self.request_end_game_transition()
+                return
+            if hasattr(self, "has_blocking_visual_activity") and self.has_blocking_visual_activity():
+                return
+            self.auto_elapsed += dt
+            if self.auto_elapsed < self.auto_start_delay and not self.auto_started:
+                return
+            self.auto_started = True
+            self.auto_start_delay = 0.0
+            commands = self.forward_activity_result_to_controller(
+                ActivityResult(type="auto.tick", source="action_runner.auto_game_full_flow")
+            )
+            self.dispatch_visual_commands(commands)
+
+        def handle_event(self, event):
+            if event.type == end_game_event_type and self.end_screen_factory is not None:
+                return ScreenTransition(
+                    screen_factory=self.end_screen_factory,
+                    screen_size=EndGameScreen.SCREEN_SIZE,
+                    title="The Fool's Reef - action: end_game",
+                )
+            return super().handle_event(event)
+
+        def request_end_game_transition(self):
+            if self.end_transition_requested:
+                return
+            if hasattr(self, "has_blocking_visual_activity") and self.has_blocking_visual_activity():
+                return
+            self.end_transition_requested = True
+            pygame.event.post(pygame.event.Event(end_game_event_type))
+
+    def create_auto_game_context():
+        return {
+            "game_controller": AutoGameController(durak_game=AutoGameController.create_default_durak_game()),
+            "group_store": GroupStore(resource_manager=ResourceManager),
+        }
+
+    def start_menu_factory(_render_context=None):
+        settings_repository = SettingsRepository(config_path)
+
+        def start_game(_config):
+            return ScreenTransition(
+                screen_factory=table_screen_factory(create_auto_game_context()),
+                screen_size=TableScreen.SCREEN_SIZE,
+                title="The Fool's Reef - action: auto_game_full_flow",
+            )
+
+        return StartMenuScreen(settings_repository=settings_repository, on_play=start_game)
+
+    def end_screen_factory(game_controller):
+        def new_game():
+            return ScreenTransition(
+                screen_factory=start_menu_factory,
+                screen_size=StartMenuScreen.SCREEN_SIZE,
+                title="The Fool's Reef - action: auto_game_full_flow",
+            )
+
+        return lambda _render_context=None: EndGameScreen(
+            game_controller=game_controller,
+            on_new_game=new_game,
+        )
+
+    def table_screen_factory(auto_context):
+        def factory(_render_context=None):
+            ResourceManager.build_runtime_cache(ASSETS_DIR)
+            auto_context["group_store"].build()
+            return AutoGameScreen(
+                group_store=auto_context["group_store"],
+                game_controller=auto_context["game_controller"],
+                auto_start_delay=args.start_delay,
+                end_screen_factory=end_screen_factory(auto_context["game_controller"]),
+            )
+
+        return factory
+
+    render_engine = RenderEngine(
+        screen_factory=start_menu_factory,
+        screen_size=StartMenuScreen.SCREEN_SIZE,
+        title="The Fool's Reef - action: auto_game_full_flow",
     )
     render_engine.run()
     return 0

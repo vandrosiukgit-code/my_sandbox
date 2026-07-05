@@ -40,10 +40,30 @@ The entry point for visual Action dev tests is:
 & ".\.venv\Scripts\python.exe" fixtures\action_runner.py <command>
 ```
 
+From bash on Windows, run the same harness from the repository root with:
+
+```bash
+./.venv/Scripts/python.exe fixtures/action_runner.py <command>
+```
+
+If Git Bash does not resolve the relative `.venv` path, use the absolute
+Windows path:
+
+```bash
+"C:/Users/Zver/Documents/Codex/2026-04-26/Sandbox/.venv/Scripts/python.exe" fixtures/action_runner.py <command>
+```
+
 Current actions:
 
 ```text
+bot_turn
 player_card_play
+start_game
+table_deal_cards
+take_table
+discard_table
+auto_game
+auto_game_full_flow
 ```
 
 The action runner:
@@ -62,6 +82,10 @@ launcher for dev tests.
 & ".\.venv\Scripts\python.exe" fixtures\action_runner.py
 ```
 
+```bash
+./.venv/Scripts/python.exe fixtures/action_runner.py
+```
+
 The interactive prompt shows available actions and commands:
 
 ```text
@@ -75,6 +99,10 @@ reload
 quit
 ```
 
+`run 7` launches the automatic game directly on `TableScreen`.
+`run 8` launches the same automatic game through the settings screen and then
+transitions to the end-game statistics screen.
+
 In interactive mode, `run ...` starts the Pygame action in a separate process
 and keeps the prompt available. `reload` stops the current action process and
 starts the last `run ...` command again. Use it after adjusting fixtures or
@@ -84,6 +112,10 @@ Commands can still be run directly without entering the prompt:
 
 ```powershell
 & ".\.venv\Scripts\python.exe" fixtures\action_runner.py run player_card_play
+```
+
+```bash
+./.venv/Scripts/python.exe fixtures/action_runner.py run player_card_play
 ```
 
 ## Player Card Play Dev Test
