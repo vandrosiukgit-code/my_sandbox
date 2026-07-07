@@ -17,6 +17,7 @@ class TakeTableActivity(CardDealSequenceActivity):
         clear_table,
         resource_manager,
         duration=0.26,
+        on_safe_point=None,
     ):
         super().__init__(
             source_geometry_provider=lambda: None,
@@ -24,6 +25,7 @@ class TakeTableActivity(CardDealSequenceActivity):
             prepare_hands=prepare_hands,
             reveal_card=reveal_card,
             resource_manager=resource_manager,
+            on_safe_point=on_safe_point,
         )
         self.get_table_cards = get_table_cards
         self.set_table_cards = set_table_cards

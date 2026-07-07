@@ -101,6 +101,125 @@ class GeneratedGroupLifecycleTests(unittest.TestCase):
         self.assertEqual(events, ["source.remove", "action.start"])
         self.assertTrue(activity.source_card_removed)
 
+    def test_player_turn_safe_point_fires_after_action_finish_and_slot_commit(self):
+        events = []
+
+        class PlayArea(FakePlayAreaSlotsActivity):
+            def place_player_card(self, card_data):
+                events.append(("slot.place", card_data["resource_key"]))
+                return True
+
+            def has_pending_slot_transfers(self):
+                return False
+
+            def get_player_turn_target_screen_geometry(self, _turn_context=None):
+                return {"center": (20, 20), "size": (10, 14)}
+
+        class FinishedFlightAction(FakeFlightAction):
+            def update(self, _dt):
+                self.events.append("action.update")
+
+            def is_finished(self):
+                return True
+
+        class TestPlayerTurnActivity(PlayerTurnActivity):
+            def create_player_card_action(self, turn_context):
+                _ = turn_context
+                return FinishedFlightAction(events)
+
+        activity = TestPlayerTurnActivity(
+            PlayArea(),
+            remove_source_card=lambda _turn_context: events.append("source.remove") or True,
+            on_safe_point=lambda safe_point, payload: events.append((safe_point, payload["resource_key"])),
+        )
+
+        self.assertTrue(
+            activity.start_turn(
+                {
+                    "resource_key": "cards.6_of_clubs",
+                    "card_id": "cards.6_of_clubs",
+                    "source_screen_geometry": {"center": (0, 0), "size": (10, 14)},
+                    "target_screen_geometry": {"center": (20, 20), "size": (10, 14)},
+                }
+            )
+        )
+
+        activity.update(0.0)
+
+        self.assertEqual(
+            events,
+            [
+                "source.remove",
+                "action.start",
+                "action.update",
+                ("slot.place", "cards.6_of_clubs"),
+                ("turn.played.safe_point", "cards.6_of_clubs"),
+            ],
+        )
+
+    def test_player_turn_safe_point_waits_for_pending_slot_transfers(self):
+        events = []
+
+        class PlayArea(FakePlayAreaSlotsActivity):
+            def __init__(self):
+                super().__init__()
+                self.pending_checks = [True, False]
+
+            def place_player_card(self, card_data):
+                events.append(("slot.place", card_data["resource_key"]))
+                return True
+
+            def has_pending_slot_transfers(self):
+                if self.pending_checks:
+                    return self.pending_checks.pop(0)
+                return False
+
+            def get_player_turn_target_screen_geometry(self, _turn_context=None):
+                return {"center": (20, 20), "size": (10, 14)}
+
+        class FinishedFlightAction(FakeFlightAction):
+            def update(self, _dt):
+                self.events.append("action.update")
+
+            def is_finished(self):
+                return True
+
+        class TestPlayerTurnActivity(PlayerTurnActivity):
+            def create_player_card_action(self, turn_context):
+                _ = turn_context
+                return FinishedFlightAction(events)
+
+        activity = TestPlayerTurnActivity(
+            PlayArea(),
+            remove_source_card=lambda _turn_context: events.append("source.remove") or True,
+            on_safe_point=lambda safe_point, payload: events.append((safe_point, payload["resource_key"])),
+        )
+
+        self.assertTrue(
+            activity.start_turn(
+                {
+                    "resource_key": "cards.6_of_clubs",
+                    "card_id": "cards.6_of_clubs",
+                    "source_screen_geometry": {"center": (0, 0), "size": (10, 14)},
+                    "target_screen_geometry": {"center": (20, 20), "size": (10, 14)},
+                }
+            )
+        )
+
+        activity.update(0.0)
+        self.assertEqual(
+            events,
+            [
+                "source.remove",
+                "action.start",
+                "action.update",
+                ("slot.place", "cards.6_of_clubs"),
+            ],
+        )
+
+        activity.update(0.0)
+        self.assertEqual(events[-1], ("turn.played.safe_point", "cards.6_of_clubs"))
+
     def test_discard_table_exposes_groups_during_fade_and_clears_on_finish(self):
         table_cards = [
             {

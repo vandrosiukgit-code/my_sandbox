@@ -122,6 +122,18 @@ class VisibleCardsHandDecorator(Activity):
         for hand_index in range(min(len(self.card_resource_keys), max(0, int(revealed_count)))):
             self.reveal_card(hand_index)
 
+    def prepare_incremental_cards(self, visible_cards, incoming_cards=()):
+        """Prepare only the currently visible bottom hand; future cards use projected geometry."""
+        _ = incoming_cards
+        self.set_cards(visible_cards, force=True)
+
+    def append_revealed_card(self, resource_key):
+        """Append one newly landed visible card and relayout immediately."""
+        cards = list(self.card_resource_keys)
+        cards.append(resource_key)
+        self.set_cards(cards, force=True)
+        return True
+
     def reveal_card(self, hand_index):
         """Reveal one already-positioned card without rebuilding the fan."""
         if hand_index in self.revealed_card_indices:
@@ -138,6 +150,12 @@ class VisibleCardsHandDecorator(Activity):
     def get_prepared_card_screen_geometry(self, hand_index):
         """Expose one prepared visual slot as an Action target."""
         return self.hand_activity.get_prepared_card_screen_geometry(hand_index)
+
+    def get_projected_card_screen_geometry(self, hand_index, resource_key=None):
+        getter = getattr(self.hand_activity, "get_projected_card_screen_geometry", None)
+        if callable(getter):
+            return getter(hand_index, resource_key=resource_key, card_count=hand_index + 1)
+        return self.get_prepared_card_screen_geometry(hand_index)
 
     def create_transparent_card_surface(self, resource_key):
         frames = self.resource_manager.get_frames(resource_key)

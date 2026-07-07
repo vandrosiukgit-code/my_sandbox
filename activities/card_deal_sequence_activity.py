@@ -9,13 +9,22 @@ class CardDealSequenceActivity(Activity):
     DEFAULT_DURATION = 0.26
     DEFAULT_ORDER = ("bottom_player_hand", "right_player_hand", "top_player_hand", "left_player_hand")
 
-    def __init__(self, source_geometry_provider, target_geometry_provider, prepare_hands, reveal_card, resource_manager):
+    def __init__(
+        self,
+        source_geometry_provider,
+        target_geometry_provider,
+        prepare_hands,
+        reveal_card,
+        resource_manager,
+        on_safe_point=None,
+    ):
         super().__init__(duration=0.0)
         self.source_geometry_provider = source_geometry_provider
         self.target_geometry_provider = target_geometry_provider
         self.prepare_hands = prepare_hands
         self.reveal_card = reveal_card
         self.resource_manager = resource_manager
+        self.on_safe_point = on_safe_point
         self.pending_steps = []
         self.current_action = None
         self.current_step = None
@@ -149,6 +158,7 @@ class CardDealSequenceActivity(Activity):
         self.current_action.update(dt)
         if self.current_action.is_finished():
             self.reveal_card(*self.current_step)
+            self.emit_safe_point(*self.current_step)
             self.current_action = None
             self.current_step = None
             self.start_next_step()
@@ -163,6 +173,20 @@ class CardDealSequenceActivity(Activity):
 
     def on_step_started(self, _player_id, _resource_key, _hand_index):
         """Allow source-specific sequences to hide a card when its flight begins."""
+
+    def emit_safe_point(self, player_id, resource_key, hand_index):
+        if not callable(self.on_safe_point):
+            return False
+        self.on_safe_point(
+            "deal.step.safe_point",
+            {
+                "player_id": player_id,
+                "resource_key": resource_key,
+                "hand_index": hand_index,
+                "safe_point": "deal.step.safe_point",
+            },
+        )
+        return True
 
     def finish_sequence(self):
         """Finish one supplied dealing snapshot without ending this screen activity."""

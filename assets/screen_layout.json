@@ -1,0 +1,50 @@
+{
+  "screens": {
+    "table_screen": {
+      "groups": {
+        "table_group": {
+          "frame_id": "game_table",
+          "position": [
+            0,
+            0
+          ]
+        },
+        "left_player": {
+          "frame_id": "left_player_portrait",
+          "position": [
+            0,
+            0
+          ]
+        },
+        "right_player": {
+          "frame_id": "right_player_portrait",
+          "position": [
+            0,
+            0
+          ]
+        },
+        "top_player": {
+          "frame_id": "top_player_portrait",
+          "position": [
+            0,
+            0
+          ]
+        },
+        "bottom_player": {
+          "frame_id": "bottom_player_portrait",
+          "position": [
+            0,
+            0
+          ]
+        },
+        "take_btn": {
+          "frame_id": "game_table",
+          "position": [
+            980,
+            500
+          ]
+        }
+      }
+    }
+  }
+}

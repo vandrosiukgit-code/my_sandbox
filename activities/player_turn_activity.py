@@ -21,6 +21,7 @@ class PlayerTurnActivity(Activity):
         freeze_slot_layout=None,
         release_slot_layout=None,
         remove_source_card=None,
+        on_safe_point=None,
     ):
         super().__init__(duration=0.0)
         self.validate_play_area_slots_activity(play_area_slots_activity)
@@ -33,10 +34,12 @@ class PlayerTurnActivity(Activity):
         self.freeze_slot_layout = freeze_slot_layout
         self.release_slot_layout = release_slot_layout
         self.remove_source_card = remove_source_card
+        self.on_safe_point = on_safe_point
         self.slot_layout_frozen = False
         self.slot_layout_release_pending = False
         self.source_card_removed = False
         self.completed_turn_context = None
+        self.safe_point_emitted = False
 
     @property
     def flight_groups(self):
@@ -77,6 +80,7 @@ class PlayerTurnActivity(Activity):
             if self.current_action is not None:
                 self.current_action.start()
             self.turn_active = True
+            self.safe_point_emitted = False
             return True
         except Exception:
             self.release_frozen_slot_layout()
@@ -154,6 +158,7 @@ class PlayerTurnActivity(Activity):
         self.slot_layout_release_pending = self.has_pending_slot_transfers()
         if not self.slot_layout_release_pending:
             self.release_frozen_slot_layout()
+            self.emit_safe_point()
 
     def place_turn_card_in_target_slot(self):
         if not self.turn_context:
@@ -172,6 +177,7 @@ class PlayerTurnActivity(Activity):
         if self.slot_layout_release_pending and not self.has_pending_slot_transfers():
             self.slot_layout_release_pending = False
             self.release_frozen_slot_layout()
+            self.emit_safe_point()
         if self.current_action is None:
             return
         self.current_action.update(dt)
@@ -216,6 +222,17 @@ class PlayerTurnActivity(Activity):
             self.release_slot_layout()
         self.slot_layout_frozen = False
 
+    def emit_safe_point(self):
+        if self.safe_point_emitted:
+            return False
+        if not callable(self.on_safe_point):
+            return False
+        payload = dict(self.completed_turn_context or {})
+        payload["safe_point"] = "turn.played.safe_point"
+        self.on_safe_point("turn.played.safe_point", payload)
+        self.safe_point_emitted = True
+        return True
+
     def apply_fixture(self, fixture):
         if hasattr(self.play_area_slots_activity, "apply_fixture"):
             self.play_area_slots_activity.apply_fixture(fixture)
@@ -239,6 +256,7 @@ class PlayerTurnActivity(Activity):
             self.current_action = None
             self.source_card_removed = False
             self.completed_turn_context = None
+            self.safe_point_emitted = False
             self.flight_group_registry.clear()
             self.slot_layout_release_pending = False
         finally:

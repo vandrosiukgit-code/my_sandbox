@@ -205,6 +205,16 @@
       "frame_width": 200,
       "frame_height": 200
     },
+    "main_screen.button": {
+      "path": "main_screen/button.png",
+      "frame_width": 464,
+      "frame_height": 200
+    },
+    "main_screen.buttons.button_take": {
+      "path": "main_screen/buttons/button_take.png",
+      "frame_width": 1254,
+      "frame_height": 1254
+    },
     "main_screen.p_name_bg": {
       "path": "main_screen/p_name_bg.png",
       "frame_width": 200,

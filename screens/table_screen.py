@@ -20,6 +20,7 @@ from core.resource import ResourceManager
 from game_screen import debug_overlay
 from game_screen.events import ActivityResult, ControllerResponse
 from game_screen.game_screen import GameScreen
+import screen_layout_config
 
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -52,6 +53,13 @@ class TableScreen(GameScreen):
         "cards_slot_frame_5",
         "cards_slot_frame_6",
         "cards_slot_frame_7",
+    )
+    SCREEN_ID = "table_screen"
+    FOREGROUND_GROUP_IDS = (
+        "left_player",
+        "right_player",
+        "top_player",
+        "bottom_player",
     )
 
     def __init__(self, group_store, game_controller):
@@ -87,11 +95,7 @@ class TableScreen(GameScreen):
         self.layout_player_frames()
         self.layout_deck_frame()
 
-        self.put_configured_group("table_group", "game_table", position=(0, 0))
-        self.put_configured_group("left_player", "left_player_portrait", position=(0, 0))
-        self.put_configured_group("right_player", "right_player_portrait", position=(0, 0))
-        self.put_configured_group("top_player", "top_player_portrait", position=(0, 0))
-        self.put_configured_group("bottom_player", "bottom_player_portrait", position=(0, 0))
+        self.place_configured_groups_from_layout()
 
         cards_slot_activity = self.create_cards_slot_activity(self.get_screen_frame("cards_slot_frame"))
         deck_activity = DeckActivity(
@@ -110,6 +114,7 @@ class TableScreen(GameScreen):
             freeze_slot_layout=self.freeze_play_area_slot_layout,
             release_slot_layout=self.release_play_area_slot_layout,
             remove_source_card=self.remove_hand_card,
+            on_safe_point=self.handle_bottom_player_hand_safe_point,
         )
         card_deal_sequence_activity = CardDealSequenceActivity(
             source_geometry_provider=deck_activity.get_deal_source_screen_geometry,
@@ -117,6 +122,7 @@ class TableScreen(GameScreen):
             prepare_hands=self.prepare_card_deal_hands,
             reveal_card=self.reveal_card_deal,
             resource_manager=ResourceManager,
+            on_safe_point=self.handle_bottom_player_hand_safe_point,
         )
         bottom_player_hand_activity = CardSelectionActivity(
             VisibleCardsHandDecorator(
@@ -423,6 +429,19 @@ class TableScreen(GameScreen):
         self.activate_group(group_id)
         return self.put_group_in_frame(group_id, frame_id, position=position)
 
+    def get_configured_group_placements(self):
+        return screen_layout_config.get_screen_group_placements(self.SCREEN_ID)
+
+    def place_configured_groups_from_layout(self):
+        for group_id, placement in self.get_configured_group_placements().items():
+            if not isinstance(placement, dict):
+                continue
+            frame_id = placement.get("frame_id")
+            if not frame_id or not self.has_screen_frame(frame_id):
+                continue
+            position = placement.get("position", (0, 0))
+            self.put_configured_group(group_id, frame_id, position=self.normalize_fixture_position(position))
+
     def update(self, dt):
         self._fixture_check_elapsed += dt
         if self._fixture_check_elapsed >= self._fixture_check_interval:
@@ -455,12 +474,10 @@ class TableScreen(GameScreen):
             elif hasattr(activity, "draw"):
                 activity.draw(screen)
 
-        for group_id in (
-            "left_player",
-            "right_player",
-            "top_player",
-            "bottom_player",
-        ):
+        for group_id in self.iter_midground_group_ids():
+            self.draw_group_if_active(group_id, screen)
+
+        for group_id in self.FOREGROUND_GROUP_IDS:
             self.draw_group_if_active(group_id, screen)
 
         self.draw_bottom_player_hand_probe(screen)
@@ -475,6 +492,10 @@ class TableScreen(GameScreen):
     def draw_activity_generated_groups(self, screen):
         for group in self.iter_activity_generated_groups():
             group.draw(screen)
+
+    def iter_midground_group_ids(self):
+        excluded = {"table_group", *self.FOREGROUND_GROUP_IDS}
+        return tuple(group_id for group_id in self.active_group_ids if group_id not in excluded)
 
     def iter_activity_generated_groups(self):
         seen_group_ids = set()
@@ -839,6 +860,7 @@ class TableScreen(GameScreen):
             self.clear_play_area_slot_cards,
             ResourceManager,
             0.26,
+            on_safe_point=self.handle_bottom_player_hand_safe_point,
         )
         self.add_activity(activity)
         started = activity.start_take_plan(
@@ -907,6 +929,12 @@ class TableScreen(GameScreen):
 
     def get_start_game_target_screen_geometry(self, target_activity_id, hand_index=None):
         if hand_index is not None:
+            projected = self.find_nested_activity_with_method(
+                self.get_named_activity(target_activity_id),
+                "get_projected_card_screen_geometry",
+            )
+            if projected is not None:
+                return projected.get_projected_card_screen_geometry(hand_index)
             hand = self.find_nested_activity_with_method(
                 self.get_named_activity(target_activity_id),
                 "get_prepared_card_screen_geometry",
@@ -922,12 +950,27 @@ class TableScreen(GameScreen):
         for player_id in set(hands_before_deal) | set(cards_to_deal):
             before = tuple(hands_before_deal.get(player_id, ()))
             incoming = tuple(cards_to_deal.get(player_id, ()))
+            if player_id == "bottom_player_hand":
+                hand = self.find_nested_activity_with_method(
+                    self.get_named_activity(player_id),
+                    "prepare_incremental_cards",
+                )
+                if hand is not None:
+                    hand.prepare_incremental_cards(before, incoming)
+                    continue
             hand = self.find_nested_activity_with_method(self.get_named_activity(player_id), "prepare_cards")
             if hand is None:
                 raise RuntimeError(f"{player_id} does not support prepared cards")
             hand.prepare_cards((*before, *incoming), revealed_count=len(before))
 
-    def reveal_card_deal(self, player_id, _resource_key, hand_index):
+    def reveal_card_deal(self, player_id, resource_key, hand_index):
+        if player_id == "bottom_player_hand":
+            hand = self.find_nested_activity_with_method(
+                self.get_named_activity(player_id),
+                "append_revealed_card",
+            )
+            if hand is not None:
+                return hand.append_revealed_card(resource_key)
         hand = self.find_nested_activity_with_method(self.get_named_activity(player_id), "reveal_card")
         if hand is None:
             raise RuntimeError(f"{player_id} does not support card reveal")
@@ -962,6 +1005,21 @@ class TableScreen(GameScreen):
         if rebuilt:
             self._bottom_player_hand_turn_rebuild_pending = False
         return rebuilt
+
+    def handle_bottom_player_hand_safe_point(self, safe_point, payload=None):
+        payload = payload or {}
+        player_id = payload.get("player_id")
+        if safe_point == "turn.played.safe_point":
+            return self.rebuild_bottom_player_hand_after_turn()
+        if safe_point == "deal.step.safe_point" and player_id == "bottom_player_hand":
+            hand_activity = self.get_named_activity("bottom_player_hand")
+            has_pending = getattr(hand_activity, "has_pending_layout_rebuild", None)
+            if callable(has_pending) and has_pending():
+                return self.rebuild_bottom_player_hand_after_turn()
+            return False
+        if safe_point == "table.take.safe_point" and player_id == "bottom_player_hand":
+            return self.rebuild_bottom_player_hand_after_turn()
+        return False
 
     def rebuild_bottom_player_hand_if_ready(self):
         hand_activity = self.get_named_activity("bottom_player_hand")

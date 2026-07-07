@@ -524,6 +524,73 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
 
         self.assertEqual(hand_activity.rebuild_calls, 1)
 
+    def test_bottom_hand_safe_point_rebuilds_bottom_fan_immediately(self):
+        hand_activity = FakeHandActivity(remove_result=True)
+        hand_activity.pending_layout_rebuild = True
+        screen = object.__new__(TableScreen)
+        screen.get_named_activity = lambda activity_id: hand_activity if activity_id == "bottom_player_hand" else None
+        screen._bottom_player_hand_turn_rebuild_pending = False
+
+        self.assertTrue(
+            screen.handle_bottom_player_hand_safe_point(
+                "deal.step.safe_point",
+                {"player_id": "bottom_player_hand", "hand_index": 3},
+            )
+        )
+
+        self.assertEqual(hand_activity.rebuild_calls, 1)
+
+    def test_prepare_card_deal_hands_keeps_bottom_hand_incremental(self):
+        calls = []
+
+        class BottomHand:
+            def prepare_incremental_cards(self, before, incoming):
+                calls.append(("incremental", tuple(before), tuple(incoming)))
+
+        class BotHand:
+            def prepare_cards(self, cards, revealed_count=0):
+                calls.append(("prepared", tuple(cards), revealed_count))
+
+        screen = object.__new__(TableScreen)
+        screen.get_named_activity = (
+            lambda activity_id: BottomHand()
+            if activity_id == "bottom_player_hand"
+            else BotHand()
+            if activity_id == "right_player_hand"
+            else None
+        )
+        screen.find_nested_activity_with_method = TableScreen.find_nested_activity_with_method
+
+        screen.prepare_card_deal_hands(
+            {"bottom_player_hand": ("cards.6_of_clubs",), "right_player_hand": ("cards.card_back",)},
+            {"bottom_player_hand": ("cards.7_of_clubs",), "right_player_hand": ("cards.card_back",)},
+        )
+
+        self.assertIn(
+            ("incremental", ("cards.6_of_clubs",), ("cards.7_of_clubs",)),
+            calls,
+        )
+        self.assertIn(
+            ("prepared", ("cards.card_back", "cards.card_back"), 1),
+            calls,
+        )
+
+    def test_reveal_card_deal_appends_bottom_player_card_immediately(self):
+        calls = []
+
+        class BottomHand:
+            def append_revealed_card(self, resource_key):
+                calls.append(("append", resource_key))
+                return True
+
+        screen = object.__new__(TableScreen)
+        screen.get_named_activity = lambda activity_id: BottomHand() if activity_id == "bottom_player_hand" else None
+        screen.find_nested_activity_with_method = TableScreen.find_nested_activity_with_method
+
+        screen.reveal_card_deal("bottom_player_hand", "cards.7_of_clubs", 1)
+
+        self.assertEqual(calls, [("append", "cards.7_of_clubs")])
+
     def test_round_completion_requests_bottom_layout_release(self):
         screen = object.__new__(TableScreen)
         screen._activity_result_watchers = []

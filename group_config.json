@@ -1,527 +1,563 @@
 {
-    "groups":  {
-                   "table_group":  {
-                                       "role":  "game_table",
-                                       "tags":  [
-                                                    "table",
-                                                    "background"
-                                                ],
-                                       "rect":  [
-                                                    0,
-                                                    0,
-                                                    1280,
-                                                    720
-                                                ],
-                                       "hit_rect":  [
-                                                        0,
-                                                        0,
-                                                        1280,
-                                                        720
-                                                    ],
-                                       "scale_factor":  1.0,
-                                       "hide_rect":  false,
-                                       "manifest_targets":  {
-                                                                "table.surface":  {
-                                                                                      "type":  "group",
-                                                                                      "description":  "Main game table visual object."
-                                                                                  }
-                                                            },
-                                       "layers":  [
-                                                      {
-                                                          "name":  "table",
-                                                          "type":  "image",
-                                                          "resource_key":  "main_screen.table",
-                                                          "position":  [
-                                                                           0,
-                                                                           0
-                                                                       ]
-                                                      },
-                                                      {
-                                                          "name":  "tressure_map",
-                                                          "type":  "image",
-                                                          "resource_key":  "main_screen.tressure_map",
-                                                          "position":  [
-                                                                           0,
-                                                                           0
-                                                                       ]
-                                                      }
-                                                  ]
-                                   },
-                   "right_player":  {
-                                        "role":  "player_panel",
-                                        "tags":  [
-                                                     "player",
-                                                     "right_player",
-                                                     "configurable"
-                                                 ],
-                                        "rect":  [
-                                                     0,
-                                                     0,
-                                                     200,
-                                                     200
-                                                 ],
-                                        "hit_rect":  [
-                                                         0,
-                                                         0,
-                                                         200,
-                                                         200
-                                                     ],
-                                        "scale_factor":  1.0,
-                                        "hide_rect":  true,
-                                        "rect_debug_layer_ids":  [
-                                                                     "p_name_bg",
-                                                                     "player_name_text"
-                                                                 ],
-                                        "manifest_targets":  {
-                                                                 "player.right.avatar":  {
-                                                                                             "type":  "resource",
-                                                                                             "layer":  "portrait",
-                                                                                             "description":  "Right player portrait image."
-                                                                                         },
-                                                                 "player.right.name":  {
-                                                                                           "type":  "text",
-                                                                                           "layer":  "player_name_text",
-                                                                                           "description":  "Right player display name."
-                                                                                       }
-                                                             },
-                                        "layers":  [
-                                                       {
-                                                           "name":  "p_portrait_bg",
-                                                           "type":  "image",
-                                                           "resource_key":  "main_screen.p_portrait_bg",
-                                                           "scale_percent":  [
-                                                                                 100,
-                                                                                 100
-                                                                             ],
-                                                           "position":  [
-                                                                            0,
-                                                                            0
-                                                                        ]
-                                                       },
-                                                       {
-                                                           "name":  "portrait",
-                                                           "type":  "image",
-                                                           "resource_key":  "main_screen.avatars.portrait_3",
-                                                           "scale_percent":  [
-                                                                                 100,
-                                                                                 100
-                                                                             ],
-                                                           "position":  [
-                                                                            0,
-                                                                            0
-                                                                        ]
-                                                       },
-                                                       {
-                                                           "name":  "portrait_frame",
-                                                           "type":  "image",
-                                                           "resource_key":  "main_screen.portrait_frame",
-                                                           "position":  [
-                                                                            0,
-                                                                            0
-                                                                        ]
-                                                       },
-                                                       {
-                                                           "name":  "p_name_bg",
-                                                           "type":  "image",
-                                                           "resource_key":  "main_screen.p_name_bg",
-                                                           "scale_percent":  [
-                                                                                 100,
-                                                                                 100
-                                                                             ],
-                                                           "position":  [
-                                                                            0,
-                                                                            132
-                                                                        ]
-                                                       },
-                                                       {
-                                                           "name":  "player_name_text",
-                                                           "type":  "text",
-                                                           "text":  "Player 3",
-                                                           "size":  [
-                                                                        200,
-                                                                        56
-                                                                    ],
-                                                           "position":  [
-                                                                            0,
-                                                                            132
-                                                                        ],
-                                                           "fit_mode":  "contain",
-                                                           "style":  {
-                                                                         "font_path":  "assets/fonts/Lobster/Lobster-Regular.ttf",
-                                                                         "font_size":  28,
-                                                                         "color":  [
-                                                                                       32,
-                                                                                       33,
-                                                                                       36
-                                                                                   ],
-                                                                         "antialias":  true,
-                                                                         "font_name":  "Lobster-Regular"
-                                                                     },
-                                                           "scale_percent":  [
-                                                                                 75,
-                                                                                 100
-                                                                             ],
-                                                           "height":  56,
-                                                           "text_key":  "player.right.name"
-                                                       }
-                                                   ]
-                                    },
-                   "left_player":  {
-                                       "role":  "player_panel",
-                                       "tags":  [
-                                                    "player",
-                                                    "left_player",
-                                                    "configurable"
-                                                ],
-                                       "rect":  [
-                                                    0,
-                                                    0,
-                                                    200,
-                                                    200
-                                                ],
-                                       "hit_rect":  [
-                                                        0,
-                                                        0,
-                                                        200,
-                                                        200
-                                                    ],
-                                       "scale_factor":  1.0,
-                                       "hide_rect":  true,
-                                       "rect_debug_layer_ids":  [
-                                                                    "p_name_bg",
-                                                                    "player_name_text"
-                                                                ],
-                                       "manifest_targets":  {
-                                                                "player.left.avatar":  {
-                                                                                           "type":  "resource",
-                                                                                           "layer":  "portrait",
-                                                                                           "description":  "Left player portrait image."
-                                                                                       },
-                                                                "player.left.name":  {
-                                                                                         "type":  "text",
-                                                                                         "layer":  "player_name_text",
-                                                                                         "description":  "Left player display name."
-                                                                                     }
-                                                            },
-                                       "layers":  [
-                                                      {
-                                                          "name":  "p_portrait_bg",
-                                                          "type":  "image",
-                                                          "resource_key":  "main_screen.p_portrait_bg",
-                                                          "scale_percent":  [
-                                                                                100,
-                                                                                100
-                                                                            ],
-                                                          "position":  [
-                                                                           0,
-                                                                           0
-                                                                       ]
-                                                      },
-                                                      {
-                                                          "name":  "portrait",
-                                                          "type":  "image",
-                                                          "resource_key":  "main_screen.avatars.portrait_2",
-                                                          "scale_percent":  [
-                                                                                100,
-                                                                                100
-                                                                            ],
-                                                          "position":  [
-                                                                           0,
-                                                                           0
-                                                                       ]
-                                                      },
-                                                      {
-                                                          "name":  "portrait_frame",
-                                                          "type":  "image",
-                                                          "resource_key":  "main_screen.portrait_frame",
-                                                          "position":  [
-                                                                           0,
-                                                                           0
-                                                                       ]
-                                                      },
-                                                      {
-                                                          "name":  "p_name_bg",
-                                                          "type":  "image",
-                                                          "resource_key":  "main_screen.p_name_bg",
-                                                          "scale_percent":  [
-                                                                                100,
-                                                                                100
-                                                                            ],
-                                                          "position":  [
-                                                                           0,
-                                                                           132
-                                                                       ]
-                                                      },
-                                                      {
-                                                          "name":  "player_name_text",
-                                                          "type":  "text",
-                                                          "text":  "Player 1",
-                                                          "size":  [
-                                                                       200,
-                                                                       56
-                                                                   ],
-                                                          "position":  [
-                                                                           0,
-                                                                           132
-                                                                       ],
-                                                          "fit_mode":  "contain",
-                                                          "style":  {
-                                                                        "font_path":  "assets/fonts/Lobster/Lobster-Regular.ttf",
-                                                                        "font_size":  28,
-                                                                        "color":  [
-                                                                                      32,
-                                                                                      33,
-                                                                                      36
-                                                                                  ],
-                                                                        "antialias":  true,
-                                                                        "font_name":  "Lobster-Regular"
-                                                                    },
-                                                          "scale_percent":  [
-                                                                                75,
-                                                                                100
-                                                                            ],
-                                                          "height":  56,
-                                                          "text_key":  "player.left.name"
-                                                      }
-                                                  ]
-                                   },
-                   "top_player":  {
-                                      "role":  "player_panel",
-                                      "tags":  [
-                                                   "player",
-                                                   "top_player",
-                                                   "configurable"
-                                               ],
-                                      "rect":  [
-                                                   0,
-                                                   0,
-                                                   200,
-                                                   200
-                                               ],
-                                      "hit_rect":  [
-                                                       0,
-                                                       0,
-                                                       200,
-                                                       200
-                                                   ],
-                                      "scale_factor":  1.0,
-                                      "hide_rect":  true,
-                                      "rect_debug_layer_ids":  [
-                                                                   "p_name_bg",
-                                                                   "player_name_text"
-                                                               ],
-                                      "manifest_targets":  {
-                                                               "player.top.avatar":  {
-                                                                                         "type":  "resource",
-                                                                                         "layer":  "portrait",
-                                                                                         "description":  "Top player portrait image."
-                                                                                     },
-                                                               "player.top.name":  {
-                                                                                       "type":  "text",
-                                                                                       "layer":  "player_name_text",
-                                                                                       "description":  "Top player display name."
-                                                                                   }
-                                                           },
-                                      "layers":  [
-                                                     {
-                                                         "name":  "p_portrait_bg",
-                                                         "type":  "image",
-                                                         "resource_key":  "main_screen.p_portrait_bg",
-                                                         "scale_percent":  [
-                                                                               100,
-                                                                               100
-                                                                           ],
-                                                         "position":  [
-                                                                          0,
-                                                                          0
-                                                                      ]
-                                                     },
-                                                     {
-                                                         "name":  "portrait",
-                                                         "type":  "image",
-                                                         "resource_key":  "main_screen.avatars.portrait_1",
-                                                         "scale_percent":  [
-                                                                               100,
-                                                                               100
-                                                                           ],
-                                                         "position":  [
-                                                                          0,
-                                                                          0
-                                                                      ]
-                                                     },
-                                                     {
-                                                         "name":  "portrait_frame",
-                                                         "type":  "image",
-                                                         "resource_key":  "main_screen.portrait_frame",
-                                                         "position":  [
-                                                                          0,
-                                                                          0
-                                                                      ]
-                                                     },
-                                                     {
-                                                         "name":  "p_name_bg",
-                                                         "type":  "image",
-                                                         "resource_key":  "main_screen.p_name_bg",
-                                                         "scale_percent":  [
-                                                                               100,
-                                                                               100
-                                                                           ],
-                                                         "position":  [
-                                                                          0,
-                                                                          132
-                                                                      ]
-                                                     },
-                                                     {
-                                                         "name":  "player_name_text",
-                                                         "type":  "text",
-                                                         "text":  "Player 2",
-                                                         "size":  [
-                                                                      200,
-                                                                      56
-                                                                  ],
-                                                         "position":  [
-                                                                          0,
-                                                                          132
-                                                                      ],
-                                                         "fit_mode":  "contain",
-                                                         "style":  {
-                                                                       "font_path":  "assets/fonts/Lobster/Lobster-Regular.ttf",
-                                                                       "font_size":  28,
-                                                                       "color":  [
-                                                                                     32,
-                                                                                     33,
-                                                                                     36
-                                                                                 ],
-                                                                       "antialias":  true,
-                                                                       "font_name":  "Lobster-Regular"
-                                                                   },
-                                                         "height":  56,
-                                                         "scale_percent":  [
-                                                                               75,
-                                                                               100
-                                                                           ],
-                                                         "text_key":  "player.top.name"
-                                                     }
-                                                 ]
-                                  },
-                   "bottom_player":  {
-                                         "role":  "player_panel",
-                                         "tags":  [
-                                                      "player",
-                                                      "bottom_player",
-                                                      "configurable"
-                                                  ],
-                                         "rect":  [
-                                                      0,
-                                                      0,
-                                                      200,
-                                                      200
-                                                  ],
-                                         "hit_rect":  [
-                                                          0,
-                                                          0,
-                                                          200,
-                                                          200
-                                                      ],
-                                         "scale_factor":  1.0,
-                                         "hide_rect":  true,
-                                         "rect_debug_layer_ids":  [
-                                                                      "p_name_bg",
-                                                                      "player_name_text"
-                                                                  ],
-                                         "manifest_targets":  {
-                                                                  "player.bottom.avatar":  {
-                                                                                               "type":  "resource",
-                                                                                               "layer":  "portrait",
-                                                                                               "description":  "Bottom player portrait image."
-                                                                                           },
-                                                                  "player.bottom.name":  {
-                                                                                             "type":  "text",
-                                                                                             "layer":  "player_name_text",
-                                                                                             "description":  "Bottom player display name."
-                                                                                         }
-                                                              },
-                                         "layers":  [
-                                                        {
-                                                            "name":  "p_portrait_bg",
-                                                            "type":  "image",
-                                                            "resource_key":  "main_screen.p_portrait_bg",
-                                                            "scale_percent":  [
-                                                                                  100,
-                                                                                  100
-                                                                              ],
-                                                            "position":  [
-                                                                             0,
-                                                                             0
-                                                                         ]
-                                                        },
-                                                        {
-                                                            "name":  "portrait",
-                                                            "type":  "image",
-                                                            "resource_key":  "main_screen.avatars.portrait_4",
-                                                            "scale_percent":  [
-                                                                                  100,
-                                                                                  100
-                                                                              ],
-                                                            "position":  [
-                                                                             0,
-                                                                             0
-                                                                         ]
-                                                        },
-                                                        {
-                                                            "name":  "portrait_frame",
-                                                            "type":  "image",
-                                                            "resource_key":  "main_screen.portrait_frame",
-                                                            "position":  [
-                                                                             0,
-                                                                             0
-                                                                         ]
-                                                        },
-                                                        {
-                                                            "name":  "p_name_bg",
-                                                            "type":  "image",
-                                                            "resource_key":  "main_screen.p_name_bg",
-                                                            "scale_percent":  [
-                                                                                  100,
-                                                                                  100
-                                                                              ],
-                                                            "position":  [
-                                                                             0,
-                                                                             132
-                                                                         ]
-                                                        },
-                                                        {
-                                                            "name":  "player_name_text",
-                                                            "type":  "text",
-                                                            "text":  "You",
-                                                            "size":  [
-                                                                         200,
-                                                                         56
-                                                                     ],
-                                                            "position":  [
-                                                                             0,
-                                                                             132
-                                                                         ],
-                                                            "fit_mode":  "contain",
-                                                            "style":  {
-                                                                          "font_path":  "assets/fonts/Lobster/Lobster-Regular.ttf",
-                                                                          "font_size":  28,
-                                                                          "color":  [
-                                                                                        32,
-                                                                                        33,
-                                                                                        36
-                                                                                    ],
-                                                                          "antialias":  true,
-                                                                          "font_name":  "Lobster-Regular"
-                                                                      },
-                                                            "height":  56,
-                                                            "scale_percent":  [
-                                                                                  75,
-                                                                                  100
-                                                                              ],
-                                                            "text_key":  "player.bottom.name"
-                                                        }
-                                                    ]
-                                     }
-               }
+  "groups": {
+    "table_group": {
+      "role": "game_table",
+      "tags": [
+        "table",
+        "background"
+      ],
+      "rect": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "hit_rect": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "scale_factor": 0.14,
+      "hide_rect": false,
+      "manifest_targets": {
+        "table.surface": {
+          "type": "group",
+          "description": "Main game table visual object."
+        }
+      },
+      "layers": [
+        {
+          "name": "table",
+          "type": "image",
+          "resource_key": "main_screen.table",
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "tressure_map",
+          "type": "image",
+          "resource_key": "main_screen.tressure_map",
+          "position": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    "right_player": {
+      "role": "player_panel",
+      "tags": [
+        "player",
+        "right_player",
+        "configurable"
+      ],
+      "rect": [
+        0,
+        0,
+        200,
+        200
+      ],
+      "hit_rect": [
+        0,
+        0,
+        200,
+        200
+      ],
+      "scale_factor": 1.0,
+      "hide_rect": true,
+      "rect_debug_layer_ids": [
+        "p_name_bg",
+        "player_name_text"
+      ],
+      "manifest_targets": {
+        "player.right.avatar": {
+          "type": "resource",
+          "layer": "portrait",
+          "description": "Right player portrait image."
+        },
+        "player.right.name": {
+          "type": "text",
+          "layer": "player_name_text",
+          "description": "Right player display name."
+        }
+      },
+      "layers": [
+        {
+          "name": "p_portrait_bg",
+          "type": "image",
+          "resource_key": "main_screen.p_portrait_bg",
+          "scale_percent": [
+            100,
+            100
+          ],
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "portrait",
+          "type": "image",
+          "resource_key": "main_screen.avatars.portrait_3",
+          "scale_percent": [
+            100,
+            100
+          ],
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "portrait_frame",
+          "type": "image",
+          "resource_key": "main_screen.portrait_frame",
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "p_name_bg",
+          "type": "image",
+          "resource_key": "main_screen.p_name_bg",
+          "scale_percent": [
+            100,
+            100
+          ],
+          "position": [
+            0,
+            132
+          ]
+        },
+        {
+          "name": "player_name_text",
+          "type": "text",
+          "text": "Player 3",
+          "size": [
+            200,
+            56
+          ],
+          "position": [
+            0,
+            132
+          ],
+          "fit_mode": "contain",
+          "style": {
+            "font_path": "assets/fonts/Lobster/Lobster-Regular.ttf",
+            "font_size": 28,
+            "color": [
+              32,
+              33,
+              36
+            ],
+            "antialias": true,
+            "font_name": "Lobster-Regular"
+          },
+          "scale_percent": [
+            75,
+            100
+          ],
+          "height": 56,
+          "text_key": "player.right.name"
+        }
+      ]
+    },
+    "left_player": {
+      "role": "player_panel",
+      "tags": [
+        "player",
+        "left_player",
+        "configurable"
+      ],
+      "rect": [
+        0,
+        0,
+        200,
+        200
+      ],
+      "hit_rect": [
+        0,
+        0,
+        200,
+        200
+      ],
+      "scale_factor": 1.0,
+      "hide_rect": true,
+      "rect_debug_layer_ids": [
+        "p_name_bg",
+        "player_name_text"
+      ],
+      "manifest_targets": {
+        "player.left.avatar": {
+          "type": "resource",
+          "layer": "portrait",
+          "description": "Left player portrait image."
+        },
+        "player.left.name": {
+          "type": "text",
+          "layer": "player_name_text",
+          "description": "Left player display name."
+        }
+      },
+      "layers": [
+        {
+          "name": "p_portrait_bg",
+          "type": "image",
+          "resource_key": "main_screen.p_portrait_bg",
+          "scale_percent": [
+            100,
+            100
+          ],
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "portrait",
+          "type": "image",
+          "resource_key": "main_screen.avatars.portrait_2",
+          "scale_percent": [
+            100,
+            100
+          ],
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "portrait_frame",
+          "type": "image",
+          "resource_key": "main_screen.portrait_frame",
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "p_name_bg",
+          "type": "image",
+          "resource_key": "main_screen.p_name_bg",
+          "scale_percent": [
+            100,
+            100
+          ],
+          "position": [
+            0,
+            132
+          ]
+        },
+        {
+          "name": "player_name_text",
+          "type": "text",
+          "text": "Player 1",
+          "size": [
+            200,
+            56
+          ],
+          "position": [
+            0,
+            132
+          ],
+          "fit_mode": "contain",
+          "style": {
+            "font_path": "assets/fonts/Lobster/Lobster-Regular.ttf",
+            "font_size": 28,
+            "color": [
+              32,
+              33,
+              36
+            ],
+            "antialias": true,
+            "font_name": "Lobster-Regular"
+          },
+          "scale_percent": [
+            75,
+            100
+          ],
+          "height": 56,
+          "text_key": "player.left.name"
+        }
+      ]
+    },
+    "top_player": {
+      "role": "player_panel",
+      "tags": [
+        "player",
+        "top_player",
+        "configurable"
+      ],
+      "rect": [
+        0,
+        0,
+        200,
+        200
+      ],
+      "hit_rect": [
+        0,
+        0,
+        200,
+        200
+      ],
+      "scale_factor": 1.0,
+      "hide_rect": true,
+      "rect_debug_layer_ids": [
+        "p_name_bg",
+        "player_name_text"
+      ],
+      "manifest_targets": {
+        "player.top.avatar": {
+          "type": "resource",
+          "layer": "portrait",
+          "description": "Top player portrait image."
+        },
+        "player.top.name": {
+          "type": "text",
+          "layer": "player_name_text",
+          "description": "Top player display name."
+        }
+      },
+      "layers": [
+        {
+          "name": "p_portrait_bg",
+          "type": "image",
+          "resource_key": "main_screen.p_portrait_bg",
+          "scale_percent": [
+            100,
+            100
+          ],
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "portrait",
+          "type": "image",
+          "resource_key": "main_screen.avatars.portrait_1",
+          "scale_percent": [
+            100,
+            100
+          ],
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "portrait_frame",
+          "type": "image",
+          "resource_key": "main_screen.portrait_frame",
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "p_name_bg",
+          "type": "image",
+          "resource_key": "main_screen.p_name_bg",
+          "scale_percent": [
+            100,
+            100
+          ],
+          "position": [
+            0,
+            132
+          ]
+        },
+        {
+          "name": "player_name_text",
+          "type": "text",
+          "text": "Player 2",
+          "size": [
+            200,
+            56
+          ],
+          "position": [
+            0,
+            132
+          ],
+          "fit_mode": "contain",
+          "style": {
+            "font_path": "assets/fonts/Lobster/Lobster-Regular.ttf",
+            "font_size": 28,
+            "color": [
+              32,
+              33,
+              36
+            ],
+            "antialias": true,
+            "font_name": "Lobster-Regular"
+          },
+          "height": 56,
+          "scale_percent": [
+            75,
+            100
+          ],
+          "text_key": "player.top.name"
+        }
+      ]
+    },
+    "bottom_player": {
+      "role": "player_panel",
+      "tags": [
+        "player",
+        "bottom_player",
+        "configurable"
+      ],
+      "rect": [
+        0,
+        0,
+        200,
+        200
+      ],
+      "hit_rect": [
+        0,
+        0,
+        200,
+        200
+      ],
+      "scale_factor": 1.0,
+      "hide_rect": true,
+      "rect_debug_layer_ids": [
+        "p_name_bg",
+        "player_name_text"
+      ],
+      "manifest_targets": {
+        "player.bottom.avatar": {
+          "type": "resource",
+          "layer": "portrait",
+          "description": "Bottom player portrait image."
+        },
+        "player.bottom.name": {
+          "type": "text",
+          "layer": "player_name_text",
+          "description": "Bottom player display name."
+        }
+      },
+      "layers": [
+        {
+          "name": "p_portrait_bg",
+          "type": "image",
+          "resource_key": "main_screen.p_portrait_bg",
+          "scale_percent": [
+            100,
+            100
+          ],
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "portrait",
+          "type": "image",
+          "resource_key": "main_screen.avatars.portrait_4",
+          "scale_percent": [
+            100,
+            100
+          ],
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "portrait_frame",
+          "type": "image",
+          "resource_key": "main_screen.portrait_frame",
+          "position": [
+            0,
+            0
+          ]
+        },
+        {
+          "name": "p_name_bg",
+          "type": "image",
+          "resource_key": "main_screen.p_name_bg",
+          "scale_percent": [
+            100,
+            100
+          ],
+          "position": [
+            0,
+            132
+          ]
+        },
+        {
+          "name": "player_name_text",
+          "type": "text",
+          "text": "You",
+          "size": [
+            200,
+            56
+          ],
+          "position": [
+            0,
+            132
+          ],
+          "fit_mode": "contain",
+          "style": {
+            "font_path": "assets/fonts/Lobster/Lobster-Regular.ttf",
+            "font_size": 28,
+            "color": [
+              32,
+              33,
+              36
+            ],
+            "antialias": true,
+            "font_name": "Lobster-Regular"
+          },
+          "height": 56,
+          "scale_percent": [
+            75,
+            100
+          ],
+          "text_key": "player.bottom.name"
+        }
+      ]
+    },
+    "take_btn": {
+      "role": "button take",
+      "tags": [
+        "take"
+      ],
+      "rect": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "hit_rect": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale_factor": 1.0,
+      "hide_rect": true,
+      "manifest_targets": {},
+      "layers": [
+        {
+          "name": "button_take",
+          "type": "image",
+          "resource_key": "main_screen.buttons.button_take",
+          "scale_percent": [
+            100,
+            100
+          ],
+          "position": [
+            0,
+            0
+          ]
+        }
+      ]
+    }
+  }
 }

@@ -349,15 +349,9 @@ first contract as draw order.
 `ResourceManager` loads this manifest and can repair missing dimensions.
 
 `assets/gui_manifest.json` is a generated/snapshot artifact of the current GUI
-screen, frames, groups, and hierarchy. It should be treated as a diagnostic or
-tooling export, not the primary source of truth. The durable source remains
+screen, frames, groups, and hierarchy. It should be treated as a diagnostic
+artifact, not the primary source of truth. The durable source remains
 `group_config.json`.
-
-Regenerate it with:
-
-```text
-python scripts/update_gui_manifest.py
-```
 
 ## Environment
 
@@ -376,7 +370,8 @@ to discover these modules by default; it builds directly from `group_config`.
 
 ## Known Architecture Debt
 
-- Regenerate `assets/gui_manifest.json` after layout/config changes.
+- Keep `assets/gui_manifest.json` aligned with layout/config changes if that
+  snapshot artifact is still part of the workflow.
 - Keep public target IDs unique and side-specific when adding new groups.
 - The local `.venv` may be machine-specific and can point to a missing base
   Python installation; verification should use a recreated environment.

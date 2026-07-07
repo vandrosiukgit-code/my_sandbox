@@ -340,45 +340,6 @@ main.py
 - `ResourceManager` остается единственным источником Surface/frames;
 - `Group.create_group()` собирает слои из resource keys.
 
-### 13. Обновить `resource_picker` [done]
-
-Р¤Р°Р№Р»:
-
-- `tools/resource_picker.py`
-
-Задачи:
-
-- убедиться, что дерево папок `assets/` работает;
-- довести поиск до стабильного состояния;
-- сделать tuple-слой, пригодный для `Group.create_group()`;
-- не завязывать dev tool на `pygame.display`.
-
-Критерий готовности:
-
-- инструмент помогает выбрать resource keys для сборки акторов.
-
-### 13.1. Переработать сценарии `resource_picker` по новым источникам истины [deferred]
-
-Файлы:
-
-- `tools/resource_picker.py`
-- `tools/resource_picker_refactor_tz.md`
-- `tools/resource_picker_refactor_backlog.md`
-
-Задачи:
-
-- разделить работу с PNG-файлами и manifest на вкладки `PNG Explorer` и `Manifest Explorer`;
-- сделать `Get PNG resource`, который копирует tuple для ручной вставки в `GRAPHICS`;
-- убрать ручное редактирование записей manifest из UI;
-- считать файлы `Group` единственным источником истины для состава manifest;
-- считать PNG-файл единственным источником истины для `frame_width` и `frame_height`;
-- сделать `Build Manifest` командой построения manifest из `GRAPHICS` в `Group` и метаданных PNG;
-- сделать `Manifest Update` командой синхронизации состава manifest только по `GRAPHICS` в `Group`;
-- оставить работу с PNG-метаданными отдельным сценарием `PNG Metadata Editor`.
-
-Критерий готовности:
-
-- `Manifest Update` только приводит состав manifest к текущим `GRAPHICS` в файлах `Group`.
 
 ## P6. Точка входа и сборка приложения
 
@@ -480,6 +441,6 @@ Screen -> Frame local -> nested Frame local -> Group local -> Layer local
 3. P2: добавить черновой `GameController` и fixture-состояние.
 4. P3: подготовить Frame и позже собрать игровые экраны.
 5. P4: добавить первые `Activity`.
-6. P5: подчистить ресурсный контур и `resource_picker`.
+6. P5: подчистить ресурсный контур.
 7. P6: собрать все через `main.py`.
 8. P7: обновить документацию и smoke-проверки.

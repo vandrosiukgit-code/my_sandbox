@@ -58,6 +58,28 @@ class CardDealSequenceActivityTests(unittest.TestCase):
         self.assertFalse(activity.sequence_active)
         self.assertEqual(activity.iter_generated_groups(), ())
 
+    def test_sequence_safe_point_fires_after_reveal(self):
+        events = []
+        activity = CardDealSequenceActivity(
+            source_geometry_provider=lambda: {"center": (0, 0), "size": (10, 14)},
+            target_geometry_provider=lambda _player_id, _hand_index: {"center": (20, 20), "size": (10, 14)},
+            prepare_hands=lambda _before, _incoming: None,
+            reveal_card=lambda *args: events.append(("reveal", args)),
+            resource_manager=FakeResourceManager,
+            on_safe_point=lambda safe_point, payload: events.append((safe_point, payload["player_id"], payload["hand_index"])),
+        )
+
+        activity.start_sequence((("bottom_player_hand", "cards.6_of_clubs", 0),), duration=0.0)
+        self.finish_current_action(activity)
+
+        self.assertEqual(
+            events,
+            [
+                ("reveal", ("bottom_player_hand", "cards.6_of_clubs", 0)),
+                ("deal.step.safe_point", "bottom_player_hand", 0),
+            ],
+        )
+
     def test_start_deal_prepares_hands_by_default(self):
         prepare_calls = []
         activity = self.make_activity(prepare_calls=prepare_calls)

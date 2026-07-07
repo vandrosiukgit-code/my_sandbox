@@ -122,8 +122,7 @@ main.py
 ## Current Architecture Risks
 
 - `assets/gui_manifest.json` is a generated snapshot/export and can drift from
-  the live `TableScreen` unless regenerated with
-  `python scripts/update_gui_manifest.py`.
+  the live `TableScreen`.
 - The local `.venv` can be machine-specific and should be recreated before
   verification.
 - Draw-order regressions can reappear if a parent activity consumes only

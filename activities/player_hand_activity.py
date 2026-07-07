@@ -125,7 +125,7 @@ class PlayerHandActivity(BotHandActivity):
             self._last_layout_signature = self.get_layout_signature()
             return
 
-        geometry = self.calculate_fan_geometry()
+        geometry = self.calculate_fan_geometry(count=count)
 
         for index, group in enumerate(self.generated_groups):
             slot = self.calculate_slot_position(index, count)
@@ -151,14 +151,15 @@ class PlayerHandActivity(BotHandActivity):
             None if self.fan_area_local_rect is None else tuple(self.fan_area_local_rect),
         )
 
-    def calculate_fan_geometry(self):
+    def calculate_fan_geometry(self, count=None, reference_surface=None):
         """Calculate all fan geometry from frame size, density, and max angle."""
+        count = len(self.generated_groups) if count is None else max(0, int(count))
         frame_rect = self.get_fan_area_local_rect()
 
         padding = self.calculate_edge_padding(frame_rect)
         left_bound = frame_rect.left + padding
         right_bound = frame_rect.right - padding
-        card_half_width = self.get_card_local_half_width()
+        card_half_width = self.get_card_local_half_width(reference_surface)
 
         center_x, center_y = self.get_fan_center(frame_rect)
         center_x = max(
@@ -208,12 +209,30 @@ class PlayerHandActivity(BotHandActivity):
     def get_prepared_card_screen_geometry(self, hand_index):
         """Return the final screen geometry of one prepared hand-card slot."""
         group = self.generated_groups[hand_index]
-        geometry = self.calculate_fan_geometry()
+        geometry = self.calculate_fan_geometry(count=len(self.generated_groups))
         local_angle = self.calculate_slot_position(hand_index, len(self.generated_groups)) * geometry.max_angle
         base_surface = self.group_base_frames[group.id][0]
         scale = group.get_effective_screen_scale()
         return {
             "center": tuple(group.rect.center),
+            "size": (
+                max(1, int(round(base_surface.get_width() * scale))),
+                max(1, int(round(base_surface.get_height() * scale))),
+            ),
+            "angle_degrees": float(self.orientation_degrees + local_angle),
+        }
+
+    def get_projected_card_screen_geometry(self, hand_index, resource_key=None, card_count=None):
+        """Return projected geometry for a future hand slot without prebuilding hidden cards."""
+        projected_count = max(int(hand_index) + 1, len(self.generated_groups), int(card_count or 0))
+        base_surface = self.get_reference_card_surface(resource_key)
+        geometry = self.calculate_fan_geometry(count=projected_count, reference_surface=base_surface)
+        local_angle = self.calculate_slot_position(hand_index, projected_count) * geometry.max_angle
+        center_position = self.calculate_center_arc_position(local_angle, geometry)
+        screen_center = self.frame.to_screen(center_position)
+        scale = self.get_frame_screen_scale() * self.scale_factor
+        return {
+            "center": tuple(screen_center),
             "size": (
                 max(1, int(round(base_surface.get_width() * scale))),
                 max(1, int(round(base_surface.get_height() * scale))),
@@ -239,17 +258,19 @@ class PlayerHandActivity(BotHandActivity):
     def calculate_edge_padding(self, frame_rect):
         return max(0, int(round(frame_rect.width * self.edge_padding_ratio)))
 
-    def get_card_local_half_width(self):
+    def get_card_local_half_width(self, reference_surface=None):
+        if reference_surface is not None:
+            return reference_surface.get_width() / 2
         return max(
             (frames[0].get_width() / 2 for frames in self.group_base_frames.values() if frames),
             default=0.0,
         )
 
-    def get_fan_center(self, frame_rect):
+    def get_fan_center(self, frame_rect, reference_surface=None):
         """Return sector center for the bottom-hand middle arc."""
         local_scale = self.get_activity_local_scale()
-        radius = self.calculate_center_arc_radius(frame_rect)
-        card_half_height = self.get_card_local_half_height()
+        radius = self.calculate_center_arc_radius(frame_rect, reference_surface)
+        card_half_height = self.get_card_local_half_height(reference_surface)
         return (
             frame_rect.centerx + int(round(self.center_offset[0] * local_scale)),
             frame_rect.top
@@ -257,18 +278,34 @@ class PlayerHandActivity(BotHandActivity):
             + int(round(self.center_offset[1] * local_scale)),
         )
 
-    def calculate_center_arc_radius(self, frame_rect):
-        card_half_width = self.get_card_local_half_width()
-        card_half_height = self.get_card_local_half_height()
+    def calculate_center_arc_radius(self, frame_rect, reference_surface=None):
+        card_half_width = self.get_card_local_half_width(reference_surface)
+        card_half_height = self.get_card_local_half_height(reference_surface)
         half_span = max(0.0, frame_rect.width / 2 - self.calculate_edge_padding(frame_rect) - card_half_width)
         sagitta = max(1.0, frame_rect.height - card_half_height * 2)
         return (half_span * half_span + sagitta * sagitta) / (2 * sagitta)
 
-    def get_card_local_half_height(self):
+    def get_card_local_half_height(self, reference_surface=None):
+        if reference_surface is not None:
+            return reference_surface.get_height() / 2
         return max(
             (frames[0].get_height() / 2 for frames in self.group_base_frames.values() if frames),
             default=0.0,
         )
+
+    def get_reference_card_surface(self, resource_key=None):
+        for frames in self.group_base_frames.values():
+            if frames:
+                return frames[0]
+        if resource_key is not None and self.resource_manager is not None:
+            frames = self.resource_manager.get_frames(resource_key)
+            if frames:
+                return frames[0]
+        if self.resource_manager is not None:
+            fallback_frames = self.resource_manager.get_frames("cards.card_back")
+            if fallback_frames:
+                return fallback_frames[0]
+        raise RuntimeError("Cannot resolve reference card surface for projected hand geometry")
 
     def calculate_slot_position(self, index, count):
         """Return one of count evenly spaced sector rays, assigned center-out."""
