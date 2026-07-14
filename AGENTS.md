@@ -219,6 +219,15 @@ Avoid absolute user-machine paths unless necessary.
 
 ## 4. Core architecture boundaries
 
+Stability note:
+
+```text
+`Activity` and `Action` are considered architecture-stable in the current project state.
+Do not refactor, redesign, repartition responsibilities, or "clean up" these layers
+unless the user explicitly asks for work in `activities/*`, `actions/*`, or their contracts.
+Ordinary feature work and unrelated refactors must treat these layers as frozen.
+```
+
 Project roles:
 
 ```text

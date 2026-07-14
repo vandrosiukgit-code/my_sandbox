@@ -123,9 +123,11 @@ class VisibleCardsHandDecorator(Activity):
             self.reveal_card(hand_index)
 
     def prepare_incremental_cards(self, visible_cards, incoming_cards=()):
-        """Prepare only the currently visible bottom hand; future cards use projected geometry."""
-        _ = incoming_cards
+        """Keep the bottom hand truly incremental while targets use projected geometry."""
+        visible_cards = tuple(visible_cards or ())
+        _ = tuple(incoming_cards or ())
         self.set_cards(visible_cards, force=True)
+        self.revealed_card_indices = set(range(len(self.card_resource_keys)))
 
     def append_revealed_card(self, resource_key):
         """Append one newly landed visible card and relayout immediately."""

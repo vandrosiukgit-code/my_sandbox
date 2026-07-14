@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import argparse
+import copy
 from dataclasses import dataclass
 import json
 import os
+import subprocess
 import sys
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QBrush, QColor, QFont, QPixmap
+from PySide6.QtGui import QAction, QBrush, QColor, QCursor, QFont, QPixmap
 from PySide6.QtWidgets import (
     QAbstractScrollArea,
     QAbstractItemView,
@@ -62,6 +65,163 @@ class GuiExplorerNode:
     label: str
     parent_id: str | None = None
     payload: dict | None = None
+
+
+def _load_preview_fixture_json(fixture_name):
+    fixture_path = os.path.join(PROJECT_DIR, "fixtures", fixture_name)
+    with open(fixture_path, "r", encoding="utf-8") as fixture_file:
+        return json.load(fixture_file)
+
+
+def build_table_screen_gui_preview_state():
+    base_fixture = _load_preview_fixture_json("table_screen_fixture.json")
+    discard_fixture = _load_preview_fixture_json("discard_table_fixture.json")
+    start_game_fixture = base_fixture.get("activities", {}).get("start_game", {})
+    return {
+        "bot_hand_counts": {
+            "left_player_hand": 6,
+            "right_player_hand": 6,
+            "top_player_hand": 6,
+        },
+        "bottom_player_cards": tuple(start_game_fixture.get("bottom_player_card_resource_keys", ())[:6]),
+        "table_slots": {
+            slot_id: tuple(cards)
+            for slot_id, cards in discard_fixture.get("table_slots", {}).items()
+        },
+        "trump_resource_key": base_fixture.get("activities", {}).get("deck_frame", {}).get("trump_resource_key", "cards.a_of_spades"),
+    }
+
+
+def prepare_static_preview_screen(screen):
+    for frame in screen.screen_frames.values():
+        frame.actions = []
+    if hasattr(screen, "clear_play_area_slot_cards"):
+        screen.clear_play_area_slot_cards()
+    screen.update(0.0)
+
+
+def run_table_screen_gui_preview():
+    from core import GameController
+    from core.render_engine import RenderEngine
+    from group import GroupStore
+    from screens.table_screen import TableScreen
+
+    game_controller = GameController(GameController.create_fixture_state())
+    group_store = GroupStore(resource_manager=ResourceManager)
+    preview_state = build_table_screen_gui_preview_state()
+
+    def screen_factory(_render_context=None):
+        ResourceManager.build_runtime_cache(ASSETS_DIR)
+        group_store.build()
+        screen = TableScreen(group_store=group_store, game_controller=game_controller)
+        prepare_static_preview_screen(screen)
+        screen.controller_game_started = True
+        screen.controller_owned_visual_state = False
+        for activity_id, card_count in preview_state["bot_hand_counts"].items():
+            activity = screen.get_named_activity(activity_id)
+            if activity is not None:
+                activity.apply_fixture({"card_count": card_count})
+        bottom_hand = screen.get_named_activity("bottom_player_hand")
+        if bottom_hand is not None:
+            bottom_hand.apply_fixture({"cards": preview_state["bottom_player_cards"]})
+        deck_activity = screen.get_named_activity("deck_frame")
+        if deck_activity is not None:
+            deck_activity.apply_fixture({"trump_resource_key": preview_state["trump_resource_key"]})
+        for slot_id, cards in preview_state["table_slots"].items():
+            slot_activity = screen.get_named_activity(slot_id)
+            if slot_activity is not None:
+                slot_activity.apply_fixture({"cards": cards, "card_visual_state": "visible"})
+        screen.update(0.0)
+        return screen
+
+    render_engine = RenderEngine(
+        screen_factory=screen_factory,
+        screen_size=TableScreen.SCREEN_SIZE,
+        title="The Fool's Reef - screen: table_screen [gui preview]",
+    )
+    render_engine.run()
+    return 0
+
+
+def run_layout_screen_preview(screen_id):
+    from core.render_engine import RenderEngine
+    from game_screen.game_screen import GameScreen
+    from group import GroupStore
+
+    layout = screen_layout_config.load_screen_layout()
+    screen_payload = layout.get("screens", {}).get(screen_id)
+    if not isinstance(screen_payload, dict):
+        print(f"Unknown screen: {screen_id}")
+        return 2
+
+    frames_payload = screen_payload.get("frames", {})
+    if not isinstance(frames_payload, dict) or not frames_payload:
+        print(f"Screen has no frame layout for preview: {screen_id}")
+        return 2
+
+    class LayoutPreviewScreen(GameScreen):
+        def __init__(self, group_store, background_color=(30, 30, 30)):
+            super().__init__(group_store=group_store, game_controller=None, background_color=background_color)
+            self.screen_payload = copy.deepcopy(screen_payload)
+            self._build_layout_tree()
+            self._place_groups()
+
+        def _build_layout_tree(self):
+            pending = dict(self.screen_payload.get("frames", {}))
+            while pending:
+                progress = False
+                for frame_id, frame_spec in list(pending.items()):
+                    if not isinstance(frame_spec, dict):
+                        pending.pop(frame_id)
+                        progress = True
+                        continue
+                    parent_frame_id = frame_spec.get("parent_frame_id")
+                    if parent_frame_id and not self.has_screen_frame(parent_frame_id):
+                        continue
+                    self.create_frame(
+                        frame_id,
+                        rect=frame_spec.get("rect", (0, 0, 0, 0)),
+                        parent_frame_id=parent_frame_id,
+                    )
+                    pending.pop(frame_id)
+                    progress = True
+                if progress:
+                    continue
+                unresolved = ", ".join(sorted(pending))
+                raise RuntimeError(f"Cannot resolve frame hierarchy for preview screen {screen_id}: {unresolved}")
+
+        def _place_groups(self):
+            groups = self.screen_payload.get("groups", {})
+            if not isinstance(groups, dict):
+                return
+            for group_id, placement in groups.items():
+                if not isinstance(placement, dict):
+                    continue
+                frame_id = placement.get("frame_id")
+                if not frame_id or not self.has_screen_frame(frame_id):
+                    continue
+                if self.group_store is None or not self.group_store.has(group_id):
+                    continue
+                self.activate_group(group_id)
+                self.put_group_in_frame(group_id, frame_id, position=placement.get("position", (0, 0)))
+
+    group_store = GroupStore(resource_manager=ResourceManager)
+    screen_size = tuple(screen_payload.get("size", (1280, 720)))
+    if len(screen_size) != 2:
+        screen_size = (1280, 720)
+
+    def screen_factory(_render_context=None):
+        ResourceManager.build_runtime_cache(ASSETS_DIR)
+        group_store.build()
+        return LayoutPreviewScreen(group_store=group_store)
+
+    render_engine = RenderEngine(
+        screen_factory=screen_factory,
+        screen_size=screen_size,
+        title=f"The Fool's Reef - screen: {screen_id}",
+    )
+    render_engine.run()
+    return 0
 
 
 class GuiEditorDataService:
@@ -154,7 +314,6 @@ class GuiEditorDataService:
             raise ValueError("Manifest path must stay inside assets/")
 
         entry = ResourceManager.create_default_manifest_entry(absolute_path, assets_root)
-        entry["path"] = manifest_path
         resource_key = ResourceManager.build_resource_key(manifest_path)
         manifest = self.load_resource_manifest()
         resources = manifest.setdefault("resources", {})
@@ -548,6 +707,7 @@ class GuiEditorApp(QMainWindow):
         self.gui_problem_node_ids = set()
         self.right_tabs = None
         self.left_panel = None
+        self.explorer_panel = None
         self.main_splitter = None
         self.create_screen_id_input = None
         self.create_root_frame_id_input = None
@@ -610,7 +770,7 @@ class GuiEditorApp(QMainWindow):
         self.main_splitter.addWidget(self._build_right_panel())
         self.main_splitter.setChildrenCollapsible(False)
         self.main_splitter.setStretchFactor(0, 1)
-        self.main_splitter.setStretchFactor(1, 0)
+        self.main_splitter.setStretchFactor(1, 2)
         outer.addWidget(self.main_splitter, 1)
 
     def _build_toolbar(self):
@@ -799,7 +959,7 @@ class GuiEditorApp(QMainWindow):
         self._append_graphic_resource_row()
         outer.addSpacing(self.CREATE_BLOCK_GAP)
 
-        self.group_graphic_status_label = self._muted_label("Use '+' to add the selected RM resource")
+        self.group_graphic_status_label = self._muted_label("Use '+' to bind the selected RM resource, 'More' to add another row")
         outer.addWidget(self.group_graphic_status_label)
         return box
 
@@ -895,18 +1055,22 @@ class GuiEditorApp(QMainWindow):
         entry.setText(resource_key)
         entry.editingFinished.connect(lambda current_entry=entry: self._reveal_graphic_resource_entry_in_rm(current_entry))
         add_button = self._form_button("+")
+        more_button = self._form_button("More")
         remove_button = self._form_button("-")
         row_index = len(self.group_graphic_resource_rows)
         add_button.clicked.connect(lambda _checked=False, current_entry=entry: self.add_selected_rm_resource_to_graphic_layer(current_entry))
+        more_button.clicked.connect(lambda _checked=False: self._append_graphic_resource_row())
         remove_button.clicked.connect(lambda _checked=False, index=row_index: self.remove_selected_graphic_resource(index))
         row_layout.addWidget(QLabel("resource_key"), alignment=Qt.AlignLeft | Qt.AlignVCenter)
         row_layout.addWidget(entry, 1)
         row_layout.addWidget(add_button, alignment=Qt.AlignLeft)
+        row_layout.addWidget(more_button, alignment=Qt.AlignLeft)
         row_layout.addWidget(remove_button, alignment=Qt.AlignLeft)
         row_data = {
             "widget": row_widget,
             "entry": entry,
             "add_button": add_button,
+            "more_button": more_button,
             "remove_button": remove_button,
         }
         self.group_graphic_resource_rows.append(row_data)
@@ -979,8 +1143,7 @@ class GuiEditorApp(QMainWindow):
             column = (index % 2) * 2
             grid.addWidget(QLabel(label), row, column, alignment=Qt.AlignLeft | Qt.AlignVCenter)
             grid.addWidget(widget, row, column + 1)
-        grid.setColumnStretch(1, 1)
-        grid.setColumnStretch(3, 1)
+        grid.setColumnStretch(4, 1)
         return grid
 
     # Shared control-metric helpers
@@ -1024,17 +1187,17 @@ class GuiEditorApp(QMainWindow):
 
     # Right-panel container helpers
     def _build_right_panel(self):
-        panel = QFrame()
-        panel.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
-        layout = QVBoxLayout(panel)
+        self.explorer_panel = QFrame()
+        self.explorer_panel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        layout = QVBoxLayout(self.explorer_panel)
         layout.setContentsMargins(0, 0, 0, 0)
 
         self.right_tabs = QTabWidget()
-        self.right_tabs.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+        self.right_tabs.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.right_tabs.addTab(self._build_rm_manifest_view(), "RM Manifest Explorer")
         self.right_tabs.addTab(self._build_gui_explorer_view(), "GUI Explorer")
         layout.addWidget(self.right_tabs)
-        return panel
+        return self.explorer_panel
 
     def _build_rm_manifest_view(self):
         page = QWidget()
@@ -1107,6 +1270,7 @@ class GuiEditorApp(QMainWindow):
         self.populate_rm_tree()
         self.populate_gui_tree()
         self._stabilize_right_panel_width()
+        self._apply_window_geometry_contract()
 
     def create_screen_from_form(self):
         self._clear_create_validation()
@@ -1262,17 +1426,118 @@ class GuiEditorApp(QMainWindow):
             return None
 
         group_config.reload_group_config()
+        existing_group_payload = dict(group_config.GROUP_CONFIG.get("groups", {}).get(group_id, {}))
         group_config.ensure_group(group_id)
-        group_config.save_group_config()
+        try:
+            layers, layer_inputs_provided = self._build_group_layers_from_form()
+        except ValueError as error:
+            self.create_group_status_label.setText(str(error))
+            return None
+        group_updates = {}
+        if layer_inputs_provided:
+            group_updates["layers"] = layers
+        if group_updates:
+            group_config.upsert_group(group_id, group_updates)
+        else:
+            group_config.save_group_config()
 
         payload = screen_layout_config.upsert_group_placement(group_id, screen_id, frame_id, position=position)
         screen_layout_config.save_screen_layout(payload)
         self.gui_problem_node_ids.clear()
         self.reload_explorers()
         self._select_gui_node(f"group:{group_id}", expand_parents=True)
+        if layer_inputs_provided:
+            if group_updates.get("layers"):
+                self.group_graphic_status_label.setText(f"Saved {len([layer for layer in group_updates['layers'] if layer.get('type') != 'text'])} graphic layer(s)")
+                text_layers = [layer for layer in group_updates["layers"] if layer.get("type") == "text"]
+                self.group_text_status_label.setText("Saved text layer" if text_layers else "Text layer cleared")
+            else:
+                self.group_graphic_status_label.setText("Graphic layers cleared")
+                self.group_text_status_label.setText("Text layer cleared")
+        elif existing_group_payload.get("layers"):
+            self.group_graphic_status_label.setText("Preserved existing group layers")
+            self.group_text_status_label.setText("Preserved existing text layer")
         self.create_group_status_label.setText(f"Created group: {group_id}")
         self.current_selection.setText(f"Created group: {group_id}")
         return payload
+
+    def _build_group_layers_from_form(self):
+        manifest_resources = self.service.load_resource_manifest().get("resources", {})
+        graphic_layers = []
+        layer_inputs_provided = False
+        for index, row in enumerate(self.group_graphic_resource_rows, start=1):
+            resource_key = row["entry"].text().strip()
+            if not resource_key:
+                continue
+            layer_inputs_provided = True
+            if resource_key not in manifest_resources:
+                self._mark_invalid_fields(row["entry"])
+                raise ValueError(f"Unknown graphic resource: {resource_key}")
+            graphic_layers.append(
+                {
+                    "name": f"graphic_layer_{index}",
+                    "type": "image",
+                    "resource_key": resource_key,
+                    "position": [0, 0],
+                }
+            )
+
+        text_value = self.group_text_value_input.text().strip()
+        font_value = self.group_text_font_input.text().strip()
+        size_value = self.group_text_size_input.text().strip()
+        color_value = self.group_text_color_input.text().strip()
+        text_inputs_provided = any((text_value, font_value, size_value, color_value))
+        text_layers = []
+        if text_inputs_provided:
+            layer_inputs_provided = True
+            text_layer = {
+                "name": "text_layer",
+                "type": "text",
+                "text": text_value,
+                "position": [0, 0],
+            }
+            if size_value:
+                text_layer["size"] = list(self._parse_group_text_size(size_value))
+            if font_value or color_value:
+                style = {}
+                if font_value:
+                    style["font_name"] = font_value
+                if color_value:
+                    style["color"] = list(self._parse_group_text_color(color_value))
+                if style:
+                    text_layer["style"] = style
+            text_layers.append(text_layer)
+
+        return graphic_layers + text_layers, layer_inputs_provided
+
+    def _parse_group_text_size(self, raw_value):
+        normalized = str(raw_value).lower().replace("x", ",")
+        parts = [part.strip() for part in normalized.split(",") if part.strip()]
+        if len(parts) != 2:
+            self._mark_invalid_fields(self.group_text_size_input)
+            raise ValueError("Text size must be 'width,height'")
+        try:
+            width = int(parts[0])
+            height = int(parts[1])
+        except ValueError as error:
+            self._mark_invalid_fields(self.group_text_size_input)
+            raise ValueError("Text size must be 'width,height'") from error
+        return width, height
+
+    def _parse_group_text_color(self, raw_value):
+        parts = [part.strip() for part in str(raw_value).split(",") if part.strip()]
+        if len(parts) != 3:
+            self._mark_invalid_fields(self.group_text_color_input)
+            raise ValueError("Text color must be 'r,g,b'")
+        try:
+            color = tuple(int(part) for part in parts)
+        except ValueError as error:
+            self._mark_invalid_fields(self.group_text_color_input)
+            raise ValueError("Text color must be 'r,g,b'") from error
+        if any(component < 0 or component > 255 for component in color):
+            self._mark_invalid_fields(self.group_text_color_input)
+            raise ValueError("Text color must use values from 0 to 255")
+        return color
 
     def populate_rm_tree(self):
         self.rm_tree.clear()
@@ -1305,8 +1570,19 @@ class GuiEditorApp(QMainWindow):
             self.rm_status_label.setText("PNG selection cancelled")
             return None
         selected_dir = os.path.dirname(selected_path) or self.service.assets_dir
+        manifest_path = None
+        current_item = self.rm_tree.currentItem() if self.rm_tree is not None else None
+        clicked_item = None
+        if self.rm_tree is not None:
+            clicked_item = self.rm_tree.itemAt(self.rm_tree.viewport().mapFromGlobal(QCursor.pos()))
+        target_item = clicked_item or current_item
+        if target_item is not None and target_item.text(1) == "folder":
+            folder_id = target_item.data(0, Qt.UserRole)
+            file_name = os.path.basename(selected_path)
+            resource_name = os.path.splitext(file_name)[0]
+            manifest_path = f"{folder_id.replace('.', '/')}/{resource_name}.png"
         try:
-            resource_key, entry = self.service.add_png_to_manifest(selected_path)
+            resource_key, entry = self.service.add_png_to_manifest(selected_path, manifest_path=manifest_path)
         except ValueError as error:
             self.rm_status_label.setText(str(error))
             return None
@@ -1349,7 +1625,11 @@ class GuiEditorApp(QMainWindow):
     def create_folder_from_dialog(self):
         parent_folder = None
         current_item = self.rm_tree.currentItem()
-        if current_item is not None and current_item.text(1) == "folder":
+        if (
+            current_item is not None
+            and current_item.text(1) == "folder"
+            and self.rm_tree.itemAt(self.rm_tree.viewport().mapFromGlobal(QCursor.pos())) is current_item
+        ):
             parent_folder = current_item.data(0, Qt.UserRole)
         folder_name, accepted = QInputDialog.getText(self, "Create folder", "Folder name")
         if not accepted:
@@ -1579,12 +1859,16 @@ class GuiEditorApp(QMainWindow):
         tree.updateGeometry()
 
     def _stabilize_right_panel_width(self, _index=None):
-        if self.rm_tree is None or self.gui_tree is None or self.right_tabs is None:
+        if self.rm_tree is None or self.gui_tree is None or self.right_tabs is None or self.explorer_panel is None:
             return
         tree_width = max(self._qtree_total_width(self.rm_tree), self._qtree_total_width(self.gui_tree))
         tabs_width = self.right_tabs.tabBar().sizeHint().width() + 8
-        self.right_tabs.setMinimumWidth(max(tree_width, tabs_width) + 10)
+        explorer_width = max(tree_width, tabs_width) + 10
+        self.right_tabs.setMinimumWidth(explorer_width)
         self.right_tabs.updateGeometry()
+
+    def _apply_window_geometry_contract(self):
+        return
 
     @staticmethod
     def _qtree_total_width(tree):
@@ -1691,17 +1975,210 @@ class GuiEditorApp(QMainWindow):
         if item is None:
             return
         menu = QMenu(self)
-        use_in_create_action = menu.addAction("Use in Create")
+        run_action = None
+        use_in_create_action = menu.addAction("Use in Create/Edit")
+        if item.data(0, Qt.UserRole + 1) == "screen":
+            run_action = menu.addAction("RUN")
+        delete_action = menu.addAction("Delete")
         chosen = menu.exec(self.gui_tree.viewport().mapToGlobal(position))
-        if chosen == use_in_create_action:
+        if run_action is not None and chosen == run_action:
+            self.gui_tree.setCurrentItem(item)
+            self.run_gui_screen(item.data(0, Qt.UserRole))
+        elif chosen == use_in_create_action:
             self.gui_tree.setCurrentItem(item)
             self.load_gui_node_into_create(item)
+        elif chosen == delete_action:
+            self.gui_tree.setCurrentItem(item)
+            self.delete_gui_node(item.data(0, Qt.UserRole))
+
+    def run_gui_screen(self, node_id=None):
+        target_node_id = node_id or (self.gui_tree.currentItem().data(0, Qt.UserRole) if self.gui_tree.currentItem() is not None else None)
+        if not target_node_id:
+            return None
+        kind, _separator, raw_id = str(target_node_id).partition(":")
+        screen_id = raw_id or str(target_node_id)
+        if kind != "screen":
+            return None
+        command = [
+            sys.executable,
+            os.path.abspath(__file__),
+            "preview-screen",
+            screen_id,
+        ]
+        subprocess.Popen(command, cwd=PROJECT_DIR)
+        self.current_selection.setText(f"Started screen run: {screen_id}")
+        return screen_id
+
+    def delete_gui_node(self, node_id=None):
+        target_node_id = node_id or (self.gui_tree.currentItem().data(0, Qt.UserRole) if self.gui_tree.currentItem() is not None else None)
+        if not target_node_id:
+            return None
+        kind, _separator, raw_id = str(target_node_id).partition(":")
+        entity_id = raw_id or str(target_node_id)
+        if kind not in {"screen", "frame", "group"}:
+            return None
+        expanded_node_ids = self._expanded_gui_node_ids()
+        summary = self._collect_gui_delete_summary(kind, entity_id)
+        confirmed = QMessageBox.question(
+            self,
+            "Delete",
+            summary,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if confirmed != QMessageBox.Yes:
+            self.current_selection.setText(f"Delete cancelled: {entity_id}")
+            return None
+
+        payload = screen_layout_config.load_screen_layout()
+        screens = payload.get("screens", {})
+        deleted_group_ids = []
+        if kind == "group":
+            for screen_payload in screens.values():
+                groups = screen_payload.get("groups", {})
+                if isinstance(groups, dict) and entity_id in groups:
+                    groups.pop(entity_id, None)
+                    deleted_group_ids.append(entity_id)
+        elif kind == "frame":
+            screen_id, frame_payload = self._find_screen_for_frame(entity_id, screens)
+            if screen_id is None or not isinstance(frame_payload, dict):
+                return None
+            screen_payload = screens.get(screen_id, {})
+            frames = screen_payload.get("frames", {})
+            groups = screen_payload.get("groups", {})
+            frame_ids_to_delete = self._collect_descendant_frame_ids(entity_id, frames)
+            frame_ids_to_delete.add(entity_id)
+            if isinstance(groups, dict):
+                deleted_group_ids = [
+                    group_id
+                    for group_id, placement in list(groups.items())
+                    if isinstance(placement, dict) and placement.get("frame_id") in frame_ids_to_delete
+                ]
+                for group_id in deleted_group_ids:
+                    groups.pop(group_id, None)
+            if isinstance(frames, dict):
+                for frame_id in frame_ids_to_delete:
+                    frames.pop(frame_id, None)
+        else:
+            screen_payload = screens.get(entity_id)
+            if not isinstance(screen_payload, dict):
+                return None
+            groups = screen_payload.get("groups", {})
+            if isinstance(groups, dict):
+                deleted_group_ids = list(groups.keys())
+            screens.pop(entity_id, None)
+        screen_layout_config.save_screen_layout(payload)
+
+        group_config.reload_group_config()
+        for group_id in deleted_group_ids:
+            if group_id in group_config.GROUP_CONFIG.get("groups", {}):
+                group_config.delete_group(group_id)
+
+        self.reload_explorers()
+        self._restore_expanded_gui_node_ids(expanded_node_ids, removed_node_id=target_node_id)
+        self._set_gui_delete_status(kind, entity_id)
+        return entity_id
+
+    def delete_gui_group(self, node_id=None):
+        return self.delete_gui_node(node_id)
+
+    def _collect_gui_delete_summary(self, kind, entity_id):
+        layout = screen_layout_config.load_screen_layout()
+        screens = layout.get("screens", {})
+        if kind == "group":
+            return f"Delete group '{entity_id}'?"
+        if kind == "frame":
+            screen_id, frame_payload = self._find_screen_for_frame(entity_id, screens)
+            if screen_id is None or not isinstance(frame_payload, dict):
+                return f"Delete frame '{entity_id}'?"
+            screen_payload = screens.get(screen_id, {})
+            frames = screen_payload.get("frames", {})
+            groups = screen_payload.get("groups", {})
+            frame_ids_to_delete = self._collect_descendant_frame_ids(entity_id, frames)
+            group_count = sum(
+                1
+                for placement in groups.values()
+                if isinstance(placement, dict) and placement.get("frame_id") in frame_ids_to_delete | {entity_id}
+            )
+            frame_count = len(frame_ids_to_delete) + 1
+            return f"Delete frame '{entity_id}' and its {frame_count - 1} child frame(s) with {group_count} group(s)?"
+        screen_payload = screens.get(entity_id, {})
+        group_count = len(screen_payload.get("groups", {})) if isinstance(screen_payload.get("groups", {}), dict) else 0
+        frame_count = len(screen_payload.get("frames", {})) if isinstance(screen_payload.get("frames", {}), dict) else 0
+        return f"Delete screen '{entity_id}' with {frame_count} frame(s) and {group_count} group(s)?"
+
+    @staticmethod
+    def _collect_descendant_frame_ids(frame_id, frames):
+        if not isinstance(frames, dict):
+            return set()
+        descendants = set()
+        queue = [frame_id]
+        while queue:
+            current_frame_id = queue.pop(0)
+            for child_frame_id, child_payload in frames.items():
+                if not isinstance(child_payload, dict):
+                    continue
+                if child_payload.get("parent_frame_id") != current_frame_id or child_frame_id in descendants:
+                    continue
+                descendants.add(child_frame_id)
+                queue.append(child_frame_id)
+        return descendants
+
+    def _set_gui_delete_status(self, kind, entity_id):
+        message = f"Deleted {kind}: {entity_id}"
+        if kind == "screen":
+            self.create_status_label.setText(message)
+        elif kind == "frame":
+            self.create_frame_status_label.setText(message)
+        else:
+            self.create_group_status_label.setText(message)
+        self.current_selection.setText(message)
+
+    def _expanded_gui_node_ids(self):
+        if self.gui_tree is None:
+            return set()
+        expanded = set()
+        matches = self.gui_tree.findItems("", Qt.MatchContains | Qt.MatchRecursive, 0)
+        for item in matches:
+            if item.isExpanded():
+                node_id = item.data(0, Qt.UserRole)
+                if node_id:
+                    expanded.add(node_id)
+        return expanded
+
+    def _restore_expanded_gui_node_ids(self, node_ids, removed_node_id=None):
+        if self.gui_tree is None:
+            return
+        removed_node_id = str(removed_node_id or "")
+        for node_id in node_ids:
+            if removed_node_id and node_id == removed_node_id:
+                continue
+            item = self._select_gui_node(node_id)
+            if item is not None:
+                item.setExpanded(True)
 
     def load_gui_node_into_create(self, item):
         node_id = item.data(0, Qt.UserRole)
         kind = item.data(0, Qt.UserRole + 1)
         context = self._build_gui_create_context(node_id, kind)
         self._clear_create_validation()
+        self._reset_group_layer_inputs()
+        self.create_screen_id_input.clear()
+        self.create_root_frame_id_input.clear()
+        self.create_frame_screen_id_input.clear()
+        self.create_group_screen_id_input.clear()
+        self.create_width_input.clear()
+        self.create_height_input.clear()
+        self.create_frame_id_input.clear()
+        self.create_frame_parent_id_input.clear()
+        self.create_frame_x_input.clear()
+        self.create_frame_y_input.clear()
+        self.create_frame_width_input.clear()
+        self.create_frame_height_input.clear()
+        self.create_group_id_input.clear()
+        self.create_group_frame_id_input.clear()
+        self.create_group_x_input.clear()
+        self.create_group_y_input.clear()
         if context.get("screen_id"):
             self.create_screen_id_input.setText(context["screen_id"])
             self.create_frame_screen_id_input.setText(context["screen_id"])
@@ -1713,10 +2190,10 @@ class GuiEditorApp(QMainWindow):
             self.create_width_input.setText(str(width))
             self.create_height_input.setText(str(height))
         if context.get("frame_id"):
-            self.create_frame_parent_id_input.setText(context["frame_id"])
             self.create_group_frame_id_input.setText(context["frame_id"])
         if kind == "frame":
             self.create_frame_id_input.setText(self._strip_gui_prefix(node_id))
+            self.create_frame_parent_id_input.setText(context.get("parent_frame_id", ""))
             rect = context.get("frame_rect")
             if rect:
                 self.create_frame_x_input.setText(str(rect[0]))
@@ -1730,7 +2207,42 @@ class GuiEditorApp(QMainWindow):
             position = placement.get("position", ["", ""])
             self.create_group_x_input.setText(str(position[0]))
             self.create_group_y_input.setText(str(position[1]))
+            self._load_group_layers_into_form(context.get("group_payload", {}))
         self.current_selection.setText(f"Loaded into Create: {kind} {self._strip_gui_prefix(node_id)}")
+
+    def _reset_group_layer_inputs(self):
+        while len(self.group_graphic_resource_rows) > 1:
+            row = self.group_graphic_resource_rows.pop()
+            row["widget"].setParent(None)
+            row["widget"].deleteLater()
+        if self.group_graphic_resource_rows:
+            self.group_graphic_resource_rows[0]["entry"].clear()
+        self.group_text_value_input.clear()
+        self.group_text_font_input.clear()
+        self.group_text_size_input.clear()
+        self.group_text_color_input.clear()
+
+    def _load_group_layers_into_form(self, group_payload):
+        layers = group_payload.get("layers", ()) if isinstance(group_payload, dict) else ()
+        graphic_layers = [layer for layer in layers if isinstance(layer, dict) and layer.get("type") != "text" and layer.get("resource_key")]
+        text_layer = next((layer for layer in layers if isinstance(layer, dict) and layer.get("type") == "text"), None)
+        for index, layer in enumerate(graphic_layers):
+            if index == 0 and self.group_graphic_resource_rows:
+                target_entry = self.group_graphic_resource_rows[0]["entry"]
+            else:
+                target_entry = self._append_graphic_resource_row()["entry"]
+            target_entry.setText(str(layer.get("resource_key", "")))
+        if text_layer is not None:
+            self.group_text_value_input.setText(str(text_layer.get("text", "")))
+            style = text_layer.get("style", {})
+            if isinstance(style, dict):
+                self.group_text_font_input.setText(str(style.get("font_name", style.get("font_path", "")) or ""))
+                color = style.get("color")
+                if isinstance(color, (list, tuple)) and len(color) >= 3:
+                    self.group_text_color_input.setText(",".join(str(int(component)) for component in color[:3]))
+            size = text_layer.get("size")
+            if isinstance(size, (list, tuple)) and len(size) >= 2:
+                self.group_text_size_input.setText(f"{size[0]},{size[1]}")
 
     def _build_gui_create_context(self, node_id, kind):
         stripped_id = self._strip_gui_prefix(node_id)
@@ -1738,7 +2250,7 @@ class GuiEditorApp(QMainWindow):
         screens = layout.get("screens", {})
         groups_payload = group_config.load_group_config().get("groups", {})
         if kind == "screen":
-            screen_payload = screens.get(stripped_id, {})
+            screen_payload = self._resolve_screen_payload(stripped_id, screens)
             return {
                 "screen_id": stripped_id,
                 "root_frame_id": screen_payload.get("root_frame_id", ""),
@@ -1748,19 +2260,20 @@ class GuiEditorApp(QMainWindow):
             screen_id, frame_payload = self._find_screen_for_frame(stripped_id, screens)
             if screen_id is None:
                 return {}
-            screen_payload = screens.get(screen_id, {})
+            screen_payload = self._resolve_screen_payload(screen_id, screens)
             return {
                 "screen_id": screen_id,
                 "root_frame_id": screen_payload.get("root_frame_id", ""),
                 "screen_size": tuple(screen_payload.get("size", ("", ""))),
                 "frame_id": frame_payload.get("frame_id", stripped_id),
+                "parent_frame_id": frame_payload.get("parent_frame_id", ""),
                 "frame_rect": tuple(frame_payload.get("rect", ("", "", "", ""))),
             }
         if kind == "group":
             screen_id, placement = self._find_screen_for_group(stripped_id, screens)
             if screen_id is None:
                 return {}
-            screen_payload = screens.get(screen_id, {})
+            screen_payload = self._resolve_screen_payload(screen_id, screens)
             return {
                 "screen_id": screen_id,
                 "root_frame_id": screen_payload.get("root_frame_id", ""),
@@ -1776,14 +2289,35 @@ class GuiEditorApp(QMainWindow):
         return str(node_id).split(":", 1)[-1]
 
     @staticmethod
+    def _resolve_screen_payload(screen_id, screens):
+        screen_payload = screens.get(screen_id, {})
+        default_payload = screen_layout_config.DEFAULT_SCREEN_LAYOUT.get("screens", {}).get(screen_id, {})
+        if not isinstance(screen_payload, dict):
+            screen_payload = {}
+        if not isinstance(default_payload, dict):
+            return screen_payload
+        merged_payload = dict(default_payload)
+        merged_payload.update(screen_payload)
+        return merged_payload
+
+    @staticmethod
     def _find_screen_for_frame(frame_id, screens):
         for screen_id, screen_payload in screens.items():
             frame_payload = screen_payload.get("frames", {}).get(frame_id)
             if isinstance(frame_payload, dict):
                 return screen_id, frame_payload
+        default_screens = screen_layout_config.DEFAULT_SCREEN_LAYOUT.get("screens", {})
+        for screen_id, screen_payload in default_screens.items():
+            frame_payload = screen_payload.get("frames", {}).get(frame_id)
+            if isinstance(frame_payload, dict):
+                return screen_id, dict(frame_payload)
         table_specs = GuiEditorDataService.get_table_screen_frame_specs()
         if frame_id in table_specs:
-            return "table_screen", dict(table_specs[frame_id])
+            frame_payload = dict(table_specs[frame_id])
+            manifest_rect = GuiEditorApp._load_gui_manifest_frame_rect(frame_id)
+            if manifest_rect is not None:
+                frame_payload["rect"] = manifest_rect
+            return "table_screen", frame_payload
         return None, None
 
     @staticmethod
@@ -1793,6 +2327,25 @@ class GuiEditorApp(QMainWindow):
             if isinstance(placement, dict):
                 return screen_id, placement
         return None, None
+
+    @staticmethod
+    def _load_gui_manifest_frame_rect(frame_id):
+        manifest_path = os.path.join(PROJECT_DIR, "assets", "gui_manifest.json")
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as file:
+                payload = json.load(file)
+        except (OSError, json.JSONDecodeError):
+            return None
+        frames = payload.get("frames", {})
+        if not isinstance(frames, dict):
+            return None
+        frame_payload = frames.get(frame_id, {})
+        if not isinstance(frame_payload, dict):
+            return None
+        rect = frame_payload.get("local_rect") or frame_payload.get("rect")
+        if not isinstance(rect, (list, tuple)) or len(rect) < 4:
+            return None
+        return tuple(rect[:4])
 
     def validate_create_context_from_gui(self, target_kind):
         current_item = self.gui_tree.currentItem()
@@ -1804,7 +2357,7 @@ class GuiEditorApp(QMainWindow):
             QMessageBox.warning(self, "Create context", "Cannot create a frame from a group context")
             self._mark_invalid_fields(self.create_frame_parent_id_input)
             return False
-        if target_kind == "group" and current_kind == "screen":
+        if target_kind == "group" and current_kind == "screen" and not self.create_group_frame_id_input.text().strip():
             QMessageBox.warning(self, "Create context", "Cannot create a group from a screen context without a frame")
             self._mark_invalid_fields(self.create_group_frame_id_input)
             return False
@@ -2018,7 +2571,26 @@ class GuiEditorApp(QMainWindow):
         return label
 
 
-def main():
+def build_parser():
+    parser = argparse.ArgumentParser(prog="gui_editor.py", add_help=True)
+    subparsers = parser.add_subparsers(dest="command")
+
+    preview_parser = subparsers.add_parser("preview-screen", help="Launch a static screen preview.")
+    preview_parser.add_argument("screen_id")
+
+    return parser
+
+
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.command == "preview-screen":
+        screen_id = str(args.screen_id or "").strip()
+        if screen_id == "table_screen":
+            return run_table_screen_gui_preview()
+        return run_layout_screen_preview(screen_id)
+
     app = QApplication.instance() or QApplication(sys.argv)
     window = GuiEditorApp()
     window.show()

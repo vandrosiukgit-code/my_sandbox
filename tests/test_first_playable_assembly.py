@@ -540,7 +540,7 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
 
         self.assertEqual(hand_activity.rebuild_calls, 1)
 
-    def test_prepare_card_deal_hands_keeps_bottom_hand_incremental(self):
+    def test_prepare_card_deal_hands_prefers_incremental_hand_contract(self):
         calls = []
 
         class BottomHand:
@@ -548,8 +548,8 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
                 calls.append(("incremental", tuple(before), tuple(incoming)))
 
         class BotHand:
-            def prepare_cards(self, cards, revealed_count=0):
-                calls.append(("prepared", tuple(cards), revealed_count))
+            def prepare_incremental_cards(self, before, incoming):
+                calls.append(("incremental", tuple(before), tuple(incoming)))
 
         screen = object.__new__(TableScreen)
         screen.get_named_activity = (
@@ -571,11 +571,11 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
             calls,
         )
         self.assertIn(
-            ("prepared", ("cards.card_back", "cards.card_back"), 1),
+            ("incremental", ("cards.card_back",), ("cards.card_back",)),
             calls,
         )
 
-    def test_reveal_card_deal_appends_bottom_player_card_immediately(self):
+    def test_reveal_card_deal_appends_incremental_hand_card_immediately(self):
         calls = []
 
         class BottomHand:

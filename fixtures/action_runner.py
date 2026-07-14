@@ -12,6 +12,7 @@ import os
 import shlex
 import subprocess
 import sys
+import copy
 from dataclasses import dataclass
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -40,6 +41,15 @@ ACTION_ORDER = (
     "auto_game",
     "auto_game_full_flow",
 )
+
+TABLE_SCREEN_STATIC_PRESETS = {
+    "opening_hands": "Opening hands and trump card.",
+    "player_attack": "Bottom player hand plus one attack card on the table.",
+    "player_defense": "One attack-defense pair on the table.",
+    "take_preview": "A crowded table before the defender takes cards.",
+    "discard_preview": "A crowded table before cards move to discard.",
+    "full_ui_preview": "Full UI preview with six cards in every hand and all table slots filled.",
+}
 
 
 def action_run(name, description, expected_result, configure_parser):
@@ -84,6 +94,11 @@ def build_parser():
     run_parser.add_argument("action")
     run_parser.add_argument("action_args", nargs=argparse.REMAINDER)
     run_parser.set_defaults(handler=handle_run)
+
+    screen_parser = subparsers.add_parser("screen", help="Launch one supported runtime screen directly.")
+    screen_parser.add_argument("screen_id")
+    screen_parser.add_argument("--preset", default="opening_hands")
+    screen_parser.set_defaults(handler=handle_screen)
 
     return parser
 
@@ -149,6 +164,7 @@ def print_banner():
     print("  help <number>")
     print("  run <action> [options]")
     print("  run <number> [options]")
+    print("  screen <screen_id>")
     print("  reload")
     print("  quit")
     print()
@@ -231,6 +247,13 @@ def handle_run(args):
     return action.run(action_args)
 
 
+def handle_screen(args):
+    screen_id = str(args.screen_id or "").strip()
+    if screen_id == "table_screen":
+        return run_table_screen(preset=str(getattr(args, "preset", "opening_hands") or "opening_hands").strip())
+    return run_layout_screen(screen_id)
+
+
 def iter_actions():
     ordered = [ACTION_RUNS[name] for name in ACTION_ORDER if name in ACTION_RUNS]
     ordered_names = set(ACTION_ORDER)
@@ -251,6 +274,209 @@ def resolve_action(action_id):
     if index < 1 or index > len(actions):
         return None
     return actions[index - 1]
+
+
+def load_fixture_json(fixture_name):
+    with open(os.path.join(PROJECT_DIR, "fixtures", fixture_name), encoding="utf-8") as fixture_file:
+        return json.load(fixture_file)
+
+
+def merge_fixture_dict(base, extra):
+    if not isinstance(extra, dict):
+        return base
+    merged = copy.deepcopy(base)
+    for key, value in extra.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = merge_fixture_dict(merged[key], value)
+        else:
+            merged[key] = copy.deepcopy(value)
+    return merged
+
+
+def build_table_screen_static_fixture(preset):
+    preset = str(preset or "opening_hands").strip() or "opening_hands"
+    if preset not in TABLE_SCREEN_STATIC_PRESETS:
+        raise ValueError(f"Unknown table_screen preset: {preset}")
+
+    base_fixture = load_fixture_json("table_screen_fixture.json")
+    if preset == "full_ui_preview":
+        discard_fixture = load_fixture_json("discard_table_fixture.json")
+        activities = {
+            slot_id: {"cards": cards, "card_visual_state": "visible"}
+            for slot_id, cards in discard_fixture.get("table_slots", {}).items()
+        }
+        return merge_fixture_dict(
+            base_fixture,
+            {
+                "card_counts": {
+                    "left_player_hand": 6,
+                    "right_player_hand": 6,
+                    "top_player_hand": 6,
+                    "bottom_player_hand": 6,
+                },
+                "activities": activities,
+            },
+        )
+    if preset == "opening_hands":
+        return base_fixture
+    if preset == "player_attack":
+        return merge_fixture_dict(
+            base_fixture,
+            {
+                "activities": {
+                    "cards_slot_frame": {
+                        "cards": ["cards.6_of_clubs"],
+                        "card_visual_state": "visible",
+                    }
+                }
+            },
+        )
+    if preset == "player_defense":
+        return merge_fixture_dict(
+            base_fixture,
+            {
+                "activities": {
+                    "cards_slot_frame": {
+                        "cards": ["cards.6_of_clubs", "cards.6_of_diamonds"],
+                        "card_visual_state": "visible",
+                    }
+                }
+            },
+        )
+    if preset == "take_preview":
+        take_fixture = load_fixture_json("take_table_fixture.json")
+        first_take = next(iter(take_fixture.get("takes", ())), {})
+        activities = {
+            slot_id: {"cards": cards, "card_visual_state": "visible"}
+            for slot_id, cards in first_take.get("table_slots", {}).items()
+        }
+        return merge_fixture_dict(base_fixture, {"activities": activities})
+    if preset == "discard_preview":
+        discard_fixture = load_fixture_json("discard_table_fixture.json")
+        activities = {
+            slot_id: {"cards": cards, "card_visual_state": "visible"}
+            for slot_id, cards in discard_fixture.get("table_slots", {}).items()
+        }
+        return merge_fixture_dict(base_fixture, {"activities": activities})
+    return base_fixture
+
+
+def run_table_screen(preset="opening_hands"):
+    from core import GameController
+    from core.render_engine import RenderEngine
+    from core.resource import ResourceManager
+    from group import GroupStore
+    from screens.table_screen import TableScreen
+
+    game_controller = GameController(GameController.create_fixture_state())
+    group_store = GroupStore(resource_manager=ResourceManager)
+    fixture = build_table_screen_static_fixture(preset)
+
+    def screen_factory(_render_context=None):
+        ResourceManager.build_runtime_cache(ASSETS_DIR)
+        group_store.build()
+        screen = TableScreen(
+            group_store=group_store,
+            game_controller=game_controller,
+        )
+        prepare_isolated_screen(screen)
+        screen.apply_fixture(fixture)
+        return screen
+
+    render_engine = RenderEngine(
+        screen_factory=screen_factory,
+        screen_size=TableScreen.SCREEN_SIZE,
+        title=f"The Fool's Reef - screen: table_screen [{preset}]",
+    )
+    render_engine.run()
+    return 0
+
+
+def run_layout_screen(screen_id):
+    import screen_layout_config
+
+    from core.render_engine import RenderEngine
+    from core.resource import ResourceManager
+    from game_screen.game_screen import GameScreen
+    from group import GroupStore
+
+    layout = screen_layout_config.load_screen_layout()
+    screen_payload = layout.get("screens", {}).get(screen_id)
+    if not isinstance(screen_payload, dict):
+        print(f"Unknown screen: {screen_id}")
+        return 2
+
+    frames_payload = screen_payload.get("frames", {})
+    if not isinstance(frames_payload, dict) or not frames_payload:
+        print(f"Screen has no frame layout for preview: {screen_id}")
+        return 2
+
+    class LayoutPreviewScreen(GameScreen):
+        def __init__(self, group_store, background_color=(30, 30, 30)):
+            super().__init__(group_store=group_store, game_controller=None, background_color=background_color)
+            self.screen_id = screen_id
+            self.screen_payload = copy.deepcopy(screen_payload)
+            self._build_layout_tree()
+            self._place_groups()
+
+        def _build_layout_tree(self):
+            frames = self.screen_payload.get("frames", {})
+            pending = dict(frames)
+            while pending:
+                progress = False
+                for frame_id, frame_spec in list(pending.items()):
+                    if not isinstance(frame_spec, dict):
+                        pending.pop(frame_id)
+                        progress = True
+                        continue
+                    parent_frame_id = frame_spec.get("parent_frame_id")
+                    if parent_frame_id and not self.has_screen_frame(parent_frame_id):
+                        continue
+                    rect = frame_spec.get("rect", (0, 0, 0, 0))
+                    self.create_frame(
+                        frame_id,
+                        rect=rect,
+                        parent_frame_id=parent_frame_id,
+                    )
+                    pending.pop(frame_id)
+                    progress = True
+                if progress:
+                    continue
+                unresolved = ", ".join(sorted(pending))
+                raise RuntimeError(f"Cannot resolve frame hierarchy for preview screen {screen_id}: {unresolved}")
+
+        def _place_groups(self):
+            groups = self.screen_payload.get("groups", {})
+            if not isinstance(groups, dict):
+                return
+            for group_id, placement in groups.items():
+                if not isinstance(placement, dict):
+                    continue
+                frame_id = placement.get("frame_id")
+                if not frame_id or not self.has_screen_frame(frame_id):
+                    continue
+                if self.group_store is None or not self.group_store.has(group_id):
+                    continue
+                self.activate_group(group_id)
+                self.put_group_in_frame(group_id, frame_id, position=placement.get("position", (0, 0)))
+
+    group_store = GroupStore(resource_manager=ResourceManager)
+    screen_size = tuple(screen_payload.get("size", (1280, 720)))
+    if len(screen_size) != 2:
+        screen_size = (1280, 720)
+
+    def screen_factory(_render_context=None):
+        ResourceManager.build_runtime_cache(ASSETS_DIR)
+        group_store.build()
+        return LayoutPreviewScreen(group_store=group_store)
+
+    render_engine = RenderEngine(
+        screen_factory=screen_factory,
+        screen_size=screen_size,
+        title=f"The Fool's Reef - screen: {screen_id}",
+    )
+    render_engine.run()
+    return 0
 
 
 def configure_player_card_play_parser(parser):
@@ -394,13 +620,18 @@ def run_bot_turn(args):
     configure_auto_game_parser,
 )
 def run_auto_game(args):
+    import pygame
+
     from core import GameController
     from core.durak import Card, DurakGameController, Rank, RuleBasedBotPlayer, Suit
-    from core.render_engine import RenderEngine
+    from core.render_engine import RenderEngine, ScreenTransition
     from core.resource import ResourceManager
     from game_screen.events import ActivityResult
     from group import GroupStore
+    from screens import EndGameScreen
     from screens.table_screen import TableScreen
+
+    end_game_event_type = pygame.USEREVENT + 16
 
     class AutoGameController(GameController):
         AUTONOMOUS_PLAYER_IDS = ()
@@ -450,10 +681,12 @@ def run_auto_game(args):
             return DurakGameController(participants, cards)
 
     class AutoGameScreen(TableScreen):
-        def __init__(self, *screen_args, auto_start_delay=10.0, **screen_kwargs):
+        def __init__(self, *screen_args, auto_start_delay=10.0, end_screen_factory=None, **screen_kwargs):
             self.auto_start_delay = max(0.0, float(auto_start_delay))
             self.auto_elapsed = 0.0
             self.auto_started = False
+            self.end_screen_factory = end_screen_factory
+            self.end_transition_requested = False
             super().__init__(*screen_args, **screen_kwargs)
 
         def update(self, dt):
@@ -461,6 +694,7 @@ def run_auto_game(args):
             if self.game_controller is None or not self.controller_game_started:
                 return
             if getattr(self.game_controller.durak_game.state.phase, "value", None) == "finished":
+                self.request_end_game_transition()
                 return
             if hasattr(self, "has_blocking_visual_activity") and self.has_blocking_visual_activity():
                 return
@@ -474,8 +708,31 @@ def run_auto_game(args):
             )
             self.dispatch_visual_commands(commands)
 
+        def handle_event(self, event):
+            if event.type == end_game_event_type and self.end_screen_factory is not None:
+                return ScreenTransition(
+                    screen_factory=self.end_screen_factory,
+                    screen_size=EndGameScreen.SCREEN_SIZE,
+                    title="The Fool's Reef - action: end_game",
+                )
+            return super().handle_event(event)
+
+        def request_end_game_transition(self):
+            if self.end_transition_requested:
+                return
+            if hasattr(self, "has_blocking_visual_activity") and self.has_blocking_visual_activity():
+                return
+            self.end_transition_requested = True
+            pygame.event.post(pygame.event.Event(end_game_event_type))
+
     game_controller = AutoGameController(durak_game=AutoGameController.create_default_durak_game())
     group_store = GroupStore(resource_manager=ResourceManager)
+
+    def end_screen_factory():
+        return lambda _render_context=None: EndGameScreen(
+            game_controller=game_controller,
+            on_exit=lambda: False,
+        )
 
     def screen_factory(_render_context=None):
         ResourceManager.build_runtime_cache(ASSETS_DIR)
@@ -484,6 +741,7 @@ def run_auto_game(args):
             group_store=group_store,
             game_controller=game_controller,
             auto_start_delay=args.start_delay,
+            end_screen_factory=end_screen_factory(),
         )
 
     render_engine = RenderEngine(

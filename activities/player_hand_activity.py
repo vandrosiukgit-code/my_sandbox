@@ -308,31 +308,8 @@ class PlayerHandActivity(BotHandActivity):
         raise RuntimeError("Cannot resolve reference card surface for projected hand geometry")
 
     def calculate_slot_position(self, index, count):
-        """Return one of count evenly spaced sector rays, assigned center-out."""
-        if count <= 1:
-            return 0.0
-        return self.calculate_dense_slot_position(index, count)
-
-    def set_card_base_frames(self, hand_index, frames, apply_layout=True):
-        """Replace one card panel while keeping existing fan geometry intact."""
-        group = self.generated_groups[hand_index]
-        next_frames = list(frames)
-        if not next_frames:
-            raise ValueError("card panel requires at least one frame")
-        self.group_base_frames[group.id] = next_frames
-        group.set_primary_layer_frames(next_frames, position=(0, 0))
-        if apply_layout:
-            self.apply_fan_layout()
-
-    @staticmethod
-    def calculate_dense_slot_position(index, count):
-        """Return one of count evenly spaced sector rays, assigned center-out."""
-        slots = [
-            -1.0 + 2.0 * slot_index / (count - 1)
-            for slot_index in range(count)
-        ]
-        center_out_slots = sorted(slots, key=lambda slot: (abs(slot), -slot))
-        return center_out_slots[index]
+        """Return symmetric fan slots that grow from the center outward."""
+        return self.get_center_out_slot_values(count)[index]
 
     @staticmethod
     def calculate_arc_y(angle_degrees, geometry):

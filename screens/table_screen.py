@@ -151,6 +151,7 @@ class TableScreen(GameScreen):
                 resource_key="cards.card_back",
                 card_count=9,
                 scale_factor=0.7,
+                max_total_angle=208,
                 radius=80,
                 orientation_degrees=90,
                 center_offset=(-30, 0),
@@ -163,6 +164,7 @@ class TableScreen(GameScreen):
                 resource_key="cards.card_back",
                 card_count=9,
                 scale_factor=0.7,
+                max_total_angle=208,
                 radius=80,
                 orientation_degrees=-90,
                 center_offset=(18, 0),
@@ -175,6 +177,7 @@ class TableScreen(GameScreen):
                 resource_key="cards.card_back",
                 card_count=9,
                 scale_factor=0.7,
+                max_total_angle=208,
                 radius=80,
                 orientation_degrees=180,
                 center_offset=(0, -30),
@@ -950,27 +953,25 @@ class TableScreen(GameScreen):
         for player_id in set(hands_before_deal) | set(cards_to_deal):
             before = tuple(hands_before_deal.get(player_id, ()))
             incoming = tuple(cards_to_deal.get(player_id, ()))
-            if player_id == "bottom_player_hand":
-                hand = self.find_nested_activity_with_method(
-                    self.get_named_activity(player_id),
-                    "prepare_incremental_cards",
-                )
-                if hand is not None:
-                    hand.prepare_incremental_cards(before, incoming)
-                    continue
+            hand = self.find_nested_activity_with_method(
+                self.get_named_activity(player_id),
+                "prepare_incremental_cards",
+            )
+            if hand is not None:
+                hand.prepare_incremental_cards(before, incoming)
+                continue
             hand = self.find_nested_activity_with_method(self.get_named_activity(player_id), "prepare_cards")
             if hand is None:
                 raise RuntimeError(f"{player_id} does not support prepared cards")
             hand.prepare_cards((*before, *incoming), revealed_count=len(before))
 
     def reveal_card_deal(self, player_id, resource_key, hand_index):
-        if player_id == "bottom_player_hand":
-            hand = self.find_nested_activity_with_method(
-                self.get_named_activity(player_id),
-                "append_revealed_card",
-            )
-            if hand is not None:
-                return hand.append_revealed_card(resource_key)
+        hand = self.find_nested_activity_with_method(
+            self.get_named_activity(player_id),
+            "append_revealed_card",
+        )
+        if hand is not None:
+            return hand.append_revealed_card(resource_key)
         hand = self.find_nested_activity_with_method(self.get_named_activity(player_id), "reveal_card")
         if hand is None:
             raise RuntimeError(f"{player_id} does not support card reveal")

@@ -215,6 +215,11 @@
       "frame_width": 1254,
       "frame_height": 1254
     },
+    "main_screen.logo": {
+      "path": "main_screen/logo.png",
+      "frame_width": 180,
+      "frame_height": 180
+    },
     "main_screen.p_name_bg": {
       "path": "main_screen/p_name_bg.png",
       "frame_width": 200,
@@ -239,7 +244,11 @@
       "path": "main_screen/tressure_map.png",
       "frame_width": 1280,
       "frame_height": 720
+    },
+    "test_dir.settings": {
+      "path": "main_screen/temp/static/settings.png",
+      "frame_width": 400,
+      "frame_height": 221
     }
-  },
-  "folders": []
+  }
 }

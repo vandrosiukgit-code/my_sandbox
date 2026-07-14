@@ -29,7 +29,8 @@ The editor follows a compact split-view layout:
 - left side: authoring forms (`CREATE`, later `EDIT`);
 - right side: navigation and inspection (`RM Manifest Explorer`, `GUI Explorer`).
 
-The interface should stay dense, readable, and predictable on a small window.
+Window sizing must use the OS working area, not the full physical screen bounds,
+so taskbar-reserved height remains visible and usable.
 
 Compactness means efficient use of space, not maximal packing density.
 

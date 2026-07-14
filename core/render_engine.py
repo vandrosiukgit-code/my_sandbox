@@ -10,6 +10,7 @@ Contract:
 from dataclasses import dataclass
 import inspect
 import logging
+import os
 from typing import Protocol
 
 import pygame
@@ -61,6 +62,7 @@ class RenderEngine:
         background_color=None,
         input_mapper=None,
     ):
+        self._apply_window_position_defaults()
         pygame.init()
         self.screen_size = tuple(screen_size)
         self.fixed_size = bool(fixed_size)
@@ -82,6 +84,12 @@ class RenderEngine:
         self.input_mapper = input_mapper
         self.context = self.build_context()
         self.game_screen = self.create_screen(screen_factory)
+
+    @staticmethod
+    def _apply_window_position_defaults():
+        if "SDL_VIDEO_WINDOW_POS" in os.environ:
+            return
+        os.environ.setdefault("SDL_VIDEO_CENTERED", "1")
 
     def build_context(self):
         return RenderContext(

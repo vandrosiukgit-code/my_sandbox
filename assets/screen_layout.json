@@ -18,7 +18,15 @@
           ]
         }
       },
-      "groups": {}
+      "groups": {
+        "test_group": {
+          "frame_id": "test_root_frame",
+          "position": [
+            0,
+            0
+          ]
+        }
+      }
     },
     "table_screen": {
       "groups": {
@@ -57,11 +65,11 @@
             0
           ]
         },
-        "take_btn": {
-          "frame_id": "game_table",
+        "logo": {
+          "frame_id": "play_area_frame",
           "position": [
-            980,
-            500
+            80,
+            10
           ]
         }
       }

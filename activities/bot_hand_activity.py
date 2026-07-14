@@ -109,6 +109,27 @@ class BotHandActivity(Activity):
             self.set_card_base_frames(index, [card_visibility.create_transparent_surface_like(surface)], apply_layout=False)
         self.apply_fan_layout()
 
+    def prepare_incremental_cards(self, visible_cards, incoming_cards=()):
+        """Keep bot hands incremental so each deal step targets the current fan size."""
+        keys = tuple(visible_cards or ())
+        _ = tuple(incoming_cards or ())
+        self.configure_card_resources(
+            provider=lambda index: keys[index],
+            layer_name=self.card_layer_name,
+            card_count=len(keys),
+        )
+
+    def append_revealed_card(self, resource_key):
+        """Append one newly dealt bot card and rebuild the fan for the next step."""
+        keys = tuple(self.get_card_resource_key(index) for index in range(self.card_count))
+        keys = (*keys, resource_key)
+        self.configure_card_resources(
+            provider=lambda index: keys[index],
+            layer_name=self.card_layer_name,
+            card_count=len(keys),
+        )
+        return True
+
     def reveal_card(self, hand_index):
         resource_key = self.get_card_resource_key(hand_index)
         self.set_card_base_frames(hand_index, self.resource_manager.get_frames(resource_key))
@@ -121,6 +142,41 @@ class BotHandActivity(Activity):
 
     def get_prepared_card_screen_geometry(self, hand_index):
         return self.get_group_card_screen_geometry(self.generated_groups[hand_index])
+
+    def get_projected_card_screen_geometry(self, hand_index, resource_key=None, card_count=None):
+        projected_count = max(int(hand_index) + 1, len(self.generated_groups), int(card_count or 0))
+        occupied_angle, angle_step = self.calculate_fan_angles(projected_count)
+        local_angle = self.calculate_card_angle(hand_index, projected_count, occupied_angle, angle_step)
+        angle = self.orientation_degrees + local_angle
+        frame_rect = self.frame.content_rect
+        center_x, center_y = self.get_fan_center(frame_rect)
+        pivot_x, pivot_y = self.calculate_pivot_position(center_x, center_y, angle)
+        base_surface = self.get_reference_card_surface(resource_key)
+        scaled_surface = self.scale_surface(base_surface)
+        rotated_surface = pygame.transform.rotate(scaled_surface, -angle)
+        pivot_offset = self.calculate_rotated_pivot_offset(
+            scaled_surface.get_size(),
+            rotated_surface.get_size(),
+            angle,
+        )
+        offset_scale = self.get_activity_local_scale()
+        local_rect = pygame.Rect(
+            int(round(pivot_x - pivot_offset[0] * offset_scale)),
+            int(round(pivot_y - pivot_offset[1] * offset_scale)),
+            rotated_surface.get_width(),
+            rotated_surface.get_height(),
+        )
+        local_center = local_rect.center
+        screen_center = self.frame.to_screen(local_center) if hasattr(self.frame, "to_screen") else local_center
+        scale = self.get_frame_screen_scale()
+        return {
+            "center": tuple(screen_center),
+            "size": (
+                max(1, int(round(rotated_surface.get_width() * scale))),
+                max(1, int(round(rotated_surface.get_height() * scale))),
+            ),
+            "angle_degrees": float(angle),
+        }
 
     def configure_card_resources(self, provider=None, layer_name=None, card_count=None):
         """Configure the public resource contract used for generated cards."""
@@ -234,20 +290,30 @@ class BotHandActivity(Activity):
         return self.calculate_slot_position(index, count) * max_slot_angle
 
     def calculate_slot_position(self, index, count):
-        """Return one of count evenly spaced sector rays, assigned center-out."""
-        if count <= 1:
-            return 0.0
-        return self.calculate_dense_slot_position(index, count)
+        """Return symmetric fan slots that grow from the center outward."""
+        return self.get_center_out_slot_values(count)[index]
 
-    @staticmethod
-    def calculate_dense_slot_position(index, count):
-        """Return one of count evenly spaced sector rays, assigned center-out."""
-        slots = [
-            -1.0 + 2.0 * slot_index / (count - 1)
-            for slot_index in range(count)
-        ]
-        center_out_slots = sorted(slots, key=lambda slot: (abs(slot), -slot))
-        return center_out_slots[index]
+    def get_center_out_slot_values(self, count):
+        count = max(0, int(count))
+        if count <= 0:
+            return ()
+        if count == 1:
+            return (0.0,)
+        reference_count = max(count, int(self.reference_card_count))
+        if reference_count % 2 == 0:
+            reference_count += 1
+        step = 2.0 / (reference_count - 1)
+        values = []
+        if count % 2 == 1:
+            values.append(0.0)
+            magnitudes = [step * offset for offset in range(1, reference_count // 2 + 1)]
+        else:
+            magnitudes = [step * (offset - 0.5) for offset in range(1, reference_count // 2 + 1)]
+        for magnitude in magnitudes:
+            values.extend((magnitude, -magnitude))
+            if len(values) >= count:
+                break
+        return tuple(values[:count])
 
     def calculate_fan_angles(self, count):
         """Return total occupied angle and step for count cards.
@@ -482,6 +548,21 @@ class BotHandActivity(Activity):
     def get_fan_occupied_screen_rect(self):
         """Return the current rendered fan bounds for an explicit screen layout consumer."""
         return self.calculate_fan_rect()
+
+    def get_reference_card_surface(self, resource_key=None):
+        for group in self.generated_groups:
+            frames = self.group_base_frames.get(group.id)
+            if frames:
+                return frames[0]
+        if resource_key is not None and self.resource_manager is not None:
+            frames = self.resource_manager.get_frames(resource_key)
+            if frames:
+                return frames[0]
+        if self.resource_manager is not None and self.resource_key is not None:
+            frames = self.resource_manager.get_frames(self.resource_key)
+            if frames:
+                return frames[0]
+        raise RuntimeError("Cannot resolve reference card surface for projected bot-hand geometry")
 
     def clear_generated_groups(self):
         """Удалить все generated visual-only Group из frame и владения."""

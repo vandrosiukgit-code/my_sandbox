@@ -173,6 +173,38 @@ class GuiEditorThemeTests(unittest.TestCase):
         for asset_path in asset_urls.values():
             self.assertTrue(Path(asset_path).exists(), asset_path)
 
+    def test_preview_screen_parser_accepts_table_screen(self):
+        parser = gui_editor.build_parser()
+        args = parser.parse_args(["preview-screen", "table_screen"])
+        self.assertEqual(args.command, "preview-screen")
+        self.assertEqual(args.screen_id, "table_screen")
+
+    def test_table_screen_gui_preview_state_contains_full_ui_state(self):
+        fixture = gui_editor.build_table_screen_gui_preview_state()
+        self.assertEqual(
+            fixture["bot_hand_counts"],
+            {
+                "left_player_hand": 6,
+                "right_player_hand": 6,
+                "top_player_hand": 6,
+            },
+        )
+        self.assertEqual(
+            fixture["bottom_player_cards"],
+            (
+                "cards.6_of_clubs",
+                "cards.7_of_diamonds",
+                "cards.8_of_hearts",
+                "cards.9_of_spades",
+                "cards.10_of_clubs",
+                "cards.j_of_diamonds",
+            ),
+        )
+        self.assertEqual(
+            fixture["table_slots"]["cards_slot_frame"],
+            ("cards.6_of_clubs", "cards.6_of_diamonds"),
+        )
+
 
 class GuiEditorUiContainerInvariantTests(unittest.TestCase):
     @classmethod
@@ -215,6 +247,11 @@ class GuiEditorUiContainerInvariantTests(unittest.TestCase):
         rm_width = right_tabs.width()
         self.assertEqual(initial_width, gui_width)
         self.assertEqual(initial_width, rm_width)
+
+    def test_window_uses_compact_default_size_contract(self):
+        self.assertEqual(self.window.width(), GuiEditorApp.MIN_WIDTH)
+        self.assertEqual(self.window.height(), GuiEditorApp.MIN_HEIGHT)
+        self.assertEqual(self.window.explorer_panel.width(), self.window.right_tabs.width())
 
 
 class GuiEditorUiMetricInvariantTests(unittest.TestCase):
@@ -409,6 +446,30 @@ class GuiEditorCreateContextTests(unittest.TestCase):
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
 
+    def test_gui_screen_context_can_start_action_runner_isolated_screen(self):
+        window = GuiEditorApp()
+
+        with mock.patch("tools.gui_editor.subprocess.Popen") as popen:
+            started = window.run_gui_screen("screen:table_screen")
+
+        self.assertEqual(started, "table_screen")
+        popen.assert_called_once()
+        command = popen.call_args.args[0]
+        self.assertEqual(command[-2:], ["preview-screen", "table_screen"])
+        window.close()
+
+    def test_gui_screen_context_can_start_gui_editor_preview_for_editor_screen(self):
+        window = GuiEditorApp()
+
+        with mock.patch("tools.gui_editor.subprocess.Popen") as popen:
+            started = window.run_gui_screen("screen:test_screen")
+
+        self.assertEqual(started, "test_screen")
+        popen.assert_called_once()
+        command = popen.call_args.args[0]
+        self.assertEqual(command[-2:], ["preview-screen", "test_screen"])
+        window.close()
+
     def test_gui_frame_context_populates_create_forms(self):
         window = GuiEditorApp()
         frame_item = window._select_gui_node("frame:game_table", expand_parents=True)
@@ -416,8 +477,40 @@ class GuiEditorCreateContextTests(unittest.TestCase):
         window.load_gui_node_into_create(frame_item)
 
         self.assertEqual(window.create_screen_id_input.text(), "table_screen")
-        self.assertEqual(window.create_frame_parent_id_input.text(), "game_table")
+        self.assertEqual(window.create_frame_id_input.text(), "game_table")
+        self.assertEqual(window.create_frame_parent_id_input.text(), "")
+        self.assertEqual(window.create_frame_x_input.text(), "0")
+        self.assertEqual(window.create_frame_y_input.text(), "0")
+        self.assertEqual(window.create_frame_width_input.text(), "1280")
+        self.assertEqual(window.create_frame_height_input.text(), "720")
         self.assertEqual(window.create_group_frame_id_input.text(), "game_table")
+        window.close()
+
+    def test_gui_nested_frame_context_populates_geometry_from_manifest(self):
+        window = GuiEditorApp()
+        frame_item = window._select_gui_node("frame:play_area_frame", expand_parents=True)
+
+        window.load_gui_node_into_create(frame_item)
+
+        self.assertEqual(window.create_screen_id_input.text(), "table_screen")
+        self.assertEqual(window.create_frame_id_input.text(), "play_area_frame")
+        self.assertEqual(window.create_frame_parent_id_input.text(), "game_table")
+        self.assertEqual(window.create_frame_x_input.text(), "20")
+        self.assertEqual(window.create_frame_y_input.text(), "20")
+        self.assertEqual(window.create_frame_width_input.text(), "1240")
+        self.assertEqual(window.create_frame_height_input.text(), "680")
+        self.assertEqual(window.create_group_frame_id_input.text(), "play_area_frame")
+        window.close()
+
+    def test_gui_frame_context_clears_stale_group_screen_id(self):
+        window = GuiEditorApp()
+        frame_item = window._select_gui_node("frame:play_area_frame", expand_parents=True)
+        window.create_group_screen_id_input.setText("logo")
+
+        window.load_gui_node_into_create(frame_item)
+
+        self.assertEqual(window.create_group_screen_id_input.text(), "table_screen")
+        self.assertEqual(window.create_group_frame_id_input.text(), "play_area_frame")
         window.close()
 
     def test_gui_group_context_populates_group_fields(self):
@@ -429,6 +522,20 @@ class GuiEditorCreateContextTests(unittest.TestCase):
         self.assertEqual(window.create_group_screen_id_input.text(), "table_screen")
         self.assertEqual(window.create_group_id_input.text(), "table_group")
         self.assertEqual(window.create_group_frame_id_input.text(), "game_table")
+        self.assertEqual(window.create_group_x_input.text(), "0")
+        self.assertEqual(window.create_group_y_input.text(), "0")
+        window.close()
+
+    def test_gui_screen_context_populates_screen_size_fields(self):
+        window = GuiEditorApp()
+        screen_item = window._select_gui_node("screen:table_screen", expand_parents=True)
+
+        window.load_gui_node_into_create(screen_item)
+
+        self.assertEqual(window.create_screen_id_input.text(), "table_screen")
+        self.assertEqual(window.create_root_frame_id_input.text(), "game_table")
+        self.assertEqual(window.create_width_input.text(), "1280")
+        self.assertEqual(window.create_height_input.text(), "720")
         window.close()
 
     def test_create_group_from_screen_context_shows_warning_and_marks_missing_frame(self):
@@ -446,6 +553,56 @@ class GuiEditorCreateContextTests(unittest.TestCase):
         warning_box.assert_called_once()
         self.assertIn("#d9534f", window.create_group_frame_id_input.styleSheet())
         window.close()
+
+    def test_save_existing_group_from_screen_context_allows_filled_frame_id(self):
+        with TemporaryDirectory() as temp_dir:
+            temp_layout_path = Path(temp_dir) / "screen_layout.json"
+            temp_group_path = Path(temp_dir) / "group_config.json"
+            with (
+                mock.patch.object(screen_layout_config, "SCREEN_LAYOUT_PATH", str(temp_layout_path)),
+                mock.patch.object(group_config, "GROUP_CONFIG_FILE", str(temp_group_path)),
+            ):
+                payload = screen_layout_config.upsert_screen("test_screen", "test_root_frame", (320, 320))
+                payload = screen_layout_config.upsert_group_placement("test_group", "test_screen", "test_root_frame", position=(0, 0), payload=payload)
+                screen_layout_config.save_screen_layout(payload)
+                group_config.GROUP_CONFIG = {
+                    "groups": {
+                        "test_group": {
+                            "role": "",
+                            "tags": [],
+                            "rect": [0, 0, 0, 0],
+                            "hit_rect": [0, 0, 0, 0],
+                            "scale_factor": 1.0,
+                            "hide_rect": True,
+                            "manifest_targets": {},
+                            "layers": [],
+                        }
+                    }
+                }
+                group_config.save_group_config(group_config.GROUP_CONFIG)
+                group_config.reload_group_config()
+
+                window = GuiEditorApp()
+                screen_item = window._select_gui_node("screen:test_screen", expand_parents=True)
+                window.gui_tree.setCurrentItem(screen_item)
+                window.create_group_screen_id_input.setText("test_screen")
+                window.create_group_id_input.setText("test_group")
+                window.create_group_frame_id_input.setText("test_root_frame")
+                window.create_group_x_input.setText("0")
+                window.create_group_y_input.setText("0")
+                window.group_graphic_resource_rows[0]["entry"].setText("main_screen.table")
+
+                with mock.patch("tools.gui_editor.QMessageBox.warning") as warning_box:
+                    result = window.create_group_from_form()
+
+                self.assertIsNotNone(result)
+                warning_box.assert_not_called()
+                groups_payload = group_config.load_group_config()
+                self.assertEqual(
+                    groups_payload["groups"]["test_group"]["layers"][0]["resource_key"],
+                    "main_screen.table",
+                )
+                window.close()
 
 
 class GuiEditorCreateScreenTests(unittest.TestCase):
@@ -549,6 +706,162 @@ class GuiEditorCreateScreenTests(unittest.TestCase):
                 self.assertEqual(window.create_group_status_label.text(), "Created group: status_group")
                 window.close()
 
+    def test_create_group_form_persists_graphic_and_text_layers(self):
+        with TemporaryDirectory() as temp_dir:
+            temp_layout_path = Path(temp_dir) / "screen_layout.json"
+            temp_group_path = Path(temp_dir) / "group_config.json"
+            with (
+                mock.patch.object(screen_layout_config, "SCREEN_LAYOUT_PATH", str(temp_layout_path)),
+                mock.patch.object(group_config, "GROUP_CONFIG_FILE", str(temp_group_path)),
+            ):
+                payload = screen_layout_config.upsert_screen("test_screen", "test_root_frame", (1280, 720))
+                payload = screen_layout_config.upsert_frame("test_screen", "left_panel", "test_root_frame", (100, 80, 320, 240), payload=payload)
+                screen_layout_config.save_screen_layout(payload)
+                group_config.GROUP_CONFIG = {"groups": {}}
+                group_config.save_group_config(group_config.GROUP_CONFIG)
+                group_config.reload_group_config()
+
+                window = GuiEditorApp()
+                window.create_group_screen_id_input.setText("test_screen")
+                window.create_group_id_input.setText("status_group")
+                window.create_group_frame_id_input.setText("left_panel")
+                window.create_group_x_input.setText("12")
+                window.create_group_y_input.setText("34")
+                window.group_graphic_resource_rows[0]["entry"].setText("main_screen.table")
+                window.group_text_value_input.setText("Status")
+                window.group_text_font_input.setText("Arial")
+                window.group_text_size_input.setText("200,56")
+                window.group_text_color_input.setText("255,255,255")
+
+                window.create_group_button.click()
+
+                groups_payload = group_config.load_group_config()
+                layers = groups_payload["groups"]["status_group"]["layers"]
+                self.assertEqual(layers[0]["resource_key"], "main_screen.table")
+                self.assertEqual(layers[1]["text"], "Status")
+                self.assertEqual(layers[1]["size"], [200, 56])
+                self.assertEqual(layers[1]["style"]["font_name"], "Arial")
+                self.assertEqual(layers[1]["style"]["color"], [255, 255, 255])
+
+                group_item = window._select_gui_node("group:status_group", expand_parents=True)
+                window.load_gui_node_into_create(group_item)
+                self.assertEqual(window.group_graphic_resource_rows[0]["entry"].text(), "main_screen.table")
+                self.assertEqual(window.group_text_value_input.text(), "Status")
+                self.assertEqual(window.group_text_font_input.text(), "Arial")
+                self.assertEqual(window.group_text_size_input.text(), "200,56")
+                self.assertEqual(window.group_text_color_input.text(), "255,255,255")
+                window.close()
+
+    def test_attach_png_from_rm_and_save_group_persists_graphic_layer(self):
+        with TemporaryDirectory() as temp_dir:
+            temp_layout_path = Path(temp_dir) / "screen_layout.json"
+            temp_group_path = Path(temp_dir) / "group_config.json"
+            with (
+                mock.patch.object(screen_layout_config, "SCREEN_LAYOUT_PATH", str(temp_layout_path)),
+                mock.patch.object(group_config, "GROUP_CONFIG_FILE", str(temp_group_path)),
+            ):
+                payload = screen_layout_config.upsert_screen("test_screen", "test_root_frame", (320, 320))
+                payload = screen_layout_config.upsert_group_placement("test_group", "test_screen", "test_root_frame", position=(0, 0), payload=payload)
+                screen_layout_config.save_screen_layout(payload)
+                group_config.GROUP_CONFIG = {
+                    "groups": {
+                        "test_group": {
+                            "role": "",
+                            "tags": [],
+                            "rect": [0, 0, 0, 0],
+                            "hit_rect": [0, 0, 0, 0],
+                            "scale_factor": 1.0,
+                            "hide_rect": True,
+                            "manifest_targets": {},
+                            "layers": [],
+                        }
+                    }
+                }
+                group_config.save_group_config(group_config.GROUP_CONFIG)
+                group_config.reload_group_config()
+
+                window = GuiEditorApp()
+                group_item = window._select_gui_node("group:test_group", expand_parents=True)
+                window.load_gui_node_into_create(group_item)
+                resource_item = window._select_rm_node("main_screen.table", expand_parents=True)
+                window.rm_tree.setCurrentItem(resource_item)
+
+                window.group_graphic_resource_rows[0]["add_button"].click()
+                window.create_group_button.click()
+
+                groups_payload = group_config.load_group_config()
+                layers = groups_payload["groups"]["test_group"]["layers"]
+                self.assertEqual(window.group_graphic_resource_rows[0]["entry"].text(), "main_screen.table")
+                self.assertEqual(layers[0]["resource_key"], "main_screen.table")
+                self.assertEqual(window.group_graphic_status_label.text(), "Saved 1 graphic layer(s)")
+                window.close()
+
+    def test_create_group_form_preserves_existing_layers_when_layer_inputs_are_empty(self):
+        with TemporaryDirectory() as temp_dir:
+            temp_layout_path = Path(temp_dir) / "screen_layout.json"
+            temp_group_path = Path(temp_dir) / "group_config.json"
+            with (
+                mock.patch.object(screen_layout_config, "SCREEN_LAYOUT_PATH", str(temp_layout_path)),
+                mock.patch.object(group_config, "GROUP_CONFIG_FILE", str(temp_group_path)),
+            ):
+                payload = screen_layout_config.upsert_screen("test_screen", "test_root_frame", (1280, 720))
+                payload = screen_layout_config.upsert_frame("test_screen", "left_panel", "test_root_frame", (100, 80, 320, 240), payload=payload)
+                payload = screen_layout_config.upsert_group_placement("status_group", "test_screen", "left_panel", position=(12, 34), payload=payload)
+                screen_layout_config.save_screen_layout(payload)
+                group_config.GROUP_CONFIG = {
+                    "groups": {
+                        "status_group": {
+                            "role": "",
+                            "tags": [],
+                            "rect": [0, 0, 0, 0],
+                            "hit_rect": [0, 0, 0, 0],
+                            "scale_factor": 1.0,
+                            "hide_rect": True,
+                            "manifest_targets": {},
+                            "layers": [
+                                {
+                                    "name": "graphic_layer_1",
+                                    "type": "image",
+                                    "resource_key": "main_screen.table",
+                                    "position": [0, 0],
+                                },
+                                {
+                                    "name": "text_layer",
+                                    "type": "text",
+                                    "text": "Status",
+                                    "position": [0, 0],
+                                    "size": [200, 56],
+                                    "style": {"font_name": "Arial", "color": [255, 255, 255]},
+                                },
+                            ],
+                        }
+                    }
+                }
+                group_config.save_group_config(group_config.GROUP_CONFIG)
+                group_config.reload_group_config()
+
+                window = GuiEditorApp()
+                group_item = window._select_gui_node("group:status_group", expand_parents=True)
+                window.load_gui_node_into_create(group_item)
+                window.create_group_x_input.setText("20")
+                window.create_group_y_input.setText("40")
+
+                window.create_group_button.click()
+
+                groups_payload = group_config.load_group_config()
+                layers = groups_payload["groups"]["status_group"]["layers"]
+                self.assertEqual(len(layers), 2)
+                self.assertEqual(layers[0]["resource_key"], "main_screen.table")
+                self.assertEqual(layers[1]["text"], "Status")
+                layout_payload = screen_layout_config.load_screen_layout()
+                self.assertEqual(
+                    layout_payload["screens"]["test_screen"]["groups"]["status_group"],
+                    {"frame_id": "left_panel", "position": [20, 40]},
+                )
+                self.assertEqual(window.group_graphic_status_label.text(), "Saved 1 graphic layer(s)")
+                self.assertEqual(window.group_text_status_label.text(), "Saved text layer")
+                window.close()
+
     def test_save_screen_blocks_geometry_change_when_nested_nodes_exist(self):
         with TemporaryDirectory() as temp_dir:
             temp_layout_path = Path(temp_dir) / "screen_layout.json"
@@ -601,6 +914,138 @@ class GuiEditorCreateScreenTests(unittest.TestCase):
                 warning_box.assert_called_once()
                 self.assertIn("frame:child_frame", window.gui_problem_node_ids)
                 self.assertEqual(window.create_frame_status_label.text(), "Frame geometry save blocked by nested GUI objects")
+                window.close()
+
+    def test_delete_gui_group_removes_group_from_layout_and_group_config(self):
+        with TemporaryDirectory() as temp_dir:
+            temp_layout_path = Path(temp_dir) / "screen_layout.json"
+            temp_group_path = Path(temp_dir) / "group_config.json"
+            with (
+                mock.patch.object(screen_layout_config, "SCREEN_LAYOUT_PATH", str(temp_layout_path)),
+                mock.patch.object(group_config, "GROUP_CONFIG_FILE", str(temp_group_path)),
+            ):
+                payload = screen_layout_config.upsert_screen("test_screen", "test_root_frame", (1280, 720))
+                payload = screen_layout_config.upsert_frame("test_screen", "left_panel", "test_root_frame", (100, 80, 320, 240), payload=payload)
+                payload = screen_layout_config.upsert_group_placement("status_group", "test_screen", "left_panel", position=(12, 34), payload=payload)
+                screen_layout_config.save_screen_layout(payload)
+                group_config.GROUP_CONFIG = {"groups": {}}
+                group_config.ensure_group("status_group")
+                group_config.save_group_config(group_config.GROUP_CONFIG)
+                group_config.reload_group_config()
+
+                window = GuiEditorApp()
+
+                with mock.patch("tools.gui_editor.QMessageBox.question", return_value=QMessageBox.Yes):
+                    deleted = window.delete_gui_group("group:status_group")
+
+                layout_payload = screen_layout_config.load_screen_layout()
+                groups_payload = group_config.load_group_config()
+                self.assertEqual(deleted, "status_group")
+                self.assertNotIn("status_group", layout_payload["screens"]["test_screen"]["groups"])
+                self.assertNotIn("status_group", groups_payload["groups"])
+                self.assertEqual(window.create_group_status_label.text(), "Deleted group: status_group")
+                window.close()
+
+    def test_delete_gui_frame_cascades_to_child_frames_and_groups(self):
+        with TemporaryDirectory() as temp_dir:
+            temp_layout_path = Path(temp_dir) / "screen_layout.json"
+            temp_group_path = Path(temp_dir) / "group_config.json"
+            with (
+                mock.patch.object(screen_layout_config, "SCREEN_LAYOUT_PATH", str(temp_layout_path)),
+                mock.patch.object(group_config, "GROUP_CONFIG_FILE", str(temp_group_path)),
+            ):
+                payload = screen_layout_config.upsert_screen("test_screen", "test_root_frame", (1280, 720))
+                payload = screen_layout_config.upsert_frame("test_screen", "parent_frame", "test_root_frame", (100, 80, 320, 240), payload=payload)
+                payload = screen_layout_config.upsert_frame("test_screen", "child_frame", "parent_frame", (10, 10, 100, 50), payload=payload)
+                payload = screen_layout_config.upsert_group_placement("parent_group", "test_screen", "parent_frame", position=(1, 2), payload=payload)
+                payload = screen_layout_config.upsert_group_placement("child_group", "test_screen", "child_frame", position=(3, 4), payload=payload)
+                screen_layout_config.save_screen_layout(payload)
+                group_config.GROUP_CONFIG = {"groups": {}}
+                group_config.ensure_group("parent_group")
+                group_config.ensure_group("child_group")
+                group_config.save_group_config(group_config.GROUP_CONFIG)
+                group_config.reload_group_config()
+
+                window = GuiEditorApp()
+
+                with mock.patch("tools.gui_editor.QMessageBox.question", return_value=QMessageBox.Yes):
+                    deleted = window.delete_gui_node("frame:parent_frame")
+
+                layout_payload = screen_layout_config.load_screen_layout()
+                groups_payload = group_config.load_group_config()
+                self.assertEqual(deleted, "parent_frame")
+                self.assertNotIn("parent_frame", layout_payload["screens"]["test_screen"]["frames"])
+                self.assertNotIn("child_frame", layout_payload["screens"]["test_screen"]["frames"])
+                self.assertNotIn("parent_group", layout_payload["screens"]["test_screen"]["groups"])
+                self.assertNotIn("child_group", layout_payload["screens"]["test_screen"]["groups"])
+                self.assertNotIn("parent_group", groups_payload["groups"])
+                self.assertNotIn("child_group", groups_payload["groups"])
+                self.assertEqual(window.create_frame_status_label.text(), "Deleted frame: parent_frame")
+                window.close()
+
+    def test_delete_gui_group_preserves_expanded_tree_state(self):
+        with TemporaryDirectory() as temp_dir:
+            temp_layout_path = Path(temp_dir) / "screen_layout.json"
+            temp_group_path = Path(temp_dir) / "group_config.json"
+            with (
+                mock.patch.object(screen_layout_config, "SCREEN_LAYOUT_PATH", str(temp_layout_path)),
+                mock.patch.object(group_config, "GROUP_CONFIG_FILE", str(temp_group_path)),
+            ):
+                payload = screen_layout_config.upsert_screen("test_screen", "test_root_frame", (1280, 720))
+                payload = screen_layout_config.upsert_frame("test_screen", "left_panel", "test_root_frame", (100, 80, 320, 240), payload=payload)
+                payload = screen_layout_config.upsert_group_placement("first_group", "test_screen", "left_panel", position=(12, 34), payload=payload)
+                payload = screen_layout_config.upsert_group_placement("second_group", "test_screen", "left_panel", position=(56, 78), payload=payload)
+                screen_layout_config.save_screen_layout(payload)
+                group_config.GROUP_CONFIG = {"groups": {}}
+                group_config.ensure_group("first_group")
+                group_config.ensure_group("second_group")
+                group_config.save_group_config(group_config.GROUP_CONFIG)
+                group_config.reload_group_config()
+
+                window = GuiEditorApp()
+                screen_item = window._select_gui_node("screen:test_screen")
+                frame_item = window._select_gui_node("frame:left_panel", expand_parents=True)
+                screen_item.setExpanded(True)
+                frame_item.setExpanded(True)
+
+                with mock.patch("tools.gui_editor.QMessageBox.question", return_value=QMessageBox.Yes):
+                    deleted = window.delete_gui_node("group:first_group")
+
+                remaining_screen_item = window._select_gui_node("screen:test_screen")
+                remaining_frame_item = window._select_gui_node("frame:left_panel", expand_parents=True)
+                self.assertEqual(deleted, "first_group")
+                self.assertTrue(remaining_screen_item.isExpanded())
+                self.assertTrue(remaining_frame_item.isExpanded())
+                window.close()
+
+    def test_delete_gui_screen_cascades_to_screen_frames_and_groups(self):
+        with TemporaryDirectory() as temp_dir:
+            temp_layout_path = Path(temp_dir) / "screen_layout.json"
+            temp_group_path = Path(temp_dir) / "group_config.json"
+            with (
+                mock.patch.object(screen_layout_config, "SCREEN_LAYOUT_PATH", str(temp_layout_path)),
+                mock.patch.object(group_config, "GROUP_CONFIG_FILE", str(temp_group_path)),
+            ):
+                payload = screen_layout_config.upsert_screen("test_screen", "test_root_frame", (1280, 720))
+                payload = screen_layout_config.upsert_frame("test_screen", "left_panel", "test_root_frame", (100, 80, 320, 240), payload=payload)
+                payload = screen_layout_config.upsert_group_placement("status_group", "test_screen", "left_panel", position=(12, 34), payload=payload)
+                screen_layout_config.save_screen_layout(payload)
+                group_config.GROUP_CONFIG = {"groups": {}}
+                group_config.ensure_group("status_group")
+                group_config.save_group_config(group_config.GROUP_CONFIG)
+                group_config.reload_group_config()
+
+                window = GuiEditorApp()
+
+                with mock.patch("tools.gui_editor.QMessageBox.question", return_value=QMessageBox.Yes):
+                    deleted = window.delete_gui_node("screen:test_screen")
+
+                layout_payload = screen_layout_config.load_screen_layout()
+                groups_payload = group_config.load_group_config()
+                self.assertEqual(deleted, "test_screen")
+                self.assertNotIn("test_screen", layout_payload["screens"])
+                self.assertNotIn("status_group", groups_payload["groups"])
+                self.assertEqual(window.create_status_label.text(), "Deleted screen: test_screen")
                 window.close()
 
 
@@ -960,6 +1405,27 @@ class GuiEditorRmManifestTests(unittest.TestCase):
             self.assertEqual(window.rm_preview_label.text(), "")
             self.assertFalse(window.rm_preview_label.pixmap().isNull())
             self.assertEqual(window.rm_preview_hint_label.text(), "cards/preview.png")
+            window.close()
+
+    def test_rm_preview_uses_real_asset_path_for_logical_rm_folder(self):
+        with TemporaryDirectory() as temp_dir:
+            assets_dir = Path(temp_dir) / "assets"
+            cards_dir = assets_dir / "cards"
+            cards_dir.mkdir(parents=True)
+            png_path = cards_dir / "shield.png"
+            Image.new("RGBA", (32, 48), (255, 0, 0, 255)).save(png_path)
+
+            service = GuiEditorDataService(project_dir=temp_dir)
+            service.add_png_to_manifest(str(png_path), manifest_path="test/shield.png")
+            window = GuiEditorApp(service=service)
+
+            leaf_item = window._select_rm_node("test.shield", expand_parents=True)
+            window.rm_tree.setCurrentItem(leaf_item)
+            self.app.processEvents()
+
+            self.assertEqual(window.rm_preview_label.text(), "")
+            self.assertFalse(window.rm_preview_label.pixmap().isNull())
+            self.assertEqual(window.rm_preview_hint_label.text(), "cards/shield.png")
             window.close()
 
 

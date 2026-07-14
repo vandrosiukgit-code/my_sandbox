@@ -85,17 +85,33 @@ class ResourceManager:
             cls._assets_dir,
             cls._manifest,
         )
+        missing_resources = []
         if repaired or pruned:
             cls.save_manifest(cls._assets_dir, cls._manifest)
             for warning_text in cls._manifest_warnings:
                 warnings.warn(warning_text, RuntimeWarning, stacklevel=2)
 
-        for resource_key, entry in cls._manifest.get("resources", {}).items():
-            record = cls.create_record(resource_key, entry, cls._assets_dir)
+        for resource_key, entry in list(cls._manifest.get("resources", {}).items()):
+            try:
+                record = cls.create_record(resource_key, entry, cls._assets_dir)
+            except FileNotFoundError:
+                missing_resources.append((resource_key, entry.get("path", "")))
+                cls._manifest["resources"].pop(resource_key, None)
+                continue
             cls._runtime_cache[record.key] = record
 
             if load_surfaces:
                 cls.add_to_cache_frames_file(record.path, record.key)
+
+        if missing_resources:
+            cls.save_manifest(cls._assets_dir, cls._manifest)
+            for resource_key, relative_path in missing_resources:
+                warnings.warn(
+                    "Removed missing PNG from resource_manifest.json: "
+                    f"{resource_key} -> {relative_path}",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
 
         return cls._runtime_cache
 

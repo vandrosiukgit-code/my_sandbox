@@ -153,6 +153,23 @@ class CardVisibilityBehaviorTests(unittest.TestCase):
         self.assertEqual(hand.base_frames_by_index[0][0].get_at((0, 0)).a, 255)
         self.assertFalse(decorator.reveal_card(0))
 
+    def test_prepare_incremental_cards_keeps_only_visible_cards_in_bottom_hand(self):
+        hand = FakeHandActivity()
+        decorator = VisibleCardsHandDecorator(
+            hand,
+            resource_manager=FakeResourceManager,
+            cards=("cards.6_of_clubs",),
+        )
+
+        decorator.prepare_incremental_cards(
+            ("cards.6_of_clubs",),
+            ("cards.7_of_clubs", "cards.8_of_clubs"),
+        )
+
+        self.assertEqual(decorator.card_resource_keys, ("cards.6_of_clubs",))
+        self.assertEqual(hand.card_count, 1)
+        self.assertEqual(hand.base_frames_by_index, {})
+
     def test_slot_card_visual_state_hides_and_restores_primary_frames(self):
         activity = CardsSlotActivityDecorator(
             FakeFrame(),

@@ -14,6 +14,11 @@ class FakeResourceManager:
         return [pygame.Surface((10, 14), pygame.SRCALPHA)]
 
 
+class FakeFrame:
+    id = "frame"
+    content_rect = pygame.Rect(0, 0, 100, 100)
+
+
 class StartGameActivityTests(unittest.TestCase):
     def test_deals_one_card_to_each_recipient_before_next_round(self):
         sequence = StartGameActivity.build_recipient_sequence(("bottom", "right", "top", "left"), 2)
@@ -63,24 +68,27 @@ class StartGameActivityTests(unittest.TestCase):
         self.assertEqual(target_calls, [("bottom_player_hand", 0)])
 
     def test_six_card_hand_is_symmetric_about_its_center_axis(self):
-        positions = tuple(PlayerHandActivity.calculate_dense_slot_position(index, 6) for index in range(6))
+        activity = PlayerHandActivity(frame=FakeFrame())
+        positions = activity.get_center_out_slot_values(6)
 
         self.assertAlmostEqual(positions[0], -positions[1])
         self.assertAlmostEqual(positions[2], -positions[3])
         self.assertAlmostEqual(positions[4], -positions[5])
         self.assertGreater(positions[0], 0)
 
-    def test_six_card_hand_has_no_gaps_between_center_and_edges(self):
-        positions = sorted(
-            PlayerHandActivity.calculate_dense_slot_position(index, 6)
-            for index in range(6)
-        )
+    def test_six_card_hand_keeps_uniform_pair_steps_away_from_center(self):
+        activity = PlayerHandActivity(frame=FakeFrame())
+        positions = sorted(activity.get_center_out_slot_values(6))
         gaps = [right - left for left, right in zip(positions, positions[1:])]
 
-        for gap in gaps:
-            self.assertAlmostEqual(gap, 2 / 5)
+        self.assertEqual(gaps, [0.25, 0.25, 0.25, 0.25, 0.25])
 
-    def test_first_two_cards_form_a_right_left_v(self):
-        two_card_slots = tuple(PlayerHandActivity.calculate_dense_slot_position(index, 2) for index in range(2))
+    def test_first_two_cards_stay_near_center(self):
+        activity = PlayerHandActivity(frame=FakeFrame())
+        two_card_slots = activity.get_center_out_slot_values(2)
 
-        self.assertEqual(two_card_slots, (1.0, -1.0))
+        self.assertEqual(two_card_slots, (0.125, -0.125))
+
+    def test_three_card_hand_keeps_center_card_on_axis(self):
+        activity = PlayerHandActivity(frame=FakeFrame())
+        self.assertEqual(activity.get_center_out_slot_values(3), (0.0, 0.25, -0.25))
