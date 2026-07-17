@@ -1046,6 +1046,31 @@ class GuiEditorApp(QMainWindow):
         self.group_graphic_status_label.setText(f"Removed graphic resource: {resource_key}")
         return resource_key
 
+    def clear_selected_graphic_resource(self, row_index=None):
+        if not self.group_graphic_resource_rows:
+            self.group_graphic_status_label.setText("No graphic resource rows to clear")
+            return None
+        if row_index is None:
+            focused_row = next(
+                (index for index, row in enumerate(self.group_graphic_resource_rows) if row["entry"].hasFocus()),
+                None,
+            )
+            if focused_row is None:
+                self.group_graphic_status_label.setText("Select a graphic resource row to clear")
+                return None
+            row_index = focused_row
+        if row_index < 0 or row_index >= len(self.group_graphic_resource_rows):
+            self.group_graphic_status_label.setText("Graphic resource row not found")
+            return None
+        row = self.group_graphic_resource_rows[row_index]
+        resource_key = row["entry"].text().strip()
+        row["entry"].clear()
+        if resource_key:
+            self.group_graphic_status_label.setText(f"Cleared graphic resource: {resource_key}")
+        else:
+            self.group_graphic_status_label.setText("Cleared graphic resource row")
+        return resource_key
+
     def _append_graphic_resource_row(self, resource_key=""):
         row_widget = QWidget()
         row_layout = QHBoxLayout(row_widget)
@@ -1055,15 +1080,18 @@ class GuiEditorApp(QMainWindow):
         entry.setText(resource_key)
         entry.editingFinished.connect(lambda current_entry=entry: self._reveal_graphic_resource_entry_in_rm(current_entry))
         add_button = self._form_button("+")
+        clear_button = self._form_button("-")
         more_button = self._form_button("More")
-        remove_button = self._form_button("-")
+        remove_button = self._form_button("Less")
         row_index = len(self.group_graphic_resource_rows)
         add_button.clicked.connect(lambda _checked=False, current_entry=entry: self.add_selected_rm_resource_to_graphic_layer(current_entry))
+        clear_button.clicked.connect(lambda _checked=False, index=row_index: self.clear_selected_graphic_resource(index))
         more_button.clicked.connect(lambda _checked=False: self._append_graphic_resource_row())
         remove_button.clicked.connect(lambda _checked=False, index=row_index: self.remove_selected_graphic_resource(index))
         row_layout.addWidget(QLabel("resource_key"), alignment=Qt.AlignLeft | Qt.AlignVCenter)
         row_layout.addWidget(entry, 1)
         row_layout.addWidget(add_button, alignment=Qt.AlignLeft)
+        row_layout.addWidget(clear_button, alignment=Qt.AlignLeft)
         row_layout.addWidget(more_button, alignment=Qt.AlignLeft)
         row_layout.addWidget(remove_button, alignment=Qt.AlignLeft)
         row_data = {
@@ -1071,6 +1099,7 @@ class GuiEditorApp(QMainWindow):
             "entry": entry,
             "add_button": add_button,
             "more_button": more_button,
+            "clear_button": clear_button,
             "remove_button": remove_button,
         }
         self.group_graphic_resource_rows.append(row_data)
@@ -1081,11 +1110,18 @@ class GuiEditorApp(QMainWindow):
     def _refresh_graphic_resource_row_callbacks(self):
         for index, row in enumerate(self.group_graphic_resource_rows):
             try:
+                row["clear_button"].clicked.disconnect()
+            except RuntimeError:
+                pass
+            except TypeError:
+                pass
+            try:
                 row["remove_button"].clicked.disconnect()
             except RuntimeError:
                 pass
             except TypeError:
                 pass
+            row["clear_button"].clicked.connect(lambda _checked=False, current_index=index: self.clear_selected_graphic_resource(current_index))
             row["remove_button"].clicked.connect(lambda _checked=False, current_index=index: self.remove_selected_graphic_resource(current_index))
 
     def _reveal_graphic_resource_entry_in_rm(self, entry):
@@ -2183,9 +2219,9 @@ class GuiEditorApp(QMainWindow):
             self.create_screen_id_input.setText(context["screen_id"])
             self.create_frame_screen_id_input.setText(context["screen_id"])
             self.create_group_screen_id_input.setText(context["screen_id"])
-        if context.get("root_frame_id"):
+        if kind != "group" and context.get("root_frame_id"):
             self.create_root_frame_id_input.setText(context["root_frame_id"])
-        if context.get("screen_size"):
+        if kind != "group" and context.get("screen_size"):
             width, height = context["screen_size"]
             self.create_width_input.setText(str(width))
             self.create_height_input.setText(str(height))
@@ -2204,9 +2240,11 @@ class GuiEditorApp(QMainWindow):
             group_id = self._strip_gui_prefix(node_id)
             self.create_group_id_input.setText(group_id)
             placement = context.get("group_placement", {})
-            position = placement.get("position", ["", ""])
-            self.create_group_x_input.setText(str(position[0]))
-            self.create_group_y_input.setText(str(position[1]))
+            if isinstance(placement, dict):
+                position = placement.get("position", ("", ""))
+                if isinstance(position, (list, tuple)) and len(position) >= 2:
+                    self.create_group_x_input.setText(str(position[0]))
+                    self.create_group_y_input.setText(str(position[1]))
             self._load_group_layers_into_form(context.get("group_payload", {}))
         self.current_selection.setText(f"Loaded into Create: {kind} {self._strip_gui_prefix(node_id)}")
 

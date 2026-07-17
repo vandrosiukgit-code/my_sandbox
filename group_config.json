@@ -166,6 +166,45 @@
         }
       ]
     },
+    "right_player_attack_overlay": {
+      "role": "player_attack_overlay",
+      "tags": [
+        "right_player",
+        "visual_only",
+        "configurable"
+      ],
+      "rect": [
+        0,
+        0,
+        1024,
+        768
+      ],
+      "hit_rect": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale_factor": 0.42,
+      "hide_rect": true,
+      "manifest_targets": {
+        "player.right.attack": {
+          "type": "group",
+          "description": "Decorative right-player attack overlay."
+        }
+      },
+      "layers": [
+        {
+          "name": "attack_overlay",
+          "type": "image",
+          "resource_key": "main_screen.player_attack.overlay",
+          "position": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
     "left_player": {
       "role": "player_panel",
       "tags": [
@@ -282,6 +321,45 @@
           ],
           "height": 56,
           "text_key": "player.left.name"
+        }
+      ]
+    },
+    "left_player_attack_overlay": {
+      "role": "player_attack_overlay",
+      "tags": [
+        "left_player",
+        "visual_only",
+        "configurable"
+      ],
+      "rect": [
+        0,
+        0,
+        1024,
+        768
+      ],
+      "hit_rect": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale_factor": 0.42,
+      "hide_rect": true,
+      "manifest_targets": {
+        "player.left.attack": {
+          "type": "group",
+          "description": "Decorative left-player attack overlay."
+        }
+      },
+      "layers": [
+        {
+          "name": "attack_overlay",
+          "type": "image",
+          "resource_key": "main_screen.player_attack.overlay",
+          "position": [
+            0,
+            0
+          ]
         }
       ]
     },
@@ -404,6 +482,45 @@
         }
       ]
     },
+    "top_player_attack_overlay": {
+      "role": "player_attack_overlay",
+      "tags": [
+        "top_player",
+        "visual_only",
+        "configurable"
+      ],
+      "rect": [
+        0,
+        0,
+        1024,
+        768
+      ],
+      "hit_rect": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale_factor": 0.42,
+      "hide_rect": true,
+      "manifest_targets": {
+        "player.top.attack": {
+          "type": "group",
+          "description": "Decorative top-player attack overlay."
+        }
+      },
+      "layers": [
+        {
+          "name": "attack_overlay",
+          "type": "image",
+          "resource_key": "main_screen.player_attack.overlay",
+          "position": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
     "bottom_player": {
       "role": "player_panel",
       "tags": [
@@ -523,6 +640,201 @@
         }
       ]
     },
+    "bottom_player_attack_overlay": {
+      "role": "player_attack_overlay",
+      "tags": [
+        "bottom_player",
+        "visual_only",
+        "configurable"
+      ],
+      "rect": [
+        0,
+        0,
+        1024,
+        768
+      ],
+      "hit_rect": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale_factor": 0.42,
+      "hide_rect": true,
+      "manifest_targets": {
+        "player.bottom.attack": {
+          "type": "group",
+          "description": "Decorative bottom-player attack overlay."
+        }
+      },
+      "layers": [
+        {
+          "name": "attack_overlay",
+          "type": "image",
+          "resource_key": "main_screen.player_attack.overlay",
+          "position": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    "bottom_player_defense_overlay": {
+      "role": "player_defense_overlay",
+      "tags": [
+        "bottom_player",
+        "visual_only",
+        "configurable"
+      ],
+      "rect": [
+        0,
+        0,
+        150,
+        150
+      ],
+      "hit_rect": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale_factor": 1.0,
+      "hide_rect": true,
+      "manifest_targets": {
+        "player.bottom.defense": {
+          "type": "group",
+          "description": "Decorative bottom-player defense overlay."
+        }
+      },
+      "layers": [
+        {
+          "name": "defense_overlay",
+          "type": "image",
+          "resource_key": "main_screen.player_defense.overlay",
+          "position": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    "right_player_defense_overlay": {
+      "role": "player_defense_overlay",
+      "tags": [
+        "right_player",
+        "visual_only",
+        "configurable"
+      ],
+      "rect": [
+        0,
+        0,
+        150,
+        150
+      ],
+      "hit_rect": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale_factor": 1.0,
+      "hide_rect": true,
+      "manifest_targets": {
+        "player.right.defense": {
+          "type": "group",
+          "description": "Decorative right-player defense overlay."
+        }
+      },
+      "layers": [
+        {
+          "name": "defense_overlay",
+          "type": "image",
+          "resource_key": "main_screen.player_defense.overlay",
+          "position": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    "top_player_defense_overlay": {
+      "role": "player_defense_overlay",
+      "tags": [
+        "top_player",
+        "visual_only",
+        "configurable"
+      ],
+      "rect": [
+        0,
+        0,
+        150,
+        150
+      ],
+      "hit_rect": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale_factor": 1.0,
+      "hide_rect": true,
+      "manifest_targets": {
+        "player.top.defense": {
+          "type": "group",
+          "description": "Decorative top-player defense overlay."
+        }
+      },
+      "layers": [
+        {
+          "name": "defense_overlay",
+          "type": "image",
+          "resource_key": "main_screen.player_defense.overlay",
+          "position": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    "left_player_defense_overlay": {
+      "role": "player_defense_overlay",
+      "tags": [
+        "left_player",
+        "visual_only",
+        "configurable"
+      ],
+      "rect": [
+        0,
+        0,
+        150,
+        150
+      ],
+      "hit_rect": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale_factor": 1.0,
+      "hide_rect": true,
+      "manifest_targets": {
+        "player.left.defense": {
+          "type": "group",
+          "description": "Decorative left-player defense overlay."
+        }
+      },
+      "layers": [
+        {
+          "name": "defense_overlay",
+          "type": "image",
+          "resource_key": "main_screen.player_defense.overlay",
+          "position": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
     "test_group": {
       "role": "",
       "tags": [],
@@ -553,7 +865,7 @@
         }
       ]
     },
-    "logo": {
+    "btn_take": {
       "role": "",
       "tags": [],
       "rect": [
@@ -575,7 +887,37 @@
         {
           "name": "graphic_layer_1",
           "type": "image",
-          "resource_key": "main_screen.logo",
+          "resource_key": "main_screen.buttons.btn_take",
+          "position": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    "btn_pass": {
+      "role": "",
+      "tags": [],
+      "rect": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "hit_rect": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "scale_factor": 1.0,
+      "hide_rect": true,
+      "manifest_targets": {},
+      "layers": [
+        {
+          "name": "graphic_layer_1",
+          "type": "image",
+          "resource_key": "main_screen.btn_pass",
           "position": [
             0,
             0

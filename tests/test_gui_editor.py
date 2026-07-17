@@ -783,6 +783,10 @@ class GuiEditorCreateScreenTests(unittest.TestCase):
                 window = GuiEditorApp()
                 group_item = window._select_gui_node("group:test_group", expand_parents=True)
                 window.load_gui_node_into_create(group_item)
+                window.create_group_screen_id_input.setText("test_screen")
+                window.create_group_frame_id_input.setText("test_root_frame")
+                window.create_group_x_input.setText("0")
+                window.create_group_y_input.setText("0")
                 resource_item = window._select_rm_node("main_screen.table", expand_parents=True)
                 window.rm_tree.setCurrentItem(resource_item)
 
@@ -843,6 +847,8 @@ class GuiEditorCreateScreenTests(unittest.TestCase):
                 window = GuiEditorApp()
                 group_item = window._select_gui_node("group:status_group", expand_parents=True)
                 window.load_gui_node_into_create(group_item)
+                window.create_group_screen_id_input.setText("test_screen")
+                window.create_group_frame_id_input.setText("left_panel")
                 window.create_group_x_input.setText("20")
                 window.create_group_y_input.setText("40")
 
@@ -861,6 +867,18 @@ class GuiEditorCreateScreenTests(unittest.TestCase):
                 self.assertEqual(window.group_graphic_status_label.text(), "Saved 1 graphic layer(s)")
                 self.assertEqual(window.group_text_status_label.text(), "Saved text layer")
                 window.close()
+
+    def test_graphic_layer_delete_clears_resource_without_removing_row(self):
+        window = GuiEditorApp()
+        row = window.group_graphic_resource_rows[0]
+        row["entry"].setText("main_screen.table")
+
+        row["clear_button"].click()
+
+        self.assertEqual(row["entry"].text(), "")
+        self.assertEqual(len(window.group_graphic_resource_rows), 1)
+        self.assertEqual(window.group_graphic_status_label.text(), "Cleared graphic resource: main_screen.table")
+        window.close()
 
     def test_save_screen_blocks_geometry_change_when_nested_nodes_exist(self):
         with TemporaryDirectory() as temp_dir:

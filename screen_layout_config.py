@@ -29,7 +29,8 @@ DEFAULT_SCREEN_LAYOUT = {
                 "right_player": {"frame_id": "right_player_portrait", "position": [0, 0]},
                 "top_player": {"frame_id": "top_player_portrait", "position": [0, 0]},
                 "bottom_player": {"frame_id": "bottom_player_portrait", "position": [0, 0]},
-                "take_btn": {"frame_id": "game_table", "position": [980, 500]},
+                "btn_take": {"frame_id": "play_area_frame", "position": [870, 500]},
+                "btn_pass": {"frame_id": "play_area_frame", "position": [1030, 500]},
             }
         }
     }

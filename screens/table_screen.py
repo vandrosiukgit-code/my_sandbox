@@ -5,6 +5,8 @@ import pygame
 
 from activities import (
     BotHandActivity,
+    BottomPlayerAttackActivity,
+    BottomPlayerDefenseActivity,
     CardSelectionActivity,
     CardsSlotActivityDecorator,
     CardDealSequenceActivity,
@@ -14,6 +16,13 @@ from activities import (
     PlayerTurnActivity,
     PlayAreaSlotsActivity,
     TakeTableActivity,
+    TakeButtonActivity,
+    TopPlayerAttackActivity,
+    TopPlayerDefenseActivity,
+    LeftPlayerAttackActivity,
+    LeftPlayerDefenseActivity,
+    RightPlayerAttackActivity,
+    RightPlayerDefenseActivity,
     VisibleCardsHandDecorator,
 )
 from core.resource import ResourceManager
@@ -61,6 +70,24 @@ class TableScreen(GameScreen):
         "top_player",
         "bottom_player",
     )
+    DEFENSE_FOREGROUND_GROUP_IDS = (
+        "left_player_defense_overlay",
+        "right_player_defense_overlay",
+        "top_player_defense_overlay",
+        "bottom_player_defense_overlay",
+    )
+    ATTACK_ACTIVITY_BY_TARGET = {
+        "player.bottom.attack": "bottom_player_attack",
+        "player.right.attack": "right_player_attack",
+        "player.top.attack": "top_player_attack",
+        "player.left.attack": "left_player_attack",
+    }
+    DEFENSE_ACTIVITY_BY_TARGET = {
+        "player.bottom.defense": "bottom_player_defense",
+        "player.right.defense": "right_player_defense",
+        "player.top.defense": "top_player_defense",
+        "player.left.defense": "left_player_defense",
+    }
 
     def __init__(self, group_store, game_controller):
         super().__init__(
@@ -188,6 +215,34 @@ class TableScreen(GameScreen):
             "deck_frame": deck_activity,
             "card_deal_sequence": card_deal_sequence_activity,
         }
+        bottom_player_attack_activity = self.create_bottom_player_attack_activity()
+        if bottom_player_attack_activity is not None:
+            activity_map["bottom_player_attack"] = bottom_player_attack_activity
+        top_player_attack_activity = self.create_top_player_attack_activity()
+        if top_player_attack_activity is not None:
+            activity_map["top_player_attack"] = top_player_attack_activity
+        left_player_attack_activity = self.create_left_player_attack_activity()
+        if left_player_attack_activity is not None:
+            activity_map["left_player_attack"] = left_player_attack_activity
+        right_player_attack_activity = self.create_right_player_attack_activity()
+        if right_player_attack_activity is not None:
+            activity_map["right_player_attack"] = right_player_attack_activity
+        bottom_player_defense_activity = self.create_bottom_player_defense_activity()
+        if bottom_player_defense_activity is not None:
+            activity_map["bottom_player_defense"] = bottom_player_defense_activity
+        top_player_defense_activity = self.create_top_player_defense_activity()
+        if top_player_defense_activity is not None:
+            activity_map["top_player_defense"] = top_player_defense_activity
+        left_player_defense_activity = self.create_left_player_defense_activity()
+        if left_player_defense_activity is not None:
+            activity_map["left_player_defense"] = left_player_defense_activity
+        right_player_defense_activity = self.create_right_player_defense_activity()
+        if right_player_defense_activity is not None:
+            activity_map["right_player_defense"] = right_player_defense_activity
+        for button_group_id in ("btn_take", "btn_pass"):
+            button_activity = self.create_action_button_activity(button_group_id)
+            if button_activity is not None:
+                activity_map[button_group_id] = button_activity
         self._play_area_slot_layout_lock_depth = 0
         self._locked_play_area_slot_horizontal_local_bounds = None
         for activity_id, activity in activity_map.items():
@@ -483,6 +538,9 @@ class TableScreen(GameScreen):
         for group_id in self.FOREGROUND_GROUP_IDS:
             self.draw_group_if_active(group_id, screen)
 
+        for group_id in self.DEFENSE_FOREGROUND_GROUP_IDS:
+            self.draw_group_if_active(group_id, screen)
+
         self.draw_bottom_player_hand_probe(screen)
 
         for frame in self.iter_root_frames():
@@ -497,7 +555,11 @@ class TableScreen(GameScreen):
             group.draw(screen)
 
     def iter_midground_group_ids(self):
-        excluded = {"table_group", *self.FOREGROUND_GROUP_IDS}
+        excluded = {
+            "table_group",
+            *self.FOREGROUND_GROUP_IDS,
+            *self.DEFENSE_FOREGROUND_GROUP_IDS,
+        }
         return tuple(group_id for group_id in self.active_group_ids if group_id not in excluded)
 
     def iter_activity_generated_groups(self):
@@ -722,15 +784,159 @@ class TableScreen(GameScreen):
         if command_type == "table.discard":
             payload = self.get_command_value(command, "payload", {}) or {}
             return self.start_discard_table_from_command(payload, command)
+        if command_type == "player.attack.start":
+            return self.start_player_attack_transition(command, entering=True)
+        if command_type == "player.attack.finish":
+            return self.start_player_attack_transition(command, entering=False)
+        if command_type == "player.defense.start":
+            return self.start_player_defense_transition(command, entering=True)
+        if command_type == "player.defense.finish":
+            return self.start_player_defense_transition(command, entering=False)
         if command_type == "turn.prompt":
             payload = self.get_command_value(command, "payload", {}) or {}
             self.last_turn_prompt = dict(payload)
+            self.sync_action_buttons_from_prompt(payload)
             return None
         return super().dispatch_visual_command(command)
 
     def dispatch_visual_commands(self, visual_commands):
         for command in visual_commands or ():
             self.dispatch_visual_command(command)
+
+    def start_bottom_player_attack_transition(self, command, entering):
+        return self.start_player_attack_transition(command, entering)
+
+    def start_player_attack_transition(self, command, entering):
+        return self.start_player_overlay_transition(
+            command,
+            entering=entering,
+            activity_by_target=self.ATTACK_ACTIVITY_BY_TARGET,
+            transition_name="attack",
+            default_target="player.bottom.attack",
+        )
+
+    def start_player_defense_transition(self, command, entering):
+        return self.start_player_overlay_transition(
+            command,
+            entering=entering,
+            activity_by_target=self.DEFENSE_ACTIVITY_BY_TARGET,
+            transition_name="defense",
+            default_target="player.bottom.defense",
+        )
+
+    def start_player_overlay_transition(
+        self,
+        command,
+        *,
+        entering,
+        activity_by_target,
+        transition_name,
+        default_target=None,
+    ):
+        target = self.get_command_value(command, "target") or default_target
+        activity_id = activity_by_target.get(target)
+        if activity_id is None:
+            return None
+        activity = self.get_named_activity(activity_id)
+        starter = getattr(
+            activity,
+            f"start_{transition_name}" if entering else f"finish_{transition_name}",
+            None,
+        )
+        if not callable(starter):
+            return None
+        transition_id = starter()
+        result_type = (
+            f"player.{transition_name}.started"
+            if entering
+            else f"player.{transition_name}.finished"
+        )
+        watcher_key = (id(activity), transition_id, result_type)
+        watcher_keys_name = f"_player_{transition_name}_watcher_keys"
+        if not hasattr(self, watcher_keys_name):
+            setattr(self, watcher_keys_name, set())
+        watcher_keys = getattr(self, watcher_keys_name)
+        if watcher_key in watcher_keys:
+            return transition_id
+        watcher_keys.add(watcher_key)
+        self.register_activity_result_watcher(
+            activity=activity,
+            result=ActivityResult(
+                type=result_type,
+                source=activity_id,
+                command_id=self.get_command_value(command, "command_id"),
+                payload={"state": "active" if entering else "idle"},
+            ),
+            completion_check=lambda watched_activity, watched_id=transition_id: (
+                watched_activity.is_transition_complete(watched_id)
+            ),
+        )
+        return transition_id
+
+    def create_action_button_activity(self, group_id):
+        if self.group_store is None or not self.group_store.has(group_id):
+            return None
+        return TakeButtonActivity(self.get_group(group_id), button_group_id=group_id)
+
+    def create_bottom_player_attack_activity(self):
+        group_id = "bottom_player_attack_overlay"
+        if self.group_store is None or not self.group_store.has(group_id):
+            return None
+        return BottomPlayerAttackActivity(self.get_group(group_id), frame_duration=0.045)
+
+    def create_top_player_attack_activity(self):
+        group_id = "top_player_attack_overlay"
+        if self.group_store is None or not self.group_store.has(group_id):
+            return None
+        return TopPlayerAttackActivity(self.get_group(group_id), frame_duration=0.045)
+
+    def create_left_player_attack_activity(self):
+        group_id = "left_player_attack_overlay"
+        if self.group_store is None or not self.group_store.has(group_id):
+            return None
+        return LeftPlayerAttackActivity(self.get_group(group_id), frame_duration=0.045)
+
+    def create_right_player_attack_activity(self):
+        group_id = "right_player_attack_overlay"
+        if self.group_store is None or not self.group_store.has(group_id):
+            return None
+        return RightPlayerAttackActivity(self.get_group(group_id), frame_duration=0.045)
+
+    def create_bottom_player_defense_activity(self):
+        group_id = "bottom_player_defense_overlay"
+        if self.group_store is None or not self.group_store.has(group_id):
+            return None
+        return BottomPlayerDefenseActivity(self.get_group(group_id), frame_duration=0.10)
+
+    def create_top_player_defense_activity(self):
+        group_id = "top_player_defense_overlay"
+        if self.group_store is None or not self.group_store.has(group_id):
+            return None
+        return TopPlayerDefenseActivity(self.get_group(group_id), frame_duration=0.10)
+
+    def create_left_player_defense_activity(self):
+        group_id = "left_player_defense_overlay"
+        if self.group_store is None or not self.group_store.has(group_id):
+            return None
+        return LeftPlayerDefenseActivity(self.get_group(group_id), frame_duration=0.10)
+
+    def create_right_player_defense_activity(self):
+        group_id = "right_player_defense_overlay"
+        if self.group_store is None or not self.group_store.has(group_id):
+            return None
+        return RightPlayerDefenseActivity(self.get_group(group_id), frame_duration=0.10)
+
+    def sync_action_buttons_from_prompt(self, payload):
+        if not isinstance(payload, dict):
+            return
+        self.sync_action_button_state("btn_take", payload.get("can_take_cards"))
+        self.sync_action_button_state("btn_pass", payload.get("can_pass_turn"))
+
+    def sync_action_button_state(self, activity_id, enabled):
+        activity = self.get_named_activity(activity_id)
+        setter = getattr(activity, "set_enabled", None)
+        if callable(setter) and enabled is not None:
+            setter(bool(enabled))
 
     def set_deck_trump_from_command(self, payload):
         deck_activity = self.get_named_activity("deck_frame")

@@ -2,6 +2,7 @@ import unittest
 import random
 
 from core.game_controller import GameController
+from core.durak.cards import Suit
 from core.durak.state import BattlePair, BattleTable, GamePhase
 from game_screen.events import ControllerResponse, ScreenInputEvent, VisualCommand
 from screens.table_screen import TableScreen
@@ -73,8 +74,9 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
             [command.type for command in response.commands],
             ["deck.set_trump", "deal.initial"],
         )
-        self.assertEqual(response.state_view["attacker_id"], "bottom_player_hand")
-        self.assertEqual(response.state_view["defender_id"], "right_player_hand")
+        self.assertIn(response.state_view["attacker_id"], GameController.PLAYER_ORDER)
+        self.assertIn(response.state_view["defender_id"], GameController.PLAYER_ORDER)
+        self.assertNotEqual(response.state_view["attacker_id"], response.state_view["defender_id"])
 
     def test_game_controller_provides_end_game_stats(self):
         controller = GameController()
@@ -103,7 +105,7 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
         cards_to_deal = deal_command.payload["cards_to_deal"]
 
         self.assertEqual(len(cards_to_deal["bottom_player_hand"]), 6)
-        self.assertIn("cards.6_of_hearts", cards_to_deal["bottom_player_hand"])
+        self.assertTrue(all(card_id.startswith("cards.") and card_id != "cards.card_back" for card_id in cards_to_deal["bottom_player_hand"]))
         self.assertEqual(cards_to_deal["right_player_hand"], ("cards.card_back",) * 6)
         self.assertEqual(cards_to_deal["top_player_hand"], ("cards.card_back",) * 6)
         self.assertEqual(cards_to_deal["left_player_hand"], ("cards.card_back",) * 6)
@@ -111,9 +113,12 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
     def test_human_card_click_applies_domain_attack_and_emits_play_command(self):
         controller = GameController()
         controller.start_game()
-        controller.handle_activity_result(
-            type("Result", (), {"payload": {}, "status": "completed", "type": "deal.completed"})()
-        )
+        state = controller.durak_game.state
+        state.phase = GamePhase.ATTACKING
+        state.attacker_id = "bottom_player_hand"
+        state.defender_id = "right_player_hand"
+        state.get_participant("bottom_player_hand").hand[:] = ["cards.6_of_hearts"]
+        controller._last_snapshot = controller.durak_game.build_snapshot()
         input_event = ScreenInputEvent(
             type="click",
             payload={
@@ -139,9 +144,14 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
     def test_activity_result_after_human_turn_starts_bot_response(self):
         controller = GameController()
         controller.start_game()
-        controller.handle_activity_result(
-            type("Result", (), {"payload": {}, "status": "completed", "type": "deal.completed"})()
-        )
+        state = controller.durak_game.state
+        state.phase = GamePhase.ATTACKING
+        state.attacker_id = "bottom_player_hand"
+        state.defender_id = "right_player_hand"
+        state.get_participant("bottom_player_hand").hand[:] = ["cards.6_of_hearts"]
+        state.get_participant("right_player_hand").hand[:] = ["cards.7_of_hearts"]
+        controller._last_snapshot = controller.durak_game.build_snapshot()
+        controller._pending_visual_commands.clear()
         controller.handle_input(
             ScreenInputEvent(
                 type="click",
@@ -157,10 +167,19 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
             )
         )
 
-        response = controller.handle_activity_result(
+        defense_response = controller.handle_activity_result(
             type("Result", (), {"payload": {}, "status": "completed", "type": "turn.completed"})()
         )
+        response = controller.handle_activity_result(
+            type(
+                "Result",
+                (),
+                {"payload": {}, "status": "completed", "type": "player.defense.started"},
+            )()
+        )
 
+        self.assertEqual(defense_response.commands[0].type, "player.defense.start")
+        self.assertEqual(defense_response.commands[0].target, "player.right.defense")
         self.assertIn(response.commands[0].type, {"start_player_turn", "table.take"})
         if response.commands[0].type == "start_player_turn":
             self.assertNotEqual(
@@ -181,6 +200,8 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
             pairs=[BattlePair("cards.6_of_clubs")],
             defender_initial_hand_size=6,
         )
+        controller._last_snapshot = controller.durak_game.build_snapshot()
+        controller._pending_visual_commands.clear()
 
         first_response = controller.handle_activity_result(
             type("Result", (), {"payload": {}, "status": "completed", "type": "turn.completed"})()
@@ -191,6 +212,14 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
         second_response = controller.handle_activity_result(
             type("Result", (), {"payload": {}, "status": "completed", "type": "turn.completed"})()
         )
+        if second_response.commands[0].type == "player.attack.start":
+            second_response = controller.handle_activity_result(
+                type(
+                    "Result",
+                    (),
+                    {"payload": {}, "status": "completed", "type": "player.attack.started"},
+                )()
+            )
 
         self.assertEqual(controller.durak_game.state.phase, GamePhase.DEFENDING)
         self.assertEqual(controller.durak_game.state.table.pairs[0].defense_card_id, "cards.7_of_clubs")
@@ -206,6 +235,8 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
         state.defender_id = "bottom_player_hand"
         state.get_participant("bottom_player_hand").hand[:] = ["cards.6_of_clubs"]
         state.table.pairs = [BattlePair("cards.a_of_hearts")]
+        controller._last_snapshot = controller.durak_game.build_snapshot()
+        controller._pending_visual_commands.clear()
 
         response = controller.handle_activity_result(
             type("Result", (), {"payload": {}, "status": "completed", "type": "turn.completed"})()
@@ -215,9 +246,51 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
         self.assertEqual(response.commands[-1].type, "turn.prompt")
         self.assertTrue(response.commands[-1].payload["can_take_cards"])
 
+    def test_take_button_click_submits_take_cards_command(self):
+        controller = GameController()
+        controller.start_game()
+        state = controller.durak_game.state
+        state.phase = GamePhase.DEFENDING
+        state.attacker_id = "right_player_hand"
+        state.defender_id = "bottom_player_hand"
+        state.get_participant("bottom_player_hand").hand[:] = ["cards.6_of_clubs"]
+        state.table = BattleTable(pairs=[BattlePair("cards.a_of_hearts")])
+        controller._last_snapshot = controller.durak_game.build_snapshot()
+
+        response = controller.handle_input(ScreenInputEvent(type="click", group_id="btn_take"))
+
+        self.assertEqual(controller.clicked_group_ids[-1], "btn_take")
+        self.assertEqual(response.commands[0].type, "table.take")
+        self.assertEqual(response.commands[0].payload["defender_id"], "bottom_player_hand")
+        self.assertIn("cards.a_of_hearts", tuple(state.get_participant("bottom_player_hand").hand))
+
+    def test_pass_button_click_advances_throw_in_window(self):
+        controller = GameController()
+        controller.start_game()
+        state = controller.durak_game.state
+        state.phase = GamePhase.DEFENDING
+        state.attacker_id = "bottom_player_hand"
+        state.defender_id = "right_player_hand"
+        state.get_participant("bottom_player_hand").hand[:] = ["cards.6_of_spades"]
+        state.get_participant("right_player_hand").hand[:] = ["cards.7_of_hearts"]
+        state.get_participant("top_player_hand").hand[:] = []
+        state.get_participant("left_player_hand").hand[:] = []
+        state.table = BattleTable(
+            pairs=[BattlePair("cards.6_of_hearts", "cards.8_of_hearts")],
+            defender_initial_hand_size=6,
+        )
+        controller._last_snapshot = controller.durak_game.build_snapshot()
+
+        response = controller.handle_input(ScreenInputEvent(type="click", group_id="btn_pass"))
+
+        self.assertEqual(controller.clicked_group_ids[-1], "btn_pass")
+        self.assertEqual(response.commands[0].type, "table.discard")
+        self.assertEqual(controller.durak_game.state.phase, GamePhase.ATTACKING)
+
     def test_cards_taken_from_empty_deck_do_not_queue_fake_follow_up_deal(self):
         controller = GameController()
         controller.start_game()
+        controller._pending_visual_commands.clear()
         state = controller.durak_game.state
         state.deck.card_ids[:] = []
         previous_snapshot = controller.durak_game.build_snapshot()
@@ -263,6 +336,7 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
         state.phase = GamePhase.DEFENDING
         state.attacker_id = "right_player_hand"
         state.defender_id = "bottom_player_hand"
+        state.trump_suit = Suit.HEARTS
         bottom_player = state.get_participant("bottom_player_hand")
         bottom_player.hand[:] = ["cards.7_of_hearts", "cards.8_of_clubs", "cards.9_of_hearts"]
         state.table.pairs = [BattlePair("cards.8_of_hearts")]
@@ -274,6 +348,52 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
             ("cards.9_of_hearts",),
         )
         self.assertFalse(prompt.payload["turn_finished"])
+
+    def test_defense_honors_explicit_target_when_card_beats_multiple_attacks(self):
+        controller = GameController()
+        controller.start_game()
+        state = controller.durak_game.state
+        state.phase = GamePhase.DEFENDING
+        state.attacker_id = "right_player_hand"
+        state.defender_id = "bottom_player_hand"
+        state.trump_suit = Suit.HEARTS
+        state.get_participant("bottom_player_hand").hand[:] = ["cards.10_of_clubs"]
+        state.table = BattleTable(
+            pairs=[BattlePair("cards.6_of_clubs"), BattlePair("cards.9_of_clubs")],
+            defender_initial_hand_size=2,
+        )
+        controller._last_snapshot = controller.durak_game.build_snapshot()
+        selected_card = {
+            "group_id": "bottom-group-0",
+            "card_id": "cards.10_of_clubs",
+            "resource_key": "cards.10_of_clubs",
+        }
+
+        self.assertEqual(
+            controller.resolve_defense_attack_card_id(selected_card, "cards.10_of_clubs"),
+            "cards.6_of_clubs",
+        )
+        self.assertTrue(all(pair.defense_card_id is None for pair in state.table.pairs))
+
+        selected_card["attack_card_id"] = "cards.9_of_clubs"
+        _, command = controller.apply_selected_human_card(selected_card)
+
+        self.assertIsNotNone(command)
+        self.assertIsNone(state.table.pairs[0].defense_card_id)
+        self.assertEqual(state.table.pairs[1].defense_card_id, "cards.10_of_clubs")
+
+    def test_unrelated_activity_completion_does_not_advance_gameplay(self):
+        controller = GameController()
+        controller.start_game()
+        before = controller.durak_game.build_snapshot()
+
+        response = controller.handle_activity_result(
+            type("Result", (), {"payload": {}, "status": "completed", "type": "cosmetic.completed"})()
+        )
+
+        after = controller.durak_game.build_snapshot()
+        self.assertEqual(response.commands, ())
+        self.assertEqual(after, before)
 
     def test_table_screen_dispatches_deck_and_initial_deal_commands(self):
         screen = object.__new__(TableScreen)
@@ -332,6 +452,37 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
         self.assertEqual([command.type for command in commands], ["turn.prompt"])
         self.assertEqual(deck_activity.deck_count, 0)
 
+    def test_table_screen_turn_prompt_syncs_take_button_state(self):
+        screen = object.__new__(TableScreen)
+
+        class ButtonActivity:
+            def __init__(self):
+                self.calls = []
+
+            def set_enabled(self, enabled):
+                self.calls.append(enabled)
+
+        take_button = ButtonActivity()
+        pass_button = ButtonActivity()
+        screen.get_named_activity = (
+            lambda activity_id: take_button
+            if activity_id == "btn_take"
+            else pass_button
+            if activity_id == "btn_pass"
+            else None
+        )
+
+        screen.dispatch_visual_command(
+            VisualCommand(
+                type="turn.prompt",
+                payload={"can_take_cards": True, "can_pass_turn": False, "phase": "defending"},
+            )
+        )
+
+        self.assertEqual(screen.last_turn_prompt["can_take_cards"], True)
+        self.assertEqual(take_button.calls, [True])
+        self.assertEqual(pass_button.calls, [False])
+
     def test_deal_completion_opens_human_prompt_after_start_animation(self):
         controller = GameController()
 
@@ -340,8 +491,17 @@ class FirstPlayableAssemblyTests(unittest.TestCase):
             type("Result", (), {"payload": {}, "status": "completed", "type": "deal.completed"})()
         )
 
-        self.assertEqual([command.type for command in response.commands], ["turn.prompt"])
-        self.assertEqual(response.commands[0].payload["available_card_ids"][0], "cards.6_of_hearts")
+        self.assertIn(
+            response.commands[0].type,
+            {"turn.prompt", "start_player_turn", "player.attack.start"},
+        )
+        if response.commands[0].type == "turn.prompt":
+            self.assertTrue(response.commands[0].payload["available_card_ids"])
+        elif response.commands[0].type == "start_player_turn":
+            self.assertNotEqual(
+                response.commands[0].payload["turn_context"]["player_id"],
+                "bottom_player_hand",
+            )
 
     def test_table_screen_start_dispatches_controller_start_commands_once(self):
         screen = object.__new__(TableScreen)

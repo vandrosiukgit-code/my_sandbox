@@ -44,6 +44,20 @@
             0
           ]
         },
+        "left_player_attack_overlay": {
+          "frame_id": "left_player_portrait",
+          "position": [
+            -67,
+            -61
+          ]
+        },
+        "left_player_defense_overlay": {
+          "frame_id": "left_player_portrait",
+          "position": [
+            25,
+            25
+          ]
+        },
         "right_player": {
           "frame_id": "right_player_portrait",
           "position": [
@@ -58,6 +72,34 @@
             0
           ]
         },
+        "right_player_attack_overlay": {
+          "frame_id": "right_player_portrait",
+          "position": [
+            -164,
+            -61
+          ]
+        },
+        "right_player_defense_overlay": {
+          "frame_id": "right_player_portrait",
+          "position": [
+            25,
+            25
+          ]
+        },
+        "top_player_attack_overlay": {
+          "frame_id": "top_player_portrait",
+          "position": [
+            -115,
+            0
+          ]
+        },
+        "top_player_defense_overlay": {
+          "frame_id": "top_player_portrait",
+          "position": [
+            25,
+            25
+          ]
+        },
         "bottom_player": {
           "frame_id": "bottom_player_portrait",
           "position": [
@@ -65,11 +107,32 @@
             0
           ]
         },
-        "logo": {
+        "bottom_player_attack_overlay": {
+          "frame_id": "bottom_player_portrait",
+          "position": [
+            -115,
+            -123
+          ]
+        },
+        "bottom_player_defense_overlay": {
+          "frame_id": "bottom_player_portrait",
+          "position": [
+            25,
+            25
+          ]
+        },
+        "btn_take": {
           "frame_id": "play_area_frame",
           "position": [
-            80,
-            10
+            870,
+            500
+          ]
+        },
+        "btn_pass": {
+          "frame_id": "play_area_frame",
+          "position": [
+            1030,
+            500
           ]
         }
       }

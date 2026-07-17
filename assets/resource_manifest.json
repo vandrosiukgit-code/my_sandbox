@@ -205,10 +205,35 @@
       "frame_width": 200,
       "frame_height": 200
     },
+    "main_screen.player_attack.overlay": {
+      "path": "main_screen/player_attack/overlay.png",
+      "frame_width": 1024,
+      "frame_height": 768
+    },
+    "main_screen.player_defense.overlay": {
+      "path": "main_screen/shield/overlay.png",
+      "frame_width": 150,
+      "frame_height": 150
+    },
+    "main_screen.btn_pass": {
+      "path": "main_screen/btn_pass.png",
+      "frame_width": 150,
+      "frame_height": 149
+    },
     "main_screen.button": {
       "path": "main_screen/button.png",
       "frame_width": 464,
       "frame_height": 200
+    },
+    "main_screen.buttons.btn_pass": {
+      "path": "main_screen/btn_take.png",
+      "frame_width": 150,
+      "frame_height": 150
+    },
+    "main_screen.buttons.btn_take": {
+      "path": "main_screen/btn_take.png",
+      "frame_width": 150,
+      "frame_height": 150
     },
     "main_screen.buttons.button_take": {
       "path": "main_screen/buttons/button_take.png",
@@ -250,5 +275,6 @@
       "frame_width": 400,
       "frame_height": 221
     }
-  }
+  },
+  "folders": []
 }

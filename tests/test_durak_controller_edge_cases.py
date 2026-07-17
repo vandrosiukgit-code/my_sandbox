@@ -51,13 +51,14 @@ class DurakControllerEdgeCaseTests(unittest.TestCase):
 
     def test_attack_allows_multiple_cards_with_same_rank(self):
         attacker = BaseHumanPlayer("attacker", "Attacker", 0, hand=["6_clubs", "6_spades"])
-        defender = BaseHumanPlayer("defender", "Defender", 1, hand=["8_clubs"])
+        defender = BaseHumanPlayer("defender", "Defender", 1, hand=["8_clubs", "9_clubs"])
         controller = scenario_controller(
             [attacker, defender],
             [
                 card(Rank.SIX, Suit.CLUBS),
                 card(Rank.SIX, Suit.SPADES),
                 card(Rank.EIGHT, Suit.CLUBS),
+                card(Rank.NINE, Suit.CLUBS),
             ],
         )
 
@@ -68,6 +69,42 @@ class DurakControllerEdgeCaseTests(unittest.TestCase):
             ["6_clubs", "6_spades"],
         )
         self.assertEqual(attacker.hand, [])
+
+    def test_attack_rejects_duplicate_card_without_partial_mutation(self):
+        attacker = BaseHumanPlayer("attacker", "Attacker", 0, hand=["6_clubs"])
+        defender = BaseHumanPlayer("defender", "Defender", 1, hand=["8_clubs", "9_clubs"])
+        controller = scenario_controller(
+            [attacker, defender],
+            [
+                card(Rank.SIX, Suit.CLUBS),
+                card(Rank.EIGHT, Suit.CLUBS),
+                card(Rank.NINE, Suit.CLUBS),
+            ],
+        )
+
+        with self.assertRaises(ValueError):
+            controller.apply_attack(AttackAction("attacker", ("6_clubs", "6_clubs")))
+
+        self.assertEqual(attacker.hand, ["6_clubs"])
+        self.assertEqual(controller.state.table.pairs, [])
+
+    def test_initial_attack_cannot_exceed_defender_hand_size(self):
+        attacker = BaseHumanPlayer("attacker", "Attacker", 0, hand=["6_clubs", "6_spades"])
+        defender = BaseHumanPlayer("defender", "Defender", 1, hand=["8_clubs"])
+        controller = scenario_controller(
+            [attacker, defender],
+            [
+                card(Rank.SIX, Suit.CLUBS),
+                card(Rank.SIX, Suit.SPADES),
+                card(Rank.EIGHT, Suit.CLUBS),
+            ],
+        )
+
+        with self.assertRaises(ValueError):
+            controller.apply_attack(AttackAction("attacker", ("6_clubs", "6_spades")))
+
+        self.assertEqual(attacker.hand, ["6_clubs", "6_spades"])
+        self.assertEqual(controller.state.table.pairs, [])
 
     def test_attack_rejects_empty_selection_and_card_not_in_hand(self):
         attacker = BaseHumanPlayer("attacker", "Attacker", 0, hand=["6_clubs"])
@@ -188,17 +225,18 @@ class DurakControllerEdgeCaseTests(unittest.TestCase):
         controller.apply_take_cards(TakeCardsAction("defender"))
 
         self.assertEqual(controller.state.attacker_id, "next")
-        self.assertEqual(controller.state.defender_id, "attacker")
+        self.assertEqual(controller.state.defender_id, "defender")
 
     def test_three_player_successful_defense_makes_defender_attack_next_player(self):
         attacker = BaseHumanPlayer("attacker", "Attacker", 0, hand=[])
-        defender = BaseHumanPlayer("defender", "Defender", 1, hand=["7_clubs"])
+        defender = BaseHumanPlayer("defender", "Defender", 1, hand=["7_clubs", "8_spades"])
         next_player = BaseHumanPlayer("next", "Next", 2, hand=["9_clubs"])
         controller = scenario_controller(
             [attacker, defender, next_player],
             [
                 card(Rank.SIX, Suit.CLUBS),
                 card(Rank.SEVEN, Suit.CLUBS),
+                card(Rank.EIGHT, Suit.SPADES),
                 card(Rank.NINE, Suit.CLUBS),
             ],
             attacker_id="attacker",
@@ -215,6 +253,54 @@ class DurakControllerEdgeCaseTests(unittest.TestCase):
 
         self.assertEqual(controller.state.attacker_id, "defender")
         self.assertEqual(controller.state.defender_id, "next")
+
+    def test_successful_defense_skips_players_who_left_the_game(self):
+        attacker = BaseHumanPlayer("attacker", "Attacker", 0, hand=[])
+        defender = BaseHumanPlayer("defender", "Defender", 1, hand=[])
+        next_player = BaseHumanPlayer("next", "Next", 2, hand=["9_clubs"])
+        last_player = BaseHumanPlayer("last", "Last", 3, hand=["10_clubs"])
+        controller = scenario_controller(
+            [attacker, defender, next_player, last_player],
+            [
+                card(Rank.SIX, Suit.CLUBS),
+                card(Rank.SEVEN, Suit.CLUBS),
+                card(Rank.NINE, Suit.CLUBS),
+                card(Rank.TEN, Suit.CLUBS),
+            ],
+            attacker_id="attacker",
+            defender_id="defender",
+        )
+        controller.state.phase = GamePhase.DEFENDING
+        controller.state.table = BattleTable(
+            pairs=[BattlePair("6_clubs", "7_clubs")],
+            defender_initial_hand_size=1,
+        )
+
+        controller.resolve_successful_defense()
+
+        self.assertEqual(controller.state.attacker_id, "next")
+        self.assertEqual(controller.state.defender_id, "last")
+        self.assertFalse(attacker.is_active)
+        self.assertFalse(defender.is_active)
+
+    def test_draw_order_starts_at_attacker_and_wraps_clockwise(self):
+        players = [
+            BaseHumanPlayer("p1", "P1", 0),
+            BaseHumanPlayer("p2", "P2", 1),
+            BaseHumanPlayer("p3", "P3", 2),
+            BaseHumanPlayer("p4", "P4", 3),
+        ]
+        controller = scenario_controller(
+            players,
+            [],
+            attacker_id="p2",
+            defender_id="p3",
+        )
+
+        self.assertEqual(
+            controller.rules.get_draw_order(controller.state, ["p1", "p4"]),
+            ["p2", "p4", "p1", "p3"],
+        )
 
 
 if __name__ == "__main__":

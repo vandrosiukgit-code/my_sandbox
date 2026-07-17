@@ -20,8 +20,15 @@ class DurakRules:
             return False
         if not action.card_ids:
             return False
+        if len(set(action.card_ids)) != len(action.card_ids):
+            return False
         attacker = state.get_participant(action.player_id)
         if not all(attacker.has_card(card_id) for card_id in action.card_ids):
+            return False
+        if state.defender_id is None:
+            return False
+        defender = state.get_participant(state.defender_id)
+        if len(action.card_ids) > defender.hand_size():
             return False
         ranks = {state.cards[card_id].rank for card_id in action.card_ids}
         return len(ranks) == 1
@@ -64,7 +71,9 @@ class DurakRules:
 
     def get_draw_order(self, state: DurakGameState, thrower_ids: list[str]) -> list[str]:
         ordered = [state.attacker_id]
-        for player_id in state.turn_order:
+        start_index = state.turn_order.index(state.attacker_id)
+        for offset in range(1, len(state.turn_order) + 1):
+            player_id = state.turn_order[(start_index + offset) % len(state.turn_order)]
             if player_id in thrower_ids and player_id not in ordered:
                 ordered.append(player_id)
         if state.defender_id not in ordered:

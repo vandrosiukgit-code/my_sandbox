@@ -86,6 +86,14 @@ class DurakGameController:
     def can_player_take_cards(self, player_id: str) -> bool:
         return bool(self.rules.can_take_cards(self.state, TakeCardsAction(player_id)))
 
+    def can_player_pass_throw_in(self, player_id: str) -> bool:
+        return bool(
+            self.state.phase == GamePhase.DEFENDING
+            and player_id != self.state.defender_id
+            and self.state.table.all_defended()
+            and self.get_available_throw_in_card_ids(player_id)
+        )
+
     def get_waiting_player_id(self, player_ids) -> str | None:
         for player_id in player_ids or ():
             if self.get_available_card_ids_for_player(player_id):
@@ -219,13 +227,16 @@ class DurakGameController:
         card_ids = self.state.table.all_card_ids()
         defender.receive_cards(card_ids)
         self.state.table.clear()
-        next_attacker_id = self.state.next_active_player_id(action.player_id)
         self._draw_cards()
-        self.state.attacker_id = next_attacker_id
-        self.state.defender_id = self.state.next_active_player_id(next_attacker_id)
-        self.state.phase = GamePhase.ATTACKING
         self.thrower_ids.clear()
         self._update_finished_players()
+        if self.state.phase != GamePhase.FINISHED:
+            self.state.attacker_id = self.next_active_player_with_cards(action.player_id)
+            self.state.defender_id = self.next_active_player_with_cards(self.state.attacker_id)
+            self.state.phase = GamePhase.ATTACKING
+        else:
+            self.state.attacker_id = None
+            self.state.defender_id = None
         return [GameEvent("cards_taken", {"player_id": action.player_id, "card_ids": card_ids})]
 
     def resolve_successful_defense(self) -> list[GameEvent]:
@@ -234,11 +245,20 @@ class DurakGameController:
         self.state.table.clear()
         previous_defender_id = self.state.defender_id
         self._draw_cards()
-        self.state.attacker_id = previous_defender_id
-        self.state.defender_id = self.state.next_active_player_id(previous_defender_id)
-        self.state.phase = GamePhase.ATTACKING
         self.thrower_ids.clear()
         self._update_finished_players()
+        if self.state.phase != GamePhase.FINISHED:
+            previous_defender = self.state.get_participant(previous_defender_id)
+            self.state.attacker_id = (
+                previous_defender_id
+                if previous_defender.is_active and previous_defender.hand
+                else self.next_active_player_with_cards(previous_defender_id)
+            )
+            self.state.defender_id = self.next_active_player_with_cards(self.state.attacker_id)
+            self.state.phase = GamePhase.ATTACKING
+        else:
+            self.state.attacker_id = None
+            self.state.defender_id = None
         return [GameEvent("cards_discarded", {"card_ids": card_ids})]
 
     def choose_participant_action(self, player_id: str):
@@ -404,6 +424,6 @@ class DurakGameController:
                 active_with_cards.append(player_id)
             else:
                 participant.is_active = False
-        if len(active_with_cards) == 1:
-            self.state.fool_id = active_with_cards[0]
+        if len(active_with_cards) <= 1:
+            self.state.fool_id = active_with_cards[0] if active_with_cards else None
             self.state.phase = GamePhase.FINISHED
