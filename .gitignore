@@ -15,6 +15,12 @@ venv/
 Thumbs.db
 .vscode/
 .idea/
+.codex/downloads/
+
+# Generated local reports
+bug_reports/
+gui_geometry_report.json
+test_report.txt
 
 # Твои личные настройки
 *.log

@@ -1,4 +1,2 @@
-qpygame
+pygame
 Pillow
-ttkbootstrap
-PySide6

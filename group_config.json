@@ -835,36 +835,6 @@
         }
       ]
     },
-    "test_group": {
-      "role": "",
-      "tags": [],
-      "rect": [
-        0,
-        0,
-        0,
-        0
-      ],
-      "hit_rect": [
-        0,
-        0,
-        0,
-        0
-      ],
-      "scale_factor": 1.0,
-      "hide_rect": true,
-      "manifest_targets": {},
-      "layers": [
-        {
-          "name": "graphic_layer_1",
-          "type": "image",
-          "resource_key": "test_dir.settings",
-          "position": [
-            0,
-            0
-          ]
-        }
-      ]
-    },
     "btn_take": {
       "role": "",
       "tags": [],

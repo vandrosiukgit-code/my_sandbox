@@ -220,30 +220,10 @@
       "frame_width": 150,
       "frame_height": 149
     },
-    "main_screen.button": {
-      "path": "main_screen/button.png",
-      "frame_width": 464,
-      "frame_height": 200
-    },
-    "main_screen.buttons.btn_pass": {
-      "path": "main_screen/btn_take.png",
-      "frame_width": 150,
-      "frame_height": 150
-    },
     "main_screen.buttons.btn_take": {
       "path": "main_screen/btn_take.png",
       "frame_width": 150,
       "frame_height": 150
-    },
-    "main_screen.buttons.button_take": {
-      "path": "main_screen/buttons/button_take.png",
-      "frame_width": 1254,
-      "frame_height": 1254
-    },
-    "main_screen.logo": {
-      "path": "main_screen/logo.png",
-      "frame_width": 180,
-      "frame_height": 180
     },
     "main_screen.p_name_bg": {
       "path": "main_screen/p_name_bg.png",
@@ -269,11 +249,6 @@
       "path": "main_screen/tressure_map.png",
       "frame_width": 1280,
       "frame_height": 720
-    },
-    "test_dir.settings": {
-      "path": "main_screen/temp/static/settings.png",
-      "frame_width": 400,
-      "frame_height": 221
     }
   },
   "folders": []

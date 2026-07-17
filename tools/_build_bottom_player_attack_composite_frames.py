@@ -8,8 +8,6 @@ from PIL import Image, ImageOps
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = PROJECT_ROOT / "assets" / "main_screen" / "player_attack"
-FRAMES_DIR = OUTPUT_DIR / "frames"
-ATTACK_REFERENCE_PATH = OUTPUT_DIR / "attack_overlay_reference.png"
 SPRITE_SHEET_PATH = OUTPUT_DIR / "overlay.png"
 
 CANVAS_SIZE = (1024, 768)
@@ -39,13 +37,19 @@ def clean_hidden_rgb(image):
     return cleaned
 
 
-def load_endpoint(path):
+def load_endpoint(source_path=None):
+    path = source_path or SPRITE_SHEET_PATH
     with Image.open(path) as source:
         image = source.convert("RGBA")
-    if image.size != CANVAS_SIZE:
-        raise ValueError(f"Endpoint canvas must be {CANVAS_SIZE}: {path}")
+    if source_path is None:
+        expected_sheet_size = (CANVAS_SIZE[0], CANVAS_SIZE[1] * len(FRAME_OPACITIES))
+        if image.size != expected_sheet_size:
+            raise ValueError(f"Existing sprite sheet must be {expected_sheet_size}: {path}")
+        image = image.crop((0, image.height - CANVAS_SIZE[1], CANVAS_SIZE[0], image.height))
+    elif image.size != CANVAS_SIZE:
+        image = ImageOps.fit(image, CANVAS_SIZE, method=Image.Resampling.LANCZOS)
     if image.getchannel("A").getbbox() is None:
-        raise ValueError(f"Endpoint has no visible pixels: {path}")
+        raise ValueError(f"Endpoint has no visible pixels: {source_path}")
     return clean_hidden_rgb(image)
 
 
@@ -55,31 +59,11 @@ def apply_opacity(base, opacity):
     return clean_hidden_rgb(frame)
 
 
-def export_reference(source_path):
-    with Image.open(source_path) as source:
-        normalized = ImageOps.fit(
-            source.convert("RGBA"),
-            CANVAS_SIZE,
-            method=Image.Resampling.LANCZOS,
-        )
-    normalized = clean_hidden_rgb(normalized)
-    normalized.save(ATTACK_REFERENCE_PATH, optimize=True)
-
-
 def main(source_path=None):
-    if source_path is not None:
-        export_reference(source_path)
-    attack = load_endpoint(ATTACK_REFERENCE_PATH)
+    attack = load_endpoint(source_path)
+    frames = [apply_opacity(attack, opacity) for opacity in FRAME_OPACITIES]
 
-    FRAMES_DIR.mkdir(parents=True, exist_ok=True)
-    for stale_frame_path in FRAMES_DIR.glob("frame_*.png"):
-        stale_frame_path.unlink()
-    frames = []
-    for index, opacity in enumerate(FRAME_OPACITIES):
-        frame = apply_opacity(attack, opacity)
-        frame.save(FRAMES_DIR / f"frame_{index:02d}.png", optimize=True)
-        frames.append(frame)
-
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     sprite_sheet = Image.new("RGBA", (CANVAS_SIZE[0], CANVAS_SIZE[1] * len(frames)), (0, 0, 0, 0))
     for index, frame in enumerate(frames):
         sprite_sheet.alpha_composite(frame, (0, CANVAS_SIZE[1] * index))

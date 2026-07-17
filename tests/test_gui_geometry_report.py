@@ -198,15 +198,15 @@ class GuiGeometryReportTests(unittest.TestCase):
         self.assertEqual(
             bottom_fan,
             {
-                "x": 336,
+                "x": 347,
                 "y": 439,
-                "width": 608,
-                "height": 256,
-                "left": 336,
+                "width": 586,
+                "height": 248,
+                "left": 347,
                 "top": 439,
-                "right": 944,
-                "bottom": 695,
-                "center": [640, 567],
+                "right": 933,
+                "bottom": 687,
+                "center": [640, 563],
             },
         )
 
