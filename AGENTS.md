@@ -78,6 +78,45 @@ py_compile was not completed. Normal sandbox execution of .\.venv\Scripts\python
 cannot access the venv base interpreter outside the workspace: <exact error>.
 ```
 
+## Dependency security protocol
+
+When downloading or installing a new package, theme, tool, wheel, archive, or
+other external artifact for this project:
+
+1. Prefer installation only into the project `.venv`, never globally.
+2. If the host machine has ESET command-line scanner available at:
+
+```text
+C:\Program Files\ESET\ESET Security\ecls.exe
+```
+
+scan the downloaded or installed artifact before integrating it into the
+project workflow.
+3. Prefer scanning the exact downloaded file or the exact installed package
+directory in `.venv\Lib\site-packages`, not broad unrelated paths.
+4. Treat the scan as a practical safety check, not as a cryptographic or
+absolute guarantee of safety.
+5. If ESET CLI is unavailable, fails to start, or cannot access the target,
+report that clearly instead of claiming the artifact was scanned.
+
+Preferred Windows PowerShell example:
+
+```powershell
+& "C:\Program Files\ESET\ESET Security\ecls.exe" /log-console /no-log-all <path>
+```
+
+Validation wording for dependency scans:
+
+```text
+ESET CLI scan completed for <path>; no threats found.
+```
+
+or, if it could not be completed:
+
+```text
+ESET CLI scan was not completed for <path>: <exact error>.
+```
+
 ---
 
 ## 1. Project role

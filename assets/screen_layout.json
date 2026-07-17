@@ -1,5 +1,25 @@
 {
   "screens": {
+    "test_screen": {
+      "root_frame_id": "test_root_frame",
+      "size": [
+        320,
+        320
+      ],
+      "frames": {
+        "test_root_frame": {
+          "frame_id": "test_root_frame",
+          "parent_frame_id": null,
+          "rect": [
+            0,
+            0,
+            320,
+            320
+          ]
+        }
+      },
+      "groups": {}
+    },
     "table_screen": {
       "groups": {
         "table_group": {
