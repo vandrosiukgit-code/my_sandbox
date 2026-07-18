@@ -1,6 +1,3 @@
-import json
-import os
-
 import pygame
 
 from activities import (
@@ -26,16 +23,9 @@ from activities import (
     VisibleCardsHandDecorator,
 )
 from core.resource import ResourceManager
-from game_screen import debug_overlay
 from game_screen.events import ActivityResult, ControllerResponse
 from game_screen.game_screen import GameScreen
 import screen_layout_config
-
-
-PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FIXTURE_PATH = os.path.join(PROJECT_DIR, "fixtures", "table_screen_fixture.json")
-PLAY_AREA_FIXTURE_PATH = os.path.join(PROJECT_DIR, "fixtures", "play_area_fixture.json")
-DEBUG_OVERLAY_FIXTURE_PATH = os.path.join(PROJECT_DIR, "fixtures", "debug_overlay_fixture.json")
 
 
 class TableScreen(GameScreen):
@@ -248,10 +238,6 @@ class TableScreen(GameScreen):
         for activity_id, activity in activity_map.items():
             self.register_named_activity(activity_id, activity)
             self.add_activity(activity)
-        self.fixture_paths = (FIXTURE_PATH, PLAY_AREA_FIXTURE_PATH, DEBUG_OVERLAY_FIXTURE_PATH)
-        self._fixture_mtimes = {}
-        self._fixture_check_elapsed = 0.0
-        self._fixture_check_interval = 0.2
         self.controller_game_started = False
         self.controller_owned_visual_state = False
         self._bottom_player_hand_fan_area_signature = None
@@ -259,7 +245,6 @@ class TableScreen(GameScreen):
         self._bottom_player_hand_layout_release_pending = False
         self._bottom_player_hand_turn_rebuild_pending = False
         self._activity_result_watchers = []
-        self.reload_fixture_if_changed(force=True)
 
     def start(self):
         super().start()
@@ -498,13 +483,9 @@ class TableScreen(GameScreen):
             if not frame_id or not self.has_screen_frame(frame_id):
                 continue
             position = placement.get("position", (0, 0))
-            self.put_configured_group(group_id, frame_id, position=self.normalize_fixture_position(position))
+            self.put_configured_group(group_id, frame_id, position=self.normalize_position(position))
 
     def update(self, dt):
-        self._fixture_check_elapsed += dt
-        if self._fixture_check_elapsed >= self._fixture_check_interval:
-            self._fixture_check_elapsed = 0.0
-            self.reload_fixture_if_changed()
         self.configure_bottom_player_hand_fan_area()
         super().update(dt)
         self.rebuild_bottom_player_hand_if_ready()
@@ -1345,177 +1326,8 @@ class TableScreen(GameScreen):
         )
         self.dispatch_visual_commands(commands)
 
-    def reload_fixture_if_changed(self, force=False):
-        """Hot reload dev fixture and apply it to screen activities."""
-        if self.controller_owned_visual_state and not force:
-            return
-        changed_paths = []
-        existing_paths = []
-        for fixture_path in self.fixture_paths:
-            if not os.path.exists(fixture_path):
-                continue
-
-            existing_paths.append(fixture_path)
-            mtime = os.path.getmtime(fixture_path)
-            if force or self._fixture_mtimes.get(fixture_path) != mtime:
-                changed_paths.append(fixture_path)
-
-        if not changed_paths:
-            return
-
-        for fixture_path in existing_paths:
-            fixture = self.load_fixture_file(fixture_path)
-            if fixture is None:
-                continue
-
-            self._fixture_mtimes[fixture_path] = os.path.getmtime(fixture_path)
-            self.apply_fixture(fixture)
-            print(f"Reloaded table fixture: {fixture_path}")
-
     @staticmethod
-    def load_fixture_file(fixture_path):
-        try:
-            with open(fixture_path, "r", encoding="utf-8") as fixture_file:
-                return json.load(fixture_file)
-        except json.JSONDecodeError:
-            return None
-
-    def apply_fixture(self, fixture):
-        """Apply dev fixture values that imitate controller visual commands."""
-        if "debug" in fixture:
-            debug_overlay.configure(fixture["debug"])
-
-        if "card_counts" in fixture:
-            self.apply_card_counts_fixture(fixture["card_counts"])
-
-        if "gui" in fixture:
-            self.apply_gui_fixture_tree(fixture["gui"])
-
-        frames = fixture.get("frames", {})
-        for frame_id, frame_fixture in frames.items():
-            self.apply_frame_fixture(frame_id, frame_fixture)
-
-        groups = fixture.get("groups", {})
-        for group_id, group_fixture in groups.items():
-            self.apply_group_fixture(group_id, group_fixture)
-
-        activities = fixture.get("activities", {})
-        for activity_id, activity in self.iter_named_activities():
-            activity.apply_fixture(activities.get(activity_id, {}))
-
-    def apply_card_counts_fixture(self, card_counts):
-        """Apply the compact table fixture: only visible hand sizes stay public."""
-        if not isinstance(card_counts, dict):
-            return
-
-        for activity_id, card_count in card_counts.items():
-            activity = self.get_named_activity(activity_id)
-            if activity is None:
-                continue
-
-            activity_fixture = {"card_count": card_count}
-            if activity_id == "bottom_player_hand":
-                activity_fixture["cards_from_manifest"] = True
-
-            activity.apply_fixture(activity_fixture)
-
-    def apply_gui_fixture_tree(self, tree):
-        """Apply a fixture shaped like the GUI frame hierarchy."""
-        if not isinstance(tree, dict):
-            return
-
-        if "frame_id" in tree:
-            self.apply_gui_fixture_node(tree["frame_id"], tree)
-            return
-
-        for frame_id, node in tree.items():
-            self.apply_gui_fixture_node(frame_id, node)
-
-    def apply_gui_fixture_node(self, frame_id, node):
-        """Apply one frame node, then its owned groups, activity, and children."""
-        if not isinstance(node, dict):
-            return
-
-        self.apply_frame_fixture(frame_id, node)
-
-        for group_id, group_fixture in node.get("groups", {}).items():
-            self.apply_group_fixture(group_id, group_fixture)
-
-        for child_frame_id, child_node in node.get("children", {}).items():
-            self.apply_gui_fixture_node(child_frame_id, child_node)
-
-        activity_fixture = node.get("activity")
-        activity = self.get_named_activity(frame_id)
-        if activity_fixture is not None and activity is not None:
-            activity.apply_fixture(activity_fixture)
-
-        for activity_id, fixture in node.get("activities", {}).items():
-            activity = self.get_named_activity(activity_id)
-            if activity is not None:
-                activity.apply_fixture(fixture)
-
-    def apply_frame_fixture(self, frame_id, fixture):
-        """Apply dev fixture values for a Frame and its descendants."""
-        if not fixture or not self.has_screen_frame(frame_id):
-            return
-
-        frame = self.get_screen_frame(frame_id)
-        if "scale_factor" in fixture:
-            frame.set_scale_factor(fixture["scale_factor"])
-        elif "scale" in fixture:
-            frame.set_scale_factor(fixture["scale"])
-
-        local_position = self.get_frame_fixture_local_position(frame, fixture)
-        if local_position is not None:
-            frame.set_local_position(*local_position)
-
-    @staticmethod
-    def get_frame_fixture_local_position(frame, fixture):
-        """Resolve fixture position to local coordinates inside the parent frame."""
-        if "screen_position" in fixture:
-            if frame.parent_frame is None:
-                return TableScreen.normalize_fixture_position(fixture["screen_position"])
-            return frame.parent_frame.to_local(TableScreen.normalize_fixture_position(fixture["screen_position"]))
-        for key in ("position", "local_position"):
-            if key in fixture:
-                return TableScreen.normalize_fixture_position(fixture[key])
-        return None
-
-    def apply_group_fixture(self, group_id, fixture):
-        """Apply dev fixture values for an active configured Group."""
-        if not fixture or self.group_store is None:
-            return
-        if not self.group_store.has(group_id):
-            return
-
-        group = self.group_store.get(group_id)
-        if "scale_factor" in fixture:
-            group.set_scale_factor(fixture["scale_factor"])
-        elif "scale" in fixture:
-            group.set_scale_factor(fixture["scale"])
-
-        try:
-            frame = self.find_frame_for_group(group_id)
-        except KeyError:
-            return
-        local_position = self.get_group_fixture_local_position(frame, fixture)
-        if local_position is None:
-            return
-
-        frame.place_group_local(group, local_position)
-
-    @staticmethod
-    def get_group_fixture_local_position(frame, fixture):
-        """Resolve fixture position to local coordinates inside the current frame."""
-        if "screen_position" in fixture:
-            return frame.to_local(TableScreen.normalize_fixture_position(fixture["screen_position"]))
-        for key in ("position", "local_position"):
-            if key in fixture:
-                return TableScreen.normalize_fixture_position(fixture[key])
-        return None
-
-    @staticmethod
-    def normalize_fixture_position(position):
+    def normalize_position(position):
         if isinstance(position, dict):
             return (
                 int(round(float(position.get("x", 0)))),

@@ -32,11 +32,11 @@ def build_app_context():
     Здесь создаются объекты верхнего уровня, которые должны быть общими для
     runtime:
 
-    - GameController хранит fixture-состояние;
+    - GameController хранит игровое состояние;
     - GroupStore хранит созданные Group;
     - ResourceManager передается в store как источник кадров.
     """
-    game_controller = GameController(GameController.create_fixture_state())
+    game_controller = GameController()
     group_store = GroupStore(resource_manager=ResourceManager)
 
     return {

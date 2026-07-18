@@ -11,7 +11,7 @@ from base import BaseGameController
 from core.durak import AttackAction, BaseHumanPlayer, Card, DefendAction, DurakGameController, Rank, RuleBasedBotPlayer, Suit
 from core.durak.actions import TakeCardsAction, ThrowInAction
 from core.durak.state import GamePhase
-from core.game_state import CardState, GameState
+from core.game_state import GameState
 from game_screen.events import ControllerResponse, VisualCommand
 
 
@@ -95,9 +95,6 @@ class GameController(BaseGameController):
             ),
             state_view={"events": result.events, **self.get_state_view(result)},
         )
-
-    def load_fixture(self, state):
-        self.state = state
 
     def on_group_clicked(self, group_id):
         self.clicked_group_ids.append(group_id)
@@ -625,16 +622,3 @@ class GameController(BaseGameController):
         card = cards.pop(current_index)
         cards.insert(index, card)
         return cards
-
-    @staticmethod
-    def create_fixture_state():
-        return GameState.from_cards(
-            [
-                CardState("card_6_clubs", "6", "clubs", "bottom_hand"),
-                CardState("card_7_clubs", "7", "clubs", "bottom_hand"),
-                CardState("card_8_clubs", "8", "clubs", "bottom_hand"),
-                CardState("card_9_clubs", "9", "clubs", "bottom_hand"),
-                CardState("card_10_clubs", "10", "clubs", "bottom_hand"),
-                CardState("card_j_clubs", "j", "clubs", "bottom_hand"),
-            ]
-        )
